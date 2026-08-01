@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/skill-manifest.v0.1.schema.json",
+  "manifest_schema_version": "0.1.0",
+  "name": "analyze-action-request",
+  "version": "0.1.0",
+  "status": "SPECIFICATION_ONLY",
+  "entrypoint": "SKILL.md",
+  "compatibility": {
+    "agentteams_release": "v1.2.0",
+    "agentteams_commit": "793db242257a569d911b1aa59c1cd554af78511f"
+  },
+  "inputs": ["untrusted natural-language request", "schemas/action-request.v0.1.schema.json"],
+  "outputs": ["schemas/action-request.v0.1.schema.json"],
+  "mcp_tools": ["submit_action_request", "get_action_state"],
+  "authority": {"may_propose": true, "may_decide": false, "may_approve": false, "may_execute": false},
+  "examples": ["examples/example.json"],
+  "tests": ["../../tests/test_contracts.py", "../../tests/test_boundaries.py"]
+}

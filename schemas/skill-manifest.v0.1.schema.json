@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/skill-manifest.v0.1.schema.json",
+  "title": "TITMAS reusable Skill manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_schema_version",
+    "name",
+    "version",
+    "status",
+    "entrypoint",
+    "compatibility",
+    "inputs",
+    "outputs",
+    "mcp_tools",
+    "authority",
+    "examples",
+    "tests"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "manifest_schema_version": {"const": "0.1.0"},
+    "name": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["SPECIFICATION_ONLY", "EXPERIMENTAL", "STABLE", "RETIRED"]},
+    "entrypoint": {"const": "SKILL.md"},
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentteams_release", "agentteams_commit"],
+      "properties": {
+        "agentteams_release": {"const": "v1.2.0"},
+        "agentteams_commit": {"const": "793db242257a569d911b1aa59c1cd554af78511f"}
+      }
+    },
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "outputs": {"type": "array", "items": {"type": "string"}},
+    "mcp_tools": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["may_propose", "may_decide", "may_approve", "may_execute"],
+      "properties": {
+        "may_propose": {"type": "boolean"},
+        "may_decide": {"const": false},
+        "may_approve": {"const": false},
+        "may_execute": {"const": false}
+      }
+    },
+    "examples": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "tests": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

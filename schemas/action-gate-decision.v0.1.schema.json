@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/action-gate-decision.v0.1.schema.json",
+  "title": "Action Gate decision v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "engine_version",
+    "decision_id",
+    "request_id",
+    "request_binding",
+    "outcome",
+    "reason_codes",
+    "may_execute",
+    "input_sha256",
+    "decided_at",
+    "expires_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "engine_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "decision_id": {"type": "string", "pattern": "^decision-[a-f0-9]{16,64}$"},
+    "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+    "request_binding": {"$ref": "#/$defs/requestBinding"},
+    "outcome": {"enum": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"]},
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "INPUT_INVALID",
+          "INPUT_MISMATCH",
+          "POLICY_DENY",
+          "EVIDENCE_MISSING",
+          "EVIDENCE_INVALID",
+          "EVIDENCE_TAMPERED",
+          "APPROVAL_INVALID",
+          "HUMAN_APPROVAL_REQUIRED",
+          "ALL_BOUNDARIES_SATISFIED",
+          "UNHANDLED_STATE"
+        ]
+      }
+    },
+    "may_execute": {"type": "boolean"},
+    "input_sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_request", "policy_evaluation", "evidence_verification_result", "human_approval"],
+      "properties": {
+        "action_request": {"$ref": "#/$defs/sha256"},
+        "policy_evaluation": {"$ref": "#/$defs/sha256"},
+        "evidence_verification_result": {"$ref": "#/$defs/sha256"},
+        "human_approval": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        }
+      }
+    },
+    "decided_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "requestBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "provider", "repository", "resource_ref", "parameters_sha256"],
+      "properties": {
+        "action": {"type": "string"},
+        "provider": {"type": "string"},
+        "repository": {"type": "string"},
+        "resource_ref": {"type": "string"},
+        "parameters_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"const": "ALLOW"}}},
+      "then": {"properties": {"may_execute": {"const": true}}},
+      "else": {"properties": {"may_execute": {"const": false}}}
+    }
+  ]
+}

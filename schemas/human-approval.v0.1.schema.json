@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/human-approval.v0.1.schema.json",
+  "title": "Scoped human approval v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "approval_id",
+    "request_id",
+    "request_binding",
+    "policy_id",
+    "policy_version",
+    "status",
+    "approved_by",
+    "decided_at",
+    "expires_at",
+    "record_sha256",
+    "signature_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "approval_id": {"type": "string", "pattern": "^approval-[a-z0-9-]{8,64}$"},
+    "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+    "request_binding": {"$ref": "#/$defs/requestBinding"},
+    "policy_id": {"type": "string", "minLength": 3},
+    "policy_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["GRANTED", "DENIED", "REVOKED"]},
+    "approved_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "identity_provider", "human_verified"],
+      "properties": {
+        "subject": {"type": "string", "minLength": 1},
+        "identity_provider": {"type": "string", "minLength": 1},
+        "human_verified": {"const": true}
+      }
+    },
+    "decided_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "record_sha256": {"$ref": "#/$defs/sha256"},
+    "signature_ref": {"type": "string", "minLength": 8}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "requestBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "provider", "repository", "resource_ref", "parameters_sha256"],
+      "properties": {
+        "action": {"type": "string"},
+        "provider": {"type": "string"},
+        "repository": {"type": "string"},
+        "resource_ref": {"type": "string"},
+        "parameters_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

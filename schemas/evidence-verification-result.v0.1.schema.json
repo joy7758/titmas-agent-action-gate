@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/evidence-verification-result.v0.1.schema.json",
+  "title": "Evidence verification result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "request_binding",
+    "verifier",
+    "status",
+    "bundle_sha256",
+    "evidence_types",
+    "checks",
+    "verified_at"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+    "request_binding": {"$ref": "#/$defs/requestBinding"},
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "distribution_sha256"],
+      "properties": {
+        "name": {"const": "agent-evidence"},
+        "version": {"const": "0.6.0"},
+        "distribution_sha256": {"const": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e"}
+      }
+    },
+    "status": {"enum": ["VALID", "MISSING", "INVALID", "TAMPERED"]},
+    "bundle_sha256": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "evidence_types": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"}
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "passed"],
+        "properties": {
+          "check_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"},
+          "passed": {"type": "boolean"}
+        }
+      }
+    },
+    "verified_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "requestBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "provider", "repository", "resource_ref", "parameters_sha256"],
+      "properties": {
+        "action": {"type": "string"},
+        "provider": {"type": "string"},
+        "repository": {"type": "string"},
+        "resource_ref": {"type": "string"},
+        "parameters_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "MISSING"}}},
+      "then": {"properties": {"bundle_sha256": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"status": {"enum": ["VALID", "INVALID", "TAMPERED"]}}},
+      "then": {"properties": {"bundle_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}
+    }
+  ]
+}

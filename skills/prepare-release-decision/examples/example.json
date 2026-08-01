@@ -1,0 +1,10 @@
+{
+  "example_version": "0.1.0",
+  "input": {"completed_action": "github.pull_request.create", "proposed_next_action": "github.pull_request.merge"},
+  "expected_behavior": [
+    "CREATE_NEW_REQUEST",
+    "VERIFY_POST_EXECUTION_EVIDENCE",
+    "REQUIRE_SEPARATE_GATE_DECISION",
+    "DO_NOT_MERGE_OR_RELEASE"
+  ]
+}

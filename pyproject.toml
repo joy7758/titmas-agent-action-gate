@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "titmas-agent-action-gate"
+version = "0.1.0a0"
+description = "Specification-first deterministic action gate for AgentTeams workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{name = "zhangbin"}]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4.25,<5",
+  "PyYAML>=6.0,<7"
+]
+evidence = [
+  "agent-evidence[mcp]==0.6.0"
+]
+
+[tool.setuptools]
+packages = []
+
+[tool.unittest]
+start-directory = "tests"

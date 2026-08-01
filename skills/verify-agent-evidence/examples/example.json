@@ -1,0 +1,9 @@
+{
+  "example_version": "0.1.0",
+  "input": {"request_id": "aar-example-valid-001", "bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+  "expected_behavior": [
+    "INVOKE_PINNED_AGENT_EVIDENCE_0_6_0",
+    "RETURN_RECEIPT_UNCHANGED",
+    "DO_NOT_DECIDE_ACTION"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "grant_version": "1.0.0",
+  "grant_id": "TITMAS-AAG-DBA-MANAGEMENT-GRANT-20260802-001",
+  "issued_at": "2026-08-02T00:38:20+08:00",
+  "issuer_ref": "zhangbin",
+  "grantee_ref": "DBA_PROGRAM_GOVERNANCE_COCKPIT",
+  "status": "AUTHORIZED_POLICY_SCOPE",
+  "purpose": "Allow the DBA cockpit to govern alignment and maintain auditable project-management surfaces for this project.",
+  "allowed": [
+    "READ_PROJECT_CONTENT",
+    "UPDATE_GOVERNANCE_METADATA",
+    "UPDATE_ARCHITECTURE_ALIGNMENT",
+    "UPDATE_AGENT_READABLE_DISCOVERY_SURFACES",
+    "MAINTAIN_STATUS_AND_DEPENDENCY_PROJECTIONS",
+    "REQUEST_AND_RECORD_DBA_GATES",
+    "PROPOSE_BOUNDED_CHANGES_USING_BRANCH_COMMIT_PUSH_AND_DRAFT_PR"
+  ],
+  "conditions": [
+    "ACTOR_IDENTITY_MUST_BE_TRACEABLE_TO_A_HUMAN_OR_AUTHORIZED_AGENT_SESSION",
+    "CHANGES_MUST_PRESERVE_CHILD_REPOSITORY_CANONICAL_IMPLEMENTATION_TRUTH",
+    "MATERIAL_CHANGES_REQUIRE_DIFF_TESTS_AND_ROLLBACK_PATH",
+    "CONFLICT_OR_UNKNOWN_AUTHORITY_FAILS_CLOSED",
+    "PUSH_AND_DRAFT_PR_REQUIRE_A_CONFIGURED_REMOTE_AND_VALID_CREDENTIALS"
+  ],
+  "denied": [
+    "MERGE_TO_PROTECTED_OR_DEFAULT_BRANCH",
+    "FORCE_PUSH",
+    "TAG_OR_RELEASE",
+    "DEPLOY_OR_RESTART_SERVICE",
+    "MODIFY_SECRETS_OR_CREDENTIALS",
+    "GRANT_RUNTIME_PERMISSION",
+    "EXECUTE_EXTERNAL_OR_IRREVERSIBLE_ACTION",
+    "SUBMIT_TO_COMPETITION",
+    "PAYMENT_OR_CONTRACT_ACTION",
+    "CLAIM_ADOPTION_CERTIFICATION_PRODUCTION_OR_TRUTH",
+    "DESTRUCTIVE_DELETION"
+  ],
+  "technical_effect": {
+    "repository_acl_changed": false,
+    "github_principal_mapped": false,
+    "runtime_permission_created": false,
+    "reason": "DBA is a governance role, not a GitHub account or runtime identity. This file is the canonical policy grant until a separately verified technical mapping exists."
+  },
+  "revocation": {
+    "revocable": true,
+    "revoked": false,
+    "authority_ref": "zhangbin"
+  }
+}

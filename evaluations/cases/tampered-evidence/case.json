@@ -1,0 +1,66 @@
+{
+  "case_version": "0.1.0",
+  "case_id": "tampered-evidence",
+  "description": "A PR-create request with a bundle whose content digest check fails.",
+  "action_request": {
+    "schema_version": "0.1.0",
+    "request_id": "aar-tampered-evidence-001",
+    "created_at": "2026-08-02T01:20:00+08:00",
+    "requested_by": {"agent_id": "request-analyst", "team_id": "titmas-action-gate"},
+    "action": "github.pull_request.create",
+    "target": {"provider": "github", "repository": "joy7758/action-gate-demo", "resource_ref": "refs/heads/tampered-demo"},
+    "parameters": {"base": "main", "head": "tampered-demo", "title": "Tampered fixture"},
+    "parameters_sha256": "b13d105cfe83b9c6214a4be6f0c5ca52b6dc13bb9ca8318e30da31d726e876ad",
+    "evidence_requirements": ["SOURCE_PIN", "DIFF", "TEST_RESULT"],
+    "uncertainty": [],
+    "idempotency_key": "tampered-evidence-001"
+  },
+  "policy_evaluation": {
+    "schema_version": "0.1.0",
+    "policy_id": "github-demo-policy",
+    "policy_version": "0.1.0",
+    "ruleset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "request_id": "aar-tampered-evidence-001",
+    "request_binding": {
+      "action": "github.pull_request.create",
+      "provider": "github",
+      "repository": "joy7758/action-gate-demo",
+      "resource_ref": "refs/heads/tampered-demo",
+      "parameters_sha256": "b13d105cfe83b9c6214a4be6f0c5ca52b6dc13bb9ca8318e30da31d726e876ad"
+    },
+    "effect": "ALLOW_WITHOUT_APPROVAL",
+    "risk_class": "MEDIUM",
+    "required_evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT"],
+    "evaluated_at": "2026-08-02T01:21:00+08:00"
+  },
+  "evidence_verification_result": {
+    "schema_version": "0.1.0",
+    "request_id": "aar-tampered-evidence-001",
+    "request_binding": {
+      "action": "github.pull_request.create",
+      "provider": "github",
+      "repository": "joy7758/action-gate-demo",
+      "resource_ref": "refs/heads/tampered-demo",
+      "parameters_sha256": "b13d105cfe83b9c6214a4be6f0c5ca52b6dc13bb9ca8318e30da31d726e876ad"
+    },
+    "verifier": {
+      "name": "agent-evidence",
+      "version": "0.6.0",
+      "distribution_sha256": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e"
+    },
+    "status": "TAMPERED",
+    "bundle_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT"],
+    "checks": [
+      {"check_id": "BUNDLE_DIGEST", "passed": false},
+      {"check_id": "REQUIRED_RECORDS", "passed": true}
+    ],
+    "verified_at": "2026-08-02T01:22:00+08:00"
+  },
+  "human_approval": null,
+  "expected_decision": {
+    "outcome": "BLOCK",
+    "reason_codes": ["EVIDENCE_TAMPERED"],
+    "may_execute": false
+  }
+}

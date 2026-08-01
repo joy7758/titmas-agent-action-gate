@@ -1,0 +1,67 @@
+{
+  "$schema": "./schemas/agent-index.schema.json",
+  "format_version": "1.1.0",
+  "canonical_agent_entry": true,
+  "project_id": "TITMAS-AGENT-ACTION-GATE",
+  "canonical_name": "TITMAS Agent Action Gate",
+  "canonical_name_zh": "TITMAS 智能体行动闸门",
+  "repository": "https://github.com/joy7758/titmas-agent-action-gate",
+  "purpose": "A deterministic evidence and authorization boundary for agent-proposed external actions orchestrated through AgentTeams.",
+  "competition_context": {
+    "name": "GOAI 2026 Agent Infra",
+    "status": "COMPETITION_CANDIDATE_REPOSITORY_NOT_SUBMITTED",
+    "official_affiliation_claimed": false,
+    "submission_claimed": false
+  },
+  "maturity": "M1_SPECIFICATION_BASELINE",
+  "implementation_status": "NOT_STARTED",
+  "runtime_status": "NOT_CREATED",
+  "portfolio_status": "DBA_ADMISSION_PENDING",
+  "decision_outcomes": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"],
+  "read_order": [
+    "governance/upstream/DBA-OPEN-INFRASTRUCTURE-STRATEGY-CONSTITUTION-v0.2.md",
+    "governance/dba-source-lock.json",
+    "governance/upstream-sources.json",
+    "governance/project-declaration.json",
+    "governance/dba-management-grant.json",
+    "governance/agent-recommendation-gate.json",
+    "architecture/README.md",
+    "agents/registry.json",
+    "specs/action-gate-decision-v0.1.md",
+    "docs/THREAT-MODEL-v0.1.md",
+    "docs/EXECUTION-ROADMAP.md"
+  ],
+  "machine_surfaces": {
+    "project_declaration": "governance/project-declaration.json",
+    "source_pins": "governance/upstream-sources.json",
+    "agent_registry": "agents/registry.json",
+    "agentteams_template": "deploy/agentteams/team.v1.2.0.yaml",
+    "action_request_schema": "schemas/action-request.v0.1.schema.json",
+    "evidence_result_schema": "schemas/evidence-verification-result.v0.1.schema.json",
+    "approval_schema": "schemas/human-approval.v0.1.schema.json",
+    "decision_schema": "schemas/action-gate-decision.v0.1.schema.json",
+    "skill_manifest_schema": "schemas/skill-manifest.v0.1.schema.json",
+    "mcp_manifest": "mcp/server-manifest.v0.1.json",
+    "evaluation_registry": "evaluations/case-registry.json",
+    "validator": "scripts/validate_milestone.py"
+  },
+  "when_to_use": [
+    "an AgentTeams workflow proposes an external or high-impact action",
+    "portable evidence must be verified before a policy decision",
+    "a release decision requires an explicit human approval boundary"
+  ],
+  "when_not_to_use": [
+    "as a general agent framework or central intelligent controller",
+    "as certification, compliance, or production-readiness proof",
+    "to let an agent self-authorize or bypass provider permissions",
+    "to claim a competition submission"
+  ],
+  "authority_boundaries": [
+    "AGENT_ANALYSIS_NE_AUTHORIZATION",
+    "EVIDENCE_VERIFICATION_NE_ACTION_AUTHORIZATION",
+    "GATE_ALLOW_NE_EXECUTION_SUCCESS",
+    "MCP_TOOL_AVAILABILITY_NE_PERMISSION",
+    "GOVERNANCE_MANAGEMENT_NE_RUNTIME_CONTROL",
+    "PROJECT_DECLARATION_NE_PORTFOLIO_ADMISSION"
+  ]
+}

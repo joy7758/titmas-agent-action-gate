@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/titmas-agent-action-gate/agent-index.schema.json",
+  "title": "TITMAS Agent Action Gate agent entry",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "format_version",
+    "canonical_agent_entry",
+    "project_id",
+    "purpose",
+    "maturity",
+    "implementation_status",
+    "portfolio_status",
+    "read_order",
+    "machine_surfaces",
+    "authority_boundaries"
+  ],
+  "properties": {
+    "canonical_agent_entry": {"const": true},
+    "project_id": {"const": "TITMAS-AGENT-ACTION-GATE"},
+    "read_order": {
+      "type": "array",
+      "minItems": 5,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "example_version": "0.1.0",
+  "input": {"request_id": "aar-example-valid-001", "evidence_status": "VALID", "policy_effect": "ALLOW_WITHOUT_APPROVAL"},
+  "expected_behavior": ["CALL_DETERMINISTIC_GATE", "RELAY_ALLOW_WITHOUT_REINTERPRETATION", "DO_NOT_EXECUTE"]
+}

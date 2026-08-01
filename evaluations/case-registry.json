@@ -1,0 +1,10 @@
+{
+  "registry_version": "0.1.0",
+  "status": "CONTRACT_FIXTURES_NOT_RUNTIME_RESULTS",
+  "cases": [
+    {"id": "valid-execution", "path": "cases/valid-execution/case.json", "expected_outcome": "ALLOW"},
+    {"id": "missing-evidence", "path": "cases/missing-evidence/case.json", "expected_outcome": "BLOCK"},
+    {"id": "tampered-evidence", "path": "cases/tampered-evidence/case.json", "expected_outcome": "BLOCK"},
+    {"id": "high-risk-approval", "path": "cases/high-risk-approval/case.json", "expected_outcome": "REQUIRE_APPROVAL"}
+  ]
+}

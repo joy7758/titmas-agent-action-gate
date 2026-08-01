@@ -1,0 +1,21 @@
+{
+  "lock_version": "1.0.0",
+  "fetched_at": "2026-08-02T00:38:20+08:00",
+  "source": {
+    "repository": "https://github.com/joy7758/digital-biosphere-architecture-specification.git",
+    "branch": "main",
+    "commit": "269ab5899047503557f957ba0f7abbd61d8b18d3",
+    "path": "digital-biosphere-architecture/architecture/open-infrastructure-strategy-constitution.md",
+    "git_blob": "e5b0cc29d3c707a917feb0d9b55e86c5cff871fc",
+    "sha256": "ca34af2be5152e395454a83a0e9d2f085861497b601e980adee39e0a36113954",
+    "byte_count": 14713
+  },
+  "snapshot": {
+    "path": "governance/upstream/DBA-OPEN-INFRASTRUCTURE-STRATEGY-CONSTITUTION-v0.2.md",
+    "verbatim": true,
+    "normative_authority": false,
+    "second_constitution_created": false
+  },
+  "refresh_policy": "FETCH_ORIGIN_MAIN_THEN_REVIEW_DIFF_AND_UPDATE_LOCK",
+  "drift_policy": "FAIL_CLOSED_ON_HASH_OR_SOURCE_MISMATCH"
+}

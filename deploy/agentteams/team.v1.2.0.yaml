@@ -1,0 +1,134 @@
+apiVersion: agentteams.io/v1beta1
+kind: Manager
+metadata:
+  name: titmas-action-gate-manager
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  soul: Route tasks transparently. Never create or override an Action Gate decision.
+  agents: Preserve request IDs and handoffs. Stop on missing authority or gate errors.
+---
+apiVersion: agentteams.io/v1beta1
+kind: Human
+metadata:
+  name: titmas-action-gate-reviewer
+spec:
+  displayName: CONFIGURE_VERIFIED_HUMAN_DISPLAY_NAME
+  username: CONFIGURE_MATRIX_LOCALPART
+  permissionLevel: 2
+  accessibleTeams:
+    - titmas-action-gate
+  identitySource:
+    issuer: CONFIGURE_IDENTITY_PROVIDER
+    subject: CONFIGURE_VERIFIED_SUBJECT
+  note: Collaboration identity only; scoped approvals are separate signed records.
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: workflow-lead
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Transparent coordinator; routing is not authorization.
+  soul: Decompose and route. Never decide, approve, execute, merge, tag, or release.
+  agents: Read AGENTS.md and the agent registry. Preserve correlation and decision boundaries.
+  skills:
+    - use-action-gate
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: request-analyst
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Request normalizer and uncertainty reporter.
+  soul: Convert proposals into explicit schema-valid requests without granting permission.
+  agents: Do not infer credentials, approval, policy outcome, or provider success.
+  skills:
+    - analyze-action-request
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: evidence-verifier
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Operator of the pinned canonical agent-evidence adapter.
+  soul: Return verifier receipts without rewriting failures or making policy decisions.
+  agents: Verification is evidence input, not authorization, truth, certification, or compliance.
+  skills:
+    - verify-agent-evidence
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: github-operator
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Exact-action operator with no milestone-1 execution authority.
+  soul: Stop unless a future adapter verifies a live exact ALLOW and provider ACL.
+  agents: Never broaden target or parameters; never infer approval from chat.
+  skills:
+    - execute-github-action
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: release-steward
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Post-execution evidence and release-decision requester.
+  soul: Assemble evidence and request a new gate decision; never merge, tag, or release.
+  agents: Provider success is not release authorization or competition submission.
+  skills:
+    - prepare-release-decision
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Team
+metadata:
+  name: titmas-action-gate
+spec:
+  description: Evidence-verified deterministic external-action boundary demo.
+  teamName: titmas-action-gate
+  workerMembers:
+    - name: workflow-lead
+      role: team_leader
+    - name: request-analyst
+      role: worker
+    - name: evidence-verifier
+      role: worker
+    - name: github-operator
+      role: worker
+    - name: release-steward
+      role: worker
+  peerMentions: true
+  admin:
+    name: titmas-action-gate-reviewer
+  humanMembers:
+    - name: titmas-action-gate-reviewer
+      role: coordinator

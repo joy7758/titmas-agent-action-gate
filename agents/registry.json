@@ -1,0 +1,66 @@
+{
+  "registry_version": "0.1.0",
+  "status": "SPECIFICATION_ONLY",
+  "orchestration": {
+    "product": "AgentTeams",
+    "release": "v1.2.0",
+    "commit": "793db242257a569d911b1aa59c1cd554af78511f"
+  },
+  "team_id": "titmas-action-gate",
+  "agents": [
+    {
+      "id": "workflow-lead",
+      "agentteams_role": "team_leader",
+      "identity": "Transparent coordinator that routes work and preserves handoffs.",
+      "responsibilities": ["DECOMPOSE_REQUEST", "ROUTE_SPECIALISTS", "PRESERVE_CORRELATION", "REPORT_UNCERTAINTY"],
+      "skills": ["use-action-gate"],
+      "mcp_tools": ["submit_action_request", "evaluate_action_gate", "get_action_state"],
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
+    },
+    {
+      "id": "request-analyst",
+      "agentteams_role": "worker",
+      "identity": "Normalizer that turns ambiguous proposals into explicit requests and uncertainty records.",
+      "responsibilities": ["NORMALIZE_REQUEST", "IDENTIFY_TARGET", "SURFACE_UNCERTAINTY", "PROPOSE_EVIDENCE_REQUIREMENTS"],
+      "skills": ["analyze-action-request"],
+      "mcp_tools": ["submit_action_request", "get_action_state"],
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
+    },
+    {
+      "id": "evidence-verifier",
+      "agentteams_role": "worker",
+      "identity": "Adapter operator for the pinned canonical agent-evidence verifier.",
+      "responsibilities": ["ATTACH_EVIDENCE_REFERENCE", "INVOKE_PINNED_VERIFIER", "RETURN_UNMODIFIED_RECEIPT", "REPORT_VERIFIER_FAILURE"],
+      "skills": ["verify-agent-evidence"],
+      "mcp_tools": ["attach_evidence", "verify_evidence", "get_action_state"],
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
+    },
+    {
+      "id": "github-operator",
+      "agentteams_role": "worker",
+      "identity": "Narrow provider operator that can attempt only an exact, live, unconsumed ALLOW.",
+      "responsibilities": ["COMPARE_EXACT_DECISION_BINDING", "REQUEST_DECISION_CONSUMPTION", "ATTEMPT_ONE_PROVIDER_ACTION", "CAPTURE_PROVIDER_RESULT"],
+      "skills": ["execute-github-action"],
+      "mcp_tools": ["get_action_state"],
+      "future_provider_tools": ["EXACT_GITHUB_TOOL_SELECTED_BY_BOUND_ACTION"],
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false},
+      "note": "Milestone 1 grants no execution capability; future execution remains conditional on a separate reviewed implementation and provider ACL."
+    },
+    {
+      "id": "release-steward",
+      "agentteams_role": "worker",
+      "identity": "Post-execution evidence assembler that requests, but never self-grants, a release decision.",
+      "responsibilities": ["ASSEMBLE_EXECUTION_EVIDENCE", "REQUEST_POST_EXECUTION_VERIFICATION", "REQUEST_RELEASE_DECISION", "REPORT_NON_CLAIMS"],
+      "skills": ["prepare-release-decision"],
+      "mcp_tools": ["attach_evidence", "verify_evidence", "evaluate_action_gate", "get_action_state"],
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
+    }
+  ],
+  "separation_rules": [
+    "NO_AGENT_SELF_AUTHORIZES",
+    "NO_AGENT_TREATS_VERIFICATION_AS_POLICY",
+    "NO_OPERATOR_CREATES_ITS_OWN_APPROVAL",
+    "NO_RELEASE_WITHOUT_A_NEW_GATE_DECISION",
+    "NO_MANAGER_OVERRIDE"
+  ]
+}
