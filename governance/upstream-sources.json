@@ -23,6 +23,10 @@
       "tag_target_commit": "ed504bf4f0a385ffd873ba434732af247659dcf7",
       "wheel": "agent_evidence-0.6.0-py3-none-any.whl",
       "wheel_sha256": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e",
+      "oap_schema_source_path": "schema/execution-evidence-operation-accountability-profile-v0.1.schema.json",
+      "oap_schema_local_path": "schemas/agent-evidence-oap-v0.1.schema.json",
+      "oap_schema_sha256": "cadff8c3b30a47f58563fa8700bcb2aa962338bc68336907d4f228e9b2387ea8",
+      "wheel_limitation": "VALIDATE_PROFILE_DEFAULT_SCHEMA_PATH_MISSING_FROM_WHEEL_USE_PINNED_TAG_SCHEMA_EXPLICITLY",
       "python_requires": ">=3.11",
       "integration_policy": "CALL_PINNED_PUBLIC_PACKAGE_DO_NOT_FORK_VALIDATOR",
       "code_copied": false

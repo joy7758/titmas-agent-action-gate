@@ -1,29 +1,29 @@
 {
   "gate_version": "1.0.0",
   "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-001",
-  "evaluated_at": "2026-08-02T00:38:20+08:00",
+  "evaluated_at": "2026-08-02T01:46:54+08:00",
   "evaluator_class": "AI_AGENT",
   "customer_need": "Prevent an agent in a competition dialogue or delegated workflow from crossing an explicit action boundary without an auditable decision and authorization reference.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "Milestone 1 now defines versioned contracts, AgentTeams roles, canonical agent-evidence integration, threat boundaries, deterministic decisions and reproducible cases. Product use remains not recommended until implementation and independent runtime evidence exist."
+    "reason": "The experimental reference implementation now has deterministic runtime tests, a real MCP stdio exchange, canonical agent-evidence verification, replay and mutation defenses, and a bounded real-GitHub sandbox trace. Product use remains not recommended because AgentTeams was not deployed live, demo signing keys are not production key management, and no independent security or operational review exists."
   },
   "non_recommendation_reasons": [
     {
       "id": "NR-001",
-      "reason": "Versioned machine contracts exist, but no MCP server or Action Gate implementation exists.",
-      "required_fix": "Implement the contracts without changing their authority semantics."
+      "reason": "The MCP server and Action Gate exist as a local experimental reference, but there is no hardened authenticated network deployment or production key management.",
+      "required_fix": "Replace demo HMAC material, define key rotation and recovery, harden transport authentication, and independently review the deployed boundary."
     },
     {
       "id": "NR-002",
-      "reason": "A threat model exists, but it has not been exercised against a runtime.",
-      "required_fix": "Run prompt-injection, confused-deputy, stale-authorization, replay, scope-expansion and missing-evidence tests against the implementation."
+      "reason": "The threat suite covers core prompt-injection, confused-deputy, expiry, replay and mutation cases, but it is not an independent penetration test or operational exercise.",
+      "required_fix": "Perform independent adversarial review, provider-credential compromise exercises, recovery tests, and multi-tenant isolation tests."
     },
     {
       "id": "NR-003",
-      "reason": "Contract fixtures exist, but no implementation or runtime conformance evidence exists.",
-      "required_fix": "Build the smallest bounded reference path and retain rejected actions and runtime test evidence."
+      "reason": "The local handoff harness mirrors pinned AgentTeams resources, but no live AgentTeams Manager/Worker deployment was available in the current environment.",
+      "required_fix": "Deploy the pinned AgentTeams release with configured model credentials, apply the team resources, and retain native handoff evidence."
     },
     {
       "id": "NR-004",
@@ -41,16 +41,22 @@
     "AGENTTEAMS_V1_2_0_INTEGRATION_PLAN_CREATED",
     "AGENT_EVIDENCE_0_6_0_SOURCE_PINNED",
     "THREAT_MODEL_CREATED",
-    "FOUR_REPRODUCIBLE_CONTRACT_CASES_CREATED"
+    "FOUR_REPRODUCIBLE_CONTRACT_CASES_CREATED",
+    "DETERMINISTIC_ACTION_GATE_REFERENCE_IMPLEMENTED",
+    "SIX_TOOL_MCP_STDIO_REFERENCE_IMPLEMENTED",
+    "AGENT_EVIDENCE_RUNTIME_ADAPTER_VALIDATED",
+    "REAL_GITHUB_SANDBOX_BRANCH_AND_DRAFT_PR_CREATED",
+    "REPLAY_MUTATION_AND_CONFUSED_DEPUTY_TESTS_PASSED"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",
-    "REFERENCE_IMPLEMENTATION",
-    "RUNTIME_POSITIVE_AND_NEGATIVE_CONFORMANCE",
-    "INDEPENDENT_AGENT_RECOMMENDATION_RERUN"
+    "LIVE_AGENTTEAMS_DEPLOYMENT_EVIDENCE",
+    "INDEPENDENT_SECURITY_AND_OPERATIONAL_REVIEW",
+    "PRODUCTION_KEY_AND_IDENTITY_MANAGEMENT",
+    "COMPETITION_MATERIAL_REVIEW_AND_SEPARATELY_AUTHORIZED_SUBMISSION"
   ],
   "stop_conditions": [
-    "ACTION_EXECUTION_REQUESTED_BEFORE_G5_AUTHORIZATION",
+    "ACTION_EXECUTION_REQUESTED_OUTSIDE_EXPLICIT_USER_OR_PROVIDER_AUTHORIZATION",
     "AUTHORITY_IDENTITY_UNKNOWN_OR_CONFLICTED",
     "REQUEST_SCOPE_EXCEEDS_AUTHORIZATION_SCOPE",
     "COMPETITION_SUBMISSION_OR_EXTERNAL_WRITE_REQUESTED_WITHOUT_SEPARATE_AUTHORIZATION"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import unittest
 
 from scripts.validate_milestone import ROOT, reference_decision
@@ -28,7 +27,6 @@ class ContractFixtureTests(unittest.TestCase):
 
     def test_tampered_evidence_precedes_approval(self) -> None:
         case = json.loads(json.dumps(self.cases["tampered-evidence"]))
-        high_risk = self.cases["high-risk-approval"]
         case["policy_evaluation"]["effect"] = "REQUIRE_HUMAN_APPROVAL"
         case["human_approval"] = {
             "status": "GRANTED",

@@ -11,6 +11,7 @@
     "request_binding",
     "policy_id",
     "policy_version",
+    "ruleset_sha256",
     "status",
     "approved_by",
     "decided_at",
@@ -25,6 +26,7 @@
     "request_binding": {"$ref": "#/$defs/requestBinding"},
     "policy_id": {"type": "string", "minLength": 3},
     "policy_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "ruleset_sha256": {"$ref": "#/$defs/sha256"},
     "status": {"enum": ["GRANTED", "DENIED", "REVOKED"]},
     "approved_by": {
       "type": "object",

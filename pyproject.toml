@@ -4,25 +4,66 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "titmas-agent-action-gate"
-version = "0.1.0a0"
-description = "Specification-first deterministic action gate for AgentTeams workflows."
+version = "0.2.0a0"
+description = "Evidence-verified deterministic action gate for AgentTeams workflows."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [{name = "zhangbin"}]
-dependencies = []
+dependencies = [
+  "agent-evidence[mcp]==0.6.0",
+  "jsonschema>=4.25,<5",
+  "PyYAML>=6.0,<7",
+  "rfc8785==0.1.4"
+]
+
+[project.scripts]
+titmas-action-gate = "titmas_action_gate.cli:main"
+titmas-action-gate-mcp = "titmas_action_gate.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.3,<2",
   "jsonschema>=4.25,<5",
-  "PyYAML>=6.0,<7"
+  "PyYAML>=6.0,<7",
+  "ruff>=0.14,<1"
 ]
-evidence = [
-  "agent-evidence[mcp]==0.6.0"
-]
+evidence = []
 
-[tool.setuptools]
-packages = []
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/titmas-action-gate/schemas" = ["schemas/*.json"]
+"share/titmas-action-gate/policies" = ["policies/*.json"]
+"share/titmas-action-gate/deploy/agentteams" = ["deploy/agentteams/*.yaml"]
+"share/titmas-action-gate/evaluations" = ["evaluations/case-registry.json"]
+"share/titmas-action-gate/evaluations/cases/valid-execution" = ["evaluations/cases/valid-execution/case.json"]
+"share/titmas-action-gate/evaluations/cases/missing-evidence" = ["evaluations/cases/missing-evidence/case.json"]
+"share/titmas-action-gate/evaluations/cases/tampered-evidence" = ["evaluations/cases/tampered-evidence/case.json"]
+"share/titmas-action-gate/evaluations/cases/high-risk-approval" = ["evaluations/cases/high-risk-approval/case.json"]
+"share/titmas-action-gate/agents" = ["agents/registry.json"]
+"share/titmas-action-gate/mcp" = ["mcp/server-manifest.v0.1.json"]
+"share/titmas-action-gate/governance" = ["governance/upstream-sources.json", "governance/dba-source-lock.json", "governance/project-declaration.json"]
+"share/titmas-action-gate/demo/evidence" = ["demo/evidence/*.json"]
+"share/titmas-action-gate/skills/analyze-action-request" = ["skills/analyze-action-request/SKILL.md", "skills/analyze-action-request/manifest.json"]
+"share/titmas-action-gate/skills/analyze-action-request/examples" = ["skills/analyze-action-request/examples/*.json"]
+"share/titmas-action-gate/skills/verify-agent-evidence" = ["skills/verify-agent-evidence/SKILL.md", "skills/verify-agent-evidence/manifest.json"]
+"share/titmas-action-gate/skills/verify-agent-evidence/examples" = ["skills/verify-agent-evidence/examples/*.json"]
+"share/titmas-action-gate/skills/use-action-gate" = ["skills/use-action-gate/SKILL.md", "skills/use-action-gate/manifest.json"]
+"share/titmas-action-gate/skills/use-action-gate/examples" = ["skills/use-action-gate/examples/*.json"]
+"share/titmas-action-gate/skills/execute-github-action" = ["skills/execute-github-action/SKILL.md", "skills/execute-github-action/manifest.json"]
+"share/titmas-action-gate/skills/execute-github-action/examples" = ["skills/execute-github-action/examples/*.json"]
+"share/titmas-action-gate/skills/prepare-release-decision" = ["skills/prepare-release-decision/SKILL.md", "skills/prepare-release-decision/manifest.json"]
+"share/titmas-action-gate/skills/prepare-release-decision/examples" = ["skills/prepare-release-decision/examples/*.json"]
+"share/titmas-action-gate/tests" = ["tests/test_*.py"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 160
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.unittest]
 start-directory = "tests"

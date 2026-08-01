@@ -1,56 +1,56 @@
 {
   "$schema": "../schemas/mcp-server-manifest.v0.1.schema.json",
   "manifest_schema_version": "0.1.0",
-  "server": {"name": "titmas-action-gate", "version": "0.1.0"},
-  "status": "SPECIFICATION_ONLY",
-  "transport": "streamable-http",
+  "server": {"name": "titmas-action-gate", "version": "0.2.0"},
+  "status": "EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
+  "transport": "stdio",
   "holds_provider_credentials": false,
   "tools": [
     {
       "name": "submit_action_request",
       "description": "Validate and persist one normalized action request.",
-      "input_schema": "schemas/action-request.v0.1.schema.json",
-      "output_schema": "schemas/action-request.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/submitActionRequest",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "NONE"
     },
     {
       "name": "attach_evidence",
       "description": "Attach one immutable evidence bundle reference to a request.",
-      "input_schema": "schemas/evidence-verification-result.v0.1.schema.json",
-      "output_schema": "schemas/evidence-verification-result.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/attachEvidence",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "NONE"
     },
     {
       "name": "verify_evidence",
       "description": "Invoke the pinned canonical agent-evidence adapter and retain its result.",
-      "input_schema": "schemas/evidence-verification-result.v0.1.schema.json",
-      "output_schema": "schemas/evidence-verification-result.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/requestOperation",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "EVIDENCE_RESULT_ONLY"
     },
     {
       "name": "evaluate_action_gate",
       "description": "Evaluate versioned inputs using deterministic precedence rules.",
-      "input_schema": "specs/action-gate-decision-v0.1.md#inputs",
-      "output_schema": "schemas/action-gate-decision.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/requestOperation",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "BOUNDED_DECISION_ONLY"
     },
     {
       "name": "record_human_approval",
       "description": "Persist a signed and request-scoped human approval, denial, or revocation.",
-      "input_schema": "schemas/human-approval.v0.1.schema.json",
-      "output_schema": "schemas/human-approval.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/recordHumanApproval",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "APPROVAL_INPUT_ONLY"
     },
     {
       "name": "get_action_state",
       "description": "Read append-only request, evidence, approval, and decision state.",
-      "input_schema": "schemas/action-request.v0.1.schema.json#request_id",
-      "output_schema": "schemas/action-gate-decision.v0.1.schema.json",
+      "input_schema": "schemas/mcp-tool-inputs.v0.1.schema.json#/$defs/requestOperation",
+      "output_schema": "schemas/mcp-tool-result.v0.1.schema.json",
       "mutates_external_provider": false,
       "authority_effect": "NONE"
     }

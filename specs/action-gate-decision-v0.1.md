@@ -1,6 +1,6 @@
 # Action Gate decision specification v0.1
 
-Status: `SPECIFICATION_ONLY`
+Status: `IMPLEMENTED_EXPERIMENTAL_REFERENCE`
 Schema: [`../schemas/action-gate-decision.v0.1.schema.json`](../schemas/action-gate-decision.v0.1.schema.json)
 
 ## Inputs

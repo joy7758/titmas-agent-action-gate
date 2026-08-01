@@ -8,9 +8,11 @@ Evidence-verified, deterministic authorization boundaries for AgentTeams workflo
 
 TITMAS Agent Action Gate is a production-oriented architecture and competition demo candidate for the GOAI 2026 Agent Infra track. It separates uncertain agent analysis from deterministic authorization, evidence verification, policy evaluation, and human approval.
 
-Current milestone: `M1_SPECIFICATION_BASELINE_COMPLETE`.
+Current milestone: `M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX`.
 
-There is no Action Gate runtime or deployed MCP server yet. This repository is not submitted to, endorsed by, or affiliated with GOAI, and it makes no certification, compliance, production-readiness, or security guarantee.
+The deterministic Action Gate, append-only state store, six-tool MCP stdio server, pinned `agent-evidence` adapter, five-role handoff harness, and allowlisted GitHub provider adapter are implemented and locally tested. A bounded public sandbox run created a branch and Draft PR. The pinned AgentTeams CRDs and Skills are supplied, but no live AgentTeams Manager/Worker deployment is claimed because the current environment had neither a running Docker daemon nor model credentials.
+
+This repository is not submitted to, endorsed by, or affiliated with GOAI, and it makes no certification, compliance, production-readiness, or security guarantee.
 
 ## Why this exists
 
@@ -22,7 +24,7 @@ Agents are useful at interpreting ambiguous requests, decomposing work, and expl
 - a human approval record for scoped, high-risk actions;
 - provider MCP servers, such as GitHub MCP, only after an `ALLOW` decision.
 
-## Planned team
+## AgentTeams team
 
 | AgentTeams Worker | Responsibility | Cannot do |
 |---|---|---|
@@ -58,19 +60,36 @@ Agent request
   -> human approval when required
 ```
 
-The planned end-to-end scenario is documented in [`docs/GITHUB-WORKFLOW-DEMO.md`](docs/GITHUB-WORKFLOW-DEMO.md). Milestone 1 contains four reproducible contract fixtures: valid execution, missing evidence, tampered evidence, and a high-risk release action requiring approval.
+The end-to-end scenario and retained public evidence are documented in [`docs/GITHUB-WORKFLOW-DEMO.md`](docs/GITHUB-WORKFLOW-DEMO.md). The repository contains four reproducible runtime cases: valid execution, missing evidence, tampered evidence, and a high-risk release action requiring approval.
 
-## Validate milestone 1
+## Run and validate
 
 Python 3.11 or newer is required.
 
 ```bash
 python3 -m pip install -e '.[dev]'
 python3 scripts/validate_milestone.py
-python3 -m unittest discover -s tests -v
+python3 scripts/validate_governance.py
+python3 -W error::ResourceWarning -m unittest discover -s tests -v
+python3 -m titmas_action_gate.cli evaluate-fixtures
+python3 -m titmas_action_gate.cli demo --state-dir artifacts/runtime/local-demo
+python3 -m titmas_action_gate.cli validate-install
 ```
 
-These checks validate documents, manifests, schemas, examples, decision expectations, and source pins. They do not execute AgentTeams, GitHub actions, `agent-evidence`, an MCP server, or a release.
+The tests execute the deterministic engine, pinned `agent-evidence` validator, append-only chain, MCP stdio protocol, all six tools, AgentTeams-compatible local handoffs, in-memory provider workflow, and negative boundaries. They do not prove a live AgentTeams deployment, production security, or operational readiness.
+
+Start the MCP server over stdio:
+
+```bash
+TITMAS_ACTION_GATE_STATE_DIR='artifacts/runtime/mcp' \
+TITMAS_ACTION_GATE_CALLER_TOKEN='replace-with-agent-token' \
+TITMAS_ACTION_GATE_APPROVER_TOKEN='replace-with-distinct-approver-token' \
+TITMAS_ACTION_GATE_DEMO_MODE='true' \
+TITMAS_ACTION_GATE_MCP_TRANSPORT='stdio' \
+  titmas-action-gate-mcp
+```
+
+The real GitHub runner requires a separately provisioned sandbox repository and exact local worktree. It is intentionally not part of default CI. See [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
 ## Repository map
 
@@ -80,6 +99,8 @@ These checks validate documents, manifests, schemas, examples, decision expectat
 - [`docs/MCP-TOOL-SPECIFICATION-v0.1.md`](docs/MCP-TOOL-SPECIFICATION-v0.1.md): MCP server and tool contract;
 - [`docs/THREAT-MODEL-v0.1.md`](docs/THREAT-MODEL-v0.1.md): trust boundaries and bypass threats;
 - [`docs/EXECUTION-ROADMAP.md`](docs/EXECUTION-ROADMAP.md): implementation and evaluation gates;
+- [`docs/RUNBOOK.md`](docs/RUNBOOK.md): reproducible local and sandbox commands;
+- [`SECURITY.md`](SECURITY.md): security model, reporting, and non-production limitations;
 - [`evaluations/`](evaluations/): deterministic contract cases;
 - [`governance/`](governance/): DBA source lock, existence declaration, recommendation, and management boundary.
 
@@ -94,6 +115,8 @@ ALLOW_NE_EXECUTION_SUCCESS=true
 MCP_TOOL_AVAILABILITY_NE_PERMISSION=true
 SPECIFICATION_NE_IMPLEMENTATION=true
 TEST_PASS_NE_PRODUCTION_READINESS=true
+LOCAL_AGENTTEAMS_HANDOFFS_NE_LIVE_AGENTTEAMS_DEPLOYMENT=true
+GITHUB_PR_CREATED_NE_GITHUB_PR_MERGED=true
 COMPETITION_REPOSITORY_NE_COMPETITION_SUBMISSION=true
 TITMAS_CORE_PROTOCOLS_CHANGED=false
 ```

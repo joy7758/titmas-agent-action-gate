@@ -24,7 +24,7 @@ The body must state inputs, outputs, procedure, stop conditions, external tools,
 `manifest.json` conforms to [`../schemas/skill-manifest.v0.1.schema.json`](../schemas/skill-manifest.v0.1.schema.json) and pins:
 
 - manifest schema version and semantic Skill version;
-- lifecycle status (`SPECIFICATION_ONLY` in milestone 1);
+- lifecycle status (currently `EXPERIMENTAL` for the five reference Skills);
 - AgentTeams compatibility;
 - input/output schema references;
 - named MCP tools;

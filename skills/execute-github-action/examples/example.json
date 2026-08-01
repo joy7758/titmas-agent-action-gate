@@ -2,7 +2,8 @@
   "example_version": "0.1.0",
   "input": {"decision_outcome": "ALLOW", "action": "github.pull_request.create", "parameters_match": true},
   "expected_behavior": [
-    "MILESTONE_1_STOP_NO_EXECUTION_ADAPTER",
+    "FETCH_SERVER_SIDE_DECISION_AND_ATOMICALLY_CONSUME_ONCE",
+    "EXECUTE_ONLY_EXACT_ALLOWLISTED_ACTION",
     "NEVER_TREAT_ALLOW_AS_SUCCESS",
     "NEVER_EXPAND_TO_MERGE"
   ]

@@ -3,16 +3,16 @@
   "manifest_schema_version": "0.1.0",
   "name": "execute-github-action",
   "version": "0.1.0",
-  "status": "SPECIFICATION_ONLY",
+  "status": "EXPERIMENTAL",
   "entrypoint": "SKILL.md",
   "compatibility": {
     "agentteams_release": "v1.2.0",
     "agentteams_commit": "793db242257a569d911b1aa59c1cd554af78511f"
   },
-  "inputs": ["schemas/action-gate-decision.v0.1.schema.json", "future provider invocation contract"],
-  "outputs": ["future execution-attempt receipt schema"],
+  "inputs": ["schemas/action-gate-decision.v0.1.schema.json", "exact server-side provider invocation"],
+  "outputs": ["signed append-only execution-attempt receipt"],
   "mcp_tools": ["get_action_state"],
   "authority": {"may_propose": false, "may_decide": false, "may_approve": false, "may_execute": false},
   "examples": ["examples/example.json"],
-  "tests": ["../../tests/test_contracts.py", "../../tests/test_boundaries.py"]
+  "tests": ["../../tests/test_store_runtime.py", "../../tests/test_provider_boundaries.py", "../../tests/test_workflow_runtime.py"]
 }

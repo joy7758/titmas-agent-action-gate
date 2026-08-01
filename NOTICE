@@ -1,5 +1,8 @@
 TITMAS Agent Action Gate
 Copyright 2026 zhangbin
 
-This product includes planning references to AgentTeams and agent-evidence.
-No source code from those projects is copied into this repository by milestone 1.
+This product integrates AgentTeams and agent-evidence through their public
+contracts and APIs. The exact Apache-2.0 agent-evidence v0.6.0 OAP JSON Schema
+is retained at schemas/agent-evidence-oap-v0.1.schema.json because the published
+wheel does not include the default schema path required by validate_profile_file.
+No agent-evidence validator source code is copied or reimplemented here.

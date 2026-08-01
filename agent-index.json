@@ -13,9 +13,9 @@
     "official_affiliation_claimed": false,
     "submission_claimed": false
   },
-  "maturity": "M1_SPECIFICATION_BASELINE",
-  "implementation_status": "NOT_STARTED",
-  "runtime_status": "NOT_CREATED",
+  "maturity": "M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
+  "implementation_status": "REFERENCE_IMPLEMENTATION",
+  "runtime_status": "LOCAL_VALIDATED_REAL_GITHUB_SANDBOX_NO_LIVE_AGENTTEAMS_DEPLOYMENT",
   "portfolio_status": "DBA_ADMISSION_PENDING",
   "decision_outcomes": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"],
   "read_order": [
@@ -43,6 +43,7 @@
     "skill_manifest_schema": "schemas/skill-manifest.v0.1.schema.json",
     "mcp_manifest": "mcp/server-manifest.v0.1.json",
     "evaluation_registry": "evaluations/case-registry.json",
+    "public_demo_evidence": "demo/evidence/github-sandbox-20260802.json",
     "validator": "scripts/validate_milestone.py"
   },
   "when_to_use": [

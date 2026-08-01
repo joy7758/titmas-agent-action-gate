@@ -1,6 +1,6 @@
 # AgentTeams deployment template
 
-[`team.v1.2.0.yaml`](team.v1.2.0.yaml) mirrors the public AgentTeams `v1.2.0` CRD surface and is not applied by milestone 1.
+[`team.v1.2.0.yaml`](team.v1.2.0.yaml) mirrors the public AgentTeams `v1.2.0` CRD surface. It was schema/structure checked but not applied in the retained demo because no live AgentTeams runtime was available.
 
 Before any apply:
 

@@ -1,6 +1,6 @@
-# Architecture baseline
+# Reference architecture
 
-Milestone 1 defines a fail-closed boundary between agent reasoning and external action. It does not provide a runtime.
+The experimental reference implementation enforces a fail-closed boundary between agent reasoning and external action. The AgentTeams resource template is pinned but not live-deployed in the retained demo.
 
 ```mermaid
 flowchart LR
@@ -55,7 +55,7 @@ DRAFT -> ANALYZED -> EVIDENCE_VERIFIED -> DECIDED
   -> RELEASE_DECIDED
 ```
 
-`DECIDED=ALLOW` is never rewritten into an execution-success claim. Every transition is append-only in the planned runtime; retained failures are part of the evidence trail.
+`DECIDED=ALLOW` is never rewritten into an execution-success claim. Runtime transitions are stored in a SQLite append-only hash chain; retained failures are part of the evidence trail. The store is a single-node reference, not a production tamper-proof ledger.
 
 ## Dependency direction
 

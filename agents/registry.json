@@ -1,6 +1,6 @@
 {
   "registry_version": "0.1.0",
-  "status": "SPECIFICATION_ONLY",
+  "status": "EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
   "orchestration": {
     "product": "AgentTeams",
     "release": "v1.2.0",
@@ -44,7 +44,7 @@
       "mcp_tools": ["get_action_state"],
       "future_provider_tools": ["EXACT_GITHUB_TOOL_SELECTED_BY_BOUND_ACTION"],
       "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false},
-      "note": "Milestone 1 grants no execution capability; future execution remains conditional on a separate reviewed implementation and provider ACL."
+      "note": "The agent owns no autonomous execution authority. The experimental provider adapter can attempt one exact action only after the service validates and atomically consumes a live ALLOW."
     },
     {
       "id": "release-steward",

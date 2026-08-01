@@ -5,9 +5,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,14 +39,14 @@ def main() -> int:
 
     if declaration["dba_request"].get("portfolio_admitted") is not False:
         failures.append("portfolio admission must remain false until DBA decision")
-    if declaration["project"].get("implementation_status") != "NOT_STARTED":
-        failures.append("implementation status overclaim")
+    if declaration["project"].get("implementation_status") != "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_EVIDENCE":
+        failures.append("implementation status does not match the retained reference evidence boundary")
     if grant["technical_effect"].get("repository_acl_changed") is not False:
         failures.append("policy grant must not claim a repository ACL change")
     if grant["technical_effect"].get("runtime_permission_created") is not False:
         failures.append("policy grant must not create runtime permission")
     if recommendation["recommendation"].get("current_product_use") != "NOT_RECOMMENDED":
-        failures.append("product recommendation overclaim before implementation")
+        failures.append("product recommendation must remain conservative before independent operational review")
 
     if failures:
         for failure in failures:
@@ -59,6 +58,7 @@ def main() -> int:
     print("PORTFOLIO_ADMISSION_CLAIMED=false")
     print("RUNTIME_PERMISSION_CREATED=false")
     print("PRODUCT_RECOMMENDED=false")
+    print("REFERENCE_IMPLEMENTATION_RECORDED=true")
     return 0
 
 
