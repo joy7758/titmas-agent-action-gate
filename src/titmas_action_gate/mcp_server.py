@@ -11,13 +11,31 @@ from mcp.server.fastmcp import FastMCP
 from .errors import ActionGateError
 from .service import ActionGateService
 
+_ALLOWED_MCP_BIND_HOSTS = {"127.0.0.1", "0.0.0.0", "::1"}
+
+
+def configured_mcp_host() -> str:
+    """Return a narrow bind address or fail closed during startup.
+
+    The default remains loopback. ``0.0.0.0`` exists only for reviewed,
+    disposable container-to-host smoke runs; it does not add authentication or
+    authorize a network deployment.
+    """
+
+    value = os.environ.get("TITMAS_ACTION_GATE_MCP_HOST", "127.0.0.1").strip()
+    if value not in _ALLOWED_MCP_BIND_HOSTS:
+        allowed = ", ".join(sorted(_ALLOWED_MCP_BIND_HOSTS))
+        raise ValueError(f"TITMAS_ACTION_GATE_MCP_HOST must be one of: {allowed}")
+    return value
+
+
 mcp = FastMCP(
     "titmas-action-gate",
     instructions=(
         "Deterministic evidence and authorization boundary. Tool discovery is not permission. "
         "No tool in this server mutates an external provider."
     ),
-    host="127.0.0.1",
+    host=configured_mcp_host(),
     port=8766,
 )
 _service: ActionGateService | None = None

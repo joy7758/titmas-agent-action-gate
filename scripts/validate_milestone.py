@@ -162,6 +162,7 @@ def main() -> int:
         "mcp-tool-inputs.v0.1.schema.json",
         "mcp-tool-result.v0.1.schema.json",
         "agent-evidence-oap-v0.1.schema.json",
+        "native-agentteams-run-evidence.v0.1.schema.json",
     ]
     validators: dict[str, Draft202012Validator] = {}
     for name in schema_names:
@@ -252,6 +253,45 @@ def main() -> int:
     if "CONFIGURE_" not in deployment_text:
         failures.append("deployment template must retain explicit configuration placeholders")
 
+    native_deployment_path = ROOT / "deploy/agentteams/team.native-smoke.v1.2.0.yaml"
+    native_deployment_text = native_deployment_path.read_text(encoding="utf-8")
+    native_documents = list(yaml.safe_load_all(native_deployment_text))
+    if len(native_documents) != 7:
+        failures.append("native AgentTeams smoke manifest must contain Human, five Workers, and Team")
+    if any(doc.get("apiVersion") != "agentteams.io/v1beta1" for doc in native_documents):
+        failures.append("native AgentTeams smoke manifest apiVersion mismatch")
+    native_workers = [doc for doc in native_documents if doc.get("kind") == "Worker"]
+    if {doc["metadata"]["name"] for doc in native_workers} != EXPECTED_AGENT_IDS:
+        failures.append("native AgentTeams Worker identities do not match registry")
+    native_teams = [doc for doc in native_documents if doc.get("kind") == "Team"]
+    if len(native_teams) != 1:
+        failures.append("native AgentTeams smoke manifest must contain one Team")
+    elif sum(member["role"] == "team_leader" for member in native_teams[0]["spec"]["workerMembers"]) != 1:
+        failures.append("native AgentTeams smoke Team must contain exactly one team leader")
+    for worker in native_workers:
+        annotations = worker.get("metadata", {}).get("annotations", {})
+        if annotations.get("titmas.dev/profile") != "native-smoke-only":
+            failures.append(f"native Worker lacks smoke-only annotation: {worker['metadata']['name']}")
+        if annotations.get("titmas.dev/model-risk") != "preview-model-not-a-stable-runtime-contract":
+            failures.append(f"native Worker lacks preview-model risk: {worker['metadata']['name']}")
+        if annotations.get("titmas.dev/skills-materialized") != "false":
+            failures.append(f"native Worker must not claim Skill materialization: {worker['metadata']['name']}")
+        if worker.get("spec", {}).get("model") != "qwen3.8-max-preview":
+            failures.append(f"native Worker model observation mismatch: {worker['metadata']['name']}")
+        servers = worker.get("spec", {}).get("mcpServers", [])
+        expected_server = {
+            "name": "titmas-action-gate",
+            "url": "http://host.docker.internal:8766/mcp",
+            "transport": "http",
+        }
+        if servers != [expected_server]:
+            failures.append(f"native Worker must expose only Action Gate MCP: {worker['metadata']['name']}")
+    lowered_native = native_deployment_text.lower()
+    if "host.docker.internal:8766/mcp" not in lowered_native:
+        failures.append("native AgentTeams smoke manifest must retain the observed Docker Desktop MCP endpoint")
+    if any(marker in lowered_native for marker in ("authorization: bearer", "x-api-key:", "password:", "cookie:")):
+        failures.append("native AgentTeams smoke manifest appears to contain an embedded credential")
+
     case_registry = load_json("evaluations/case-registry.json")
     registered = {case["id"]: case for case in case_registry.get("cases", [])}
     if {case_id: item["expected_outcome"] for case_id, item in registered.items()} != EXPECTED_CASE_OUTCOMES:
@@ -292,6 +332,28 @@ def main() -> int:
         failures.append("AgentTeams source pin mismatch")
     if sources["agent-evidence"]["wheel_sha256"] != "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e":
         failures.append("agent-evidence distribution pin mismatch")
+
+    native_evidence = load_json("demo/evidence/agentteams-native-20260802.json")
+    native_evidence_validator = validators.get("native-agentteams-run-evidence.v0.1.schema.json")
+    if native_evidence_validator:
+        for error in native_evidence_validator.iter_errors(native_evidence):
+            failures.append(f"native AgentTeams evidence schema: {error.message}")
+    if native_evidence.get("orchestration", {}).get("commit") != sources["agentteams"]["release_commit"]:
+        failures.append("native AgentTeams evidence source pin mismatch")
+    evidence_verifier = native_evidence.get("operator_supervised_chain", {}).get("evidence_verification", {})
+    if evidence_verifier.get("distribution_sha256") != sources["agent-evidence"]["wheel_sha256"]:
+        failures.append("native AgentTeams evidence verifier pin mismatch")
+    if native_evidence.get("autonomy_result", {}).get("leader_end_to_end_completed") is not False:
+        failures.append("native AgentTeams evidence must retain incomplete autonomous leader result")
+    provider_external_effects = native_evidence.get("provider_external_effects", {})
+    if any(provider_external_effects.values()):
+        failures.append("native AgentTeams smoke evidence must not claim a provider external effect")
+    disposition = native_evidence.get("runtime_disposition", {})
+    disposition_flags = {key: value for key, value in disposition.items() if key not in {"disposed_at", "user_provider_key_copied_into_repository"}}
+    if not all(value is True for value in disposition_flags.values()):
+        failures.append("native AgentTeams temporary runtime destruction is incomplete")
+    if disposition.get("user_provider_key_copied_into_repository") is not False:
+        failures.append("native AgentTeams evidence must not claim a user provider key was copied")
 
     validate_markdown_links(failures)
 

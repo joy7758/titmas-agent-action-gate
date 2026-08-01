@@ -1,6 +1,17 @@
 # AgentTeams deployment template
 
-[`team.v1.2.0.yaml`](team.v1.2.0.yaml) mirrors the public AgentTeams `v1.2.0` CRD surface. It was schema/structure checked but not applied in the retained demo because no live AgentTeams runtime was available.
+[`team.v1.2.0.yaml`](team.v1.2.0.yaml) is the reviewable, placeholder-bearing AgentTeams `v1.2.0` deployment shape. It remains unapplied because its production identities, endpoints, secrets, ACLs, Skill packages, and provider boundary have not been provisioned.
+
+[`team.native-smoke.v1.2.0.yaml`](team.native-smoke.v1.2.0.yaml) records the narrower resource profile used for one temporary native smoke on macOS Docker Desktop. It:
+
+- reused the installer-created `default` Manager and existing local admin identity;
+- selected `qwen3.8-max-preview`, which is explicitly not a stable model contract;
+- reached the host Action Gate through `host.docker.internal` and an explicit `TITMAS_ACTION_GATE_MCP_HOST=0.0.0.0` bind;
+- gave every Worker the same Action Gate MCP endpoint, without enforced per-Worker tool ACLs;
+- declared repository Skill names without independently proving that their packages were materialized inside the Workers;
+- carried no GitHub/provider-action credential or provider authority.
+
+The smoke profile is platform-specific, incomplete, and not idempotent. Re-applying an existing Human returned HTTP 405 in the observed v1.2.0 environment, and a model-only Worker update did not reconcile until another field changed. Use it as evidence input, not as a production deployment recipe.
 
 Before any apply:
 
@@ -13,3 +24,5 @@ Before any apply:
 7. obtain a separate deployment authorization.
 
 An AgentTeams Human permission level controls collaboration access. It is not the same as a scoped Action Gate approval record.
+
+The MCP server defaults to loopback. Binding to `0.0.0.0` expands network exposure and is allowed only by an explicit environment override for a disposable, isolated bridge smoke; it supplies neither transport authentication nor deployment authorization.

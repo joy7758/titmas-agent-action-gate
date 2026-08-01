@@ -24,12 +24,15 @@ Status: controls partially implemented and locally exercised; not an independent
 | Self-approval | operator approves its own release | separate human identity and service account | identity separation test |
 | Policy downgrade | caller selects an older permissive ruleset | server-controlled current policy and downgrade denial | policy rollback test |
 | MCP substitution | same tool name points to attacker endpoint | pinned endpoint identity and gateway policy | endpoint identity test |
+| Role/tool drift | operator invokes a gate tool outside its registry allowlist | authenticated per-Worker MCP tool ACL; prompts are not enforcement | native role-boundary conformance test |
+| Cross-task contamination | concurrent prompt writes an unrelated request into the same workflow | task/correlation-scoped admission and assignment checks | concurrent-request isolation test |
+| Declarative reconciliation drift | model or Human update is accepted but not converged as expected | read-after-write status verification and pinned upgrade gate | AgentTeams update/re-apply test |
 | Secret leakage | token appears in prompt/evidence/log | secret manager, redaction, no secret inputs | leak scanning |
 | Audit deletion | rejected attempt disappears | append-only store and retention checks | deletion attempt test |
 
 ## Residual risk
 
-Schemas cannot prove the correctness of policy, verifier, identity provider, storage, AgentTeams deployment, or GitHub configuration. A compromised gate service or provider credential can still violate intended boundaries. Runtime hardening, adversarial evaluation, independent review, recovery tests, and operational monitoring are required before any production-readiness claim.
+Schemas cannot prove the correctness of policy, verifier, identity provider, storage, AgentTeams deployment, or GitHub configuration. The native smoke confirmed that prompt-defined roles do not enforce MCP tool access: one Worker used a tool outside its registry allowlist, and a concurrent request entered the global chain. A compromised gate service or provider credential can still violate intended boundaries. Runtime hardening, gateway ACLs, concurrency isolation, adversarial evaluation, independent review, recovery tests, and operational monitoring are required before any production-readiness claim.
 
 ## Explicit exclusions
 

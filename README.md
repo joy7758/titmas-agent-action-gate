@@ -6,11 +6,11 @@ Evidence-verified, deterministic authorization boundaries for AgentTeams workflo
 
 [![Contract checks](https://github.com/joy7758/titmas-agent-action-gate/actions/workflows/contracts.yml/badge.svg)](https://github.com/joy7758/titmas-agent-action-gate/actions/workflows/contracts.yml)
 
-TITMAS Agent Action Gate is a production-oriented architecture and competition demo candidate for the GOAI 2026 Agent Infra track. It separates uncertain agent analysis from deterministic authorization, evidence verification, policy evaluation, and human approval.
+TITMAS Agent Action Gate is a production-oriented reference architecture and competition demo candidate for the GOAI 2026 Agent Infra track. It separates uncertain agent analysis from deterministic authorization, evidence verification, policy evaluation, and human approval.
 
-Current milestone: `M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX`.
+Current milestone: `M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE`.
 
-The deterministic Action Gate, append-only state store, six-tool MCP stdio server, pinned `agent-evidence` adapter, five-role handoff harness, and allowlisted GitHub provider adapter are implemented and locally tested. A bounded public sandbox run created a branch and Draft PR. The pinned AgentTeams CRDs and Skills are supplied, but no live AgentTeams Manager/Worker deployment is claimed because the current environment had neither a running Docker daemon nor model credentials.
+The deterministic Action Gate, append-only state store, six-tool MCP server, pinned `agent-evidence` adapter, five-role handoff harness, and allowlisted GitHub provider adapter are implemented and locally tested. A bounded public sandbox run created a branch and Draft PR. On 2026-08-02, an isolated temporary deployment of official AgentTeams `v1.2.0` started one Manager and five Workers against the Action Gate MCP server. Specialist Workers produced an operator-supervised request → verification → decision trace; the complete Manager → leader → Worker workflow did not finish autonomously. No provider action was attempted.
 
 This repository is not submitted to, endorsed by, or affiliated with GOAI, and it makes no certification, compliance, production-readiness, or security guarantee.
 
@@ -34,7 +34,19 @@ Agents are useful at interpreting ambiguous requests, decomposing work, and expl
 | `github-operator` | Execute an exact GitHub action after a matching `ALLOW` | Bypass the gate or approve releases |
 | `release-steward` | Assemble post-execution evidence and request the release decision | Merge, tag, or release without a new decision |
 
-Agent identities and tool boundaries are machine-readable in [`agents/registry.json`](agents/registry.json). The AgentTeams CRD template is [`deploy/agentteams/team.v1.2.0.yaml`](deploy/agentteams/team.v1.2.0.yaml).
+Agent identities and intended tool boundaries are machine-readable in [`agents/registry.json`](agents/registry.json). The reviewable deployment template is [`deploy/agentteams/team.v1.2.0.yaml`](deploy/agentteams/team.v1.2.0.yaml); the non-idempotent macOS Docker Desktop smoke profile is [`deploy/agentteams/team.native-smoke.v1.2.0.yaml`](deploy/agentteams/team.native-smoke.v1.2.0.yaml).
+
+### Native local smoke boundary
+
+The retained machine-readable evidence is [`demo/evidence/agentteams-native-20260802.json`](demo/evidence/agentteams-native-20260802.json). It records both the verified chain and the failures that prevent a stronger claim:
+
+- Qwen `qwen3.8-max-preview` specialist Workers invoked the real six-tool MCP endpoint; preview model availability is not a stable runtime contract;
+- `agent-evidence` `0.6.0` returned `VALID`, after which the deterministic gate returned a five-minute `ALLOW` that expired without execution;
+- the leader did not complete the workflow autonomously, one unrelated request entered the global store during concurrent prompts, and `github-operator` called a tool outside its declared registry allowlist;
+- all Workers shared the same MCP endpoint, so prompts described role boundaries but the smoke did not enforce per-Worker tool ACLs;
+- repository Skill names were declared in resources, but the run did not independently prove that those Skill packages were materialized inside the Workers.
+
+This is native local orchestration evidence, not a persistent deployment, autonomous-workflow proof, least-privilege proof, or production-readiness evidence.
 
 ## Deterministic decisions
 
@@ -76,7 +88,7 @@ python3 -m titmas_action_gate.cli demo --state-dir artifacts/runtime/local-demo
 python3 -m titmas_action_gate.cli validate-install
 ```
 
-The tests execute the deterministic engine, pinned `agent-evidence` validator, append-only chain, MCP stdio protocol, all six tools, AgentTeams-compatible local handoffs, in-memory provider workflow, and negative boundaries. They do not prove a live AgentTeams deployment, production security, or operational readiness.
+The tests execute the deterministic engine, pinned `agent-evidence` validator, append-only chain, MCP stdio protocol, all six tools, AgentTeams-compatible local handoffs, in-memory provider workflow, native-smoke manifest/evidence checks, and negative boundaries. They do not prove persistent AgentTeams deployment, autonomous orchestration, production security, or operational readiness.
 
 Start the MCP server over stdio:
 
@@ -115,7 +127,11 @@ ALLOW_NE_EXECUTION_SUCCESS=true
 MCP_TOOL_AVAILABILITY_NE_PERMISSION=true
 SPECIFICATION_NE_IMPLEMENTATION=true
 TEST_PASS_NE_PRODUCTION_READINESS=true
-LOCAL_AGENTTEAMS_HANDOFFS_NE_LIVE_AGENTTEAMS_DEPLOYMENT=true
+LOCAL_HANDOFF_HARNESS_NE_NATIVE_AGENTTEAMS_RUNTIME=true
+NATIVE_LOCAL_SMOKE_NE_PERSISTENT_OR_PRODUCTION_DEPLOYMENT=true
+OPERATOR_SUPERVISED_NE_AUTONOMOUS_END_TO_END=true
+HASH_CHAIN_VALID_NE_SEMANTIC_ORCHESTRATION_CLEAN=true
+PROMPT_ROLE_BOUNDARY_NE_ENFORCED_PER_WORKER_ACL=true
 GITHUB_PR_CREATED_NE_GITHUB_PR_MERGED=true
 COMPETITION_REPOSITORY_NE_COMPETITION_SUBMISSION=true
 TITMAS_CORE_PROTOCOLS_CHANGED=false

@@ -15,7 +15,7 @@
   },
   "maturity": "M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
   "implementation_status": "REFERENCE_IMPLEMENTATION",
-  "runtime_status": "LOCAL_VALIDATED_REAL_GITHUB_SANDBOX_NO_LIVE_AGENTTEAMS_DEPLOYMENT",
+  "runtime_status": "LOCAL_VALIDATED_REAL_GITHUB_SANDBOX_AND_OPERATOR_SUPERVISED_NATIVE_AGENTTEAMS_SMOKE",
   "portfolio_status": "DBA_ADMISSION_PENDING",
   "decision_outcomes": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"],
   "read_order": [
@@ -36,6 +36,7 @@
     "source_pins": "governance/upstream-sources.json",
     "agent_registry": "agents/registry.json",
     "agentteams_template": "deploy/agentteams/team.v1.2.0.yaml",
+    "agentteams_native_smoke_manifest": "deploy/agentteams/team.native-smoke.v1.2.0.yaml",
     "action_request_schema": "schemas/action-request.v0.1.schema.json",
     "evidence_result_schema": "schemas/evidence-verification-result.v0.1.schema.json",
     "approval_schema": "schemas/human-approval.v0.1.schema.json",
@@ -44,6 +45,7 @@
     "mcp_manifest": "mcp/server-manifest.v0.1.json",
     "evaluation_registry": "evaluations/case-registry.json",
     "public_demo_evidence": "demo/evidence/github-sandbox-20260802.json",
+    "native_agentteams_smoke_evidence": "demo/evidence/agentteams-native-20260802.json",
     "validator": "scripts/validate_milestone.py"
   },
   "when_to_use": [
@@ -63,6 +65,10 @@
     "GATE_ALLOW_NE_EXECUTION_SUCCESS",
     "MCP_TOOL_AVAILABILITY_NE_PERMISSION",
     "GOVERNANCE_MANAGEMENT_NE_RUNTIME_CONTROL",
-    "PROJECT_DECLARATION_NE_PORTFOLIO_ADMISSION"
+    "PROJECT_DECLARATION_NE_PORTFOLIO_ADMISSION",
+    "NATIVE_LOCAL_SMOKE_NE_PERSISTENT_OR_PRODUCTION_DEPLOYMENT",
+    "OPERATOR_SUPERVISED_NE_AUTONOMOUS_END_TO_END",
+    "HASH_CHAIN_VALID_NE_SEMANTIC_ORCHESTRATION_CLEAN",
+    "PROMPT_ROLE_BOUNDARY_NE_ENFORCED_PER_WORKER_ACL"
   ]
 }

@@ -1,0 +1,204 @@
+{
+  "$schema": "../../schemas/native-agentteams-run-evidence.v0.1.schema.json",
+  "evidence_version": "0.1.0",
+  "run_id": "agentteams-native-local-20260802-001",
+  "observed_at": "2026-08-01T20:15:20Z",
+  "orchestration": {
+    "product": "AgentTeams",
+    "release": "v1.2.0",
+    "commit": "793db242257a569d911b1aa59c1cd554af78511f",
+    "mode": "OFFICIAL_NATIVE_LOCAL_ISOLATED_RUNTIME",
+    "temporary_runtime": true,
+    "platform_constraint": "MACOS_DOCKER_DESKTOP_HOST_DOCKER_INTERNAL",
+    "manifest_manages_manager": false,
+    "manifest_apply_idempotent": false,
+    "repository_skills_materialized": false,
+    "resource_counts": {
+      "manager": 1,
+      "team": 1,
+      "human": 1,
+      "workers": 5
+    },
+    "images": {
+      "embedded": {
+        "reference": "higress-registry.cn-hangzhou.cr.aliyuncs.com/agentteams/agentteams-embedded:v1.2.0",
+        "image_id": "c0de550018e51b36138a5990b1e8095eacc9d44cc7cbdb36a697785ba02c9be4"
+      },
+      "manager": {
+        "reference": "higress-registry.cn-hangzhou.cr.aliyuncs.com/agentteams/agentteams-manager:v1.2.0",
+        "image_id": "a429666fcc66fa01b81da3bc9ea5af98437697ef794f811ac7d358d4286c317e"
+      },
+      "worker": {
+        "reference": "higress-registry.cn-hangzhou.cr.aliyuncs.com/agentteams/agentteams-worker:v1.2.0",
+        "image_id": "daf587ad042f9564abb2347db5c4205ecc25d1b322e09fdd0d58a2a16c2d5c85"
+      }
+    },
+    "manifest": "deploy/agentteams/team.native-smoke.v1.2.0.yaml"
+  },
+  "model_trials": [
+    {
+      "model": "titmas-qwen3:1.7b-40k",
+      "status": "FAILED_AUTONOMY_BASELINE",
+      "finding": "The local small-model baseline overflowed its effective context and did not reliably delegate or produce exact MCP calls.",
+      "preview_model": false
+    },
+    {
+      "model": "qwen3.8-max-preview",
+      "status": "SELECTED_NATIVE_SMOKE",
+      "finding": "Tool-calling probes passed and all four specialist Workers invoked the Action Gate MCP, but preview status is not a stable runtime contract.",
+      "preview_model": true
+    }
+  ],
+  "autonomy_result": {
+    "manager_task_created": true,
+    "manager_to_leader_handoff": true,
+    "leader_end_to_end_completed": false,
+    "classification": "AUTONOMOUS_END_TO_END_NOT_COMPLETED",
+    "finding": "The Manager created and registered the task, and the leader sent the first specialist assignment, but the leader did not complete the remaining workflow without operator prompts.",
+    "matrix_event_refs": [
+      "$nFvT_56KigWhplYO_YauccMTNRk6qOO677-wQhN3API",
+      "$bPHAb0h5WZbcdHnkbhUFvLSEVd_nOXxAYZ36kWY8abI",
+      "$DLEUnLGMpYJDzmUFrW_X9SzO1Yp4YHRXku6VuHrjfd8"
+    ]
+  },
+  "operator_supervised_chain": {
+    "classification": "OPERATOR_SUPERVISED_AGENT_EXECUTED",
+    "request_id": "aar-native-highcap-001",
+    "agents_used": [
+      "request-analyst",
+      "evidence-verifier",
+      "github-operator",
+      "release-steward"
+    ],
+    "global_chain": {
+      "record_sequences": [1, 2, 3, 4, 5, 6],
+      "hash_chain_issues": [],
+      "semantic_anomalies": ["UNRELATED_CONCURRENT_REQUEST_AT_SEQUENCE_2"],
+      "independently_recomputable_from_public_summary": false
+    },
+    "records": [
+      {
+        "sequence": 1,
+        "record_type": "action_request",
+        "record_hash": "0519fda66648811c7c45cc755dff07db14300435e8726926a481546c9f71d2d2"
+      },
+      {
+        "sequence": 3,
+        "record_type": "evidence_attachment",
+        "record_hash": "70a809af34d255d289474ff077195aea33214db00092009c351d1e3e97c31929"
+      },
+      {
+        "sequence": 4,
+        "record_type": "evidence_result",
+        "record_hash": "f01336e64932dbd0f515ac7f50240c701f2c356d9d211689e2c5bcc26a9c5b28"
+      },
+      {
+        "sequence": 5,
+        "record_type": "policy_evaluation",
+        "record_hash": "734a5685728a4437151609e561f8ac5325a886d923b2200e85533cfa9249e54d"
+      },
+      {
+        "sequence": 6,
+        "record_type": "decision",
+        "record_hash": "5ab91b32c14323a8d1afaa07aa28e7f4e9f1d69fe2e0278c2bcdcc41c0f8d068"
+      }
+    ],
+    "evidence_verification": {
+      "name": "agent-evidence",
+      "version": "0.6.0",
+      "distribution_sha256": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e",
+      "bundle_sha256": "eabd56bf4bbe346139ef5b077c4f3329968a488550524e2de05c17957ae15579",
+      "status": "VALID",
+      "checks": {
+        "SCHEMA": true,
+        "REFERENCES": true,
+        "CONSISTENCY": true,
+        "INTEGRITY": true
+      }
+    },
+    "decision": {
+      "decision_id": "decision-a06e1411cca781868f9666b3d05e376efafca565d53a9c9402a6edc92d6b558f",
+      "outcome": "ALLOW",
+      "reason_code": "ALL_BOUNDARIES_SATISFIED",
+      "decided_at": "2026-08-01T19:54:12.959471Z",
+      "expires_at": "2026-08-01T19:59:12.959471Z",
+      "expired_at_publication": true,
+      "external_action_executed": false
+    },
+    "chain_issues": []
+  },
+  "retained_findings": [
+    {
+      "id": "CONCURRENT_REQUEST_CONTAMINATION",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "description": "A concurrent leader/operator prompt created an unrelated release request at global sequence 2 inside the same store.",
+      "record_sequence": 2,
+      "record_hash": "35b059b6613f9f2d0f6689f3c2163bc91319513cde25511582fd9e1579f13b4e",
+      "remediation": "Add task-scoped correlation enforcement and reject unassigned concurrent requests before claiming autonomous orchestration."
+    },
+    {
+      "id": "ROLE_TOOL_BOUNDARY_DEVIATION",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "description": "The github-operator called evaluate_action_gate although its registry allowlist contains only get_action_state; the shared MCP endpoint did not technically enforce per-Worker tool access.",
+      "remediation": "Enforce authenticated per-Worker MCP tool allowlists at the gateway and retain the workflow-lead as the evaluation caller."
+    },
+    {
+      "id": "LEADER_AUTONOMY_INCOMPLETE",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "description": "The workflow leader did not complete the specialist chain without operator prompts after the first assignment.",
+      "remediation": "Align AgentTeams task skills and room membership, then rerun an unassisted end-to-end trace with explicit stop conditions."
+    },
+    {
+      "id": "PREVIEW_MODEL_DEPENDENCY",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "description": "The successful native smoke used qwen3.8-max-preview, whose availability and behavior are not a stable runtime contract.",
+      "remediation": "Qualify a pinned stable model and retain equivalent tool-call and orchestration evidence."
+    },
+    {
+      "id": "AGENTTEAMS_UPDATE_RECONCILIATION",
+      "severity": "MEDIUM",
+      "status": "RETAINED_AS_UPSTREAM_OBSERVATION",
+      "description": "A model-only Worker update did not reconcile until the soul field also changed, and re-applying an existing Human through the multi-document path returned HTTP 405.",
+      "remediation": "Pin the observed v1.2.0 behavior, use reviewed update procedures, and report upstream before relying on declarative convergence."
+    },
+    {
+      "id": "EPHEMERAL_INTERNAL_CREDENTIAL_DISCLOSURE",
+      "severity": "HIGH",
+      "status": "MITIGATED_FOR_TEMPORARY_RUN",
+      "description": "A read-only local diagnostic exposed one ephemeral AgentTeams internal consumer token in operator-visible output; no user provider key was exposed.",
+      "remediation": "The exact temporary stack and volume were destroyed, the local session cookie and temporary state were removed, and the exposed internal credential will not be reused."
+    }
+  ],
+  "provider_external_effects": {
+    "github_provider_called": false,
+    "external_action_executed": false,
+    "human_approval_recorded": false,
+    "merge": false,
+    "tag": false,
+    "release": false,
+    "provider_deployment": false,
+    "competition_submission": false
+  },
+  "runtime_disposition": {
+    "disposed_at": "2026-08-01T20:15:20Z",
+    "mcp_server_stopped": true,
+    "temporary_agentteams_stack_destroyed": true,
+    "dedicated_volume_removed": true,
+    "session_cookie_removed": true,
+    "temporary_action_gate_state_removed": true,
+    "user_provider_key_copied_into_repository": false
+  },
+  "non_claims": [
+    "NO_AUTONOMOUS_END_TO_END_COMPLETION",
+    "NO_PERSISTENT_AGENTTEAMS_DEPLOYMENT",
+    "NO_PRODUCTION_RUNTIME",
+    "NO_GITHUB_PROVIDER_EXECUTION",
+    "NO_PROVIDER_RELEASE_OR_DEPLOYMENT",
+    "NO_COMPETITION_SUBMISSION",
+    "NO_CERTIFICATION_OR_COMPLIANCE_CLAIM"
+  ]
+}
