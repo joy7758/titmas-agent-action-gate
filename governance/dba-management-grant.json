@@ -4,8 +4,13 @@
   "issued_at": "2026-08-02T00:38:20+08:00",
   "issuer_ref": "zhangbin",
   "grantee_ref": "DBA_PROGRAM_GOVERNANCE_COCKPIT",
-  "status": "AUTHORIZED_POLICY_SCOPE",
-  "purpose": "Allow the DBA cockpit to govern alignment and maintain auditable project-management surfaces for this project.",
+  "status": "AUTHORIZED_FULL_PROJECT_MANAGEMENT_SCOPE_WITH_ACTION_CLASS_GATES",
+  "purpose": "Allow the DBA cockpit to manage governance, architecture, implementation, evidence, repository workflow, release preparation, and competition preparation for this project while preserving action-class gates and truthful status.",
+  "owner_authorization": {
+    "authorization_text": "给予完全授权",
+    "observed_at": "2026-08-02T02:02:09+08:00",
+    "scope": "TITMAS_AGENT_ACTION_GATE_PROJECT_AND_ITS_DISPOSABLE_DEMO_ASSETS"
+  },
   "allowed": [
     "READ_PROJECT_CONTENT",
     "UPDATE_GOVERNANCE_METADATA",
@@ -13,33 +18,36 @@
     "UPDATE_AGENT_READABLE_DISCOVERY_SURFACES",
     "MAINTAIN_STATUS_AND_DEPENDENCY_PROJECTIONS",
     "REQUEST_AND_RECORD_DBA_GATES",
-    "PROPOSE_BOUNDED_CHANGES_USING_BRANCH_COMMIT_PUSH_AND_DRAFT_PR"
+    "IMPLEMENT_TEST_BUILD_AND_EVALUATE",
+    "CREATE_AND_MANAGE_PROJECT_SCOPED_REMOTE_REPOSITORIES_AND_SANDBOXES",
+    "BRANCH_COMMIT_PUSH_OPEN_AND_UPDATE_PULL_REQUESTS",
+    "MERGE_AFTER_REQUIRED_CHECKS_REVIEW_AND_EXACT_TARGET_VERIFICATION",
+    "CREATE_TAG_OR_RELEASE_AFTER_ARTIFACT_AND_RELEASE_GATES",
+    "PREPARE_DEPLOYMENT_AFTER_ENVIRONMENT_AND_ROLLBACK_GATES",
+    "PREPARE_AND_SUBMIT_COMPETITION_MATERIALS_AFTER_MATERIAL_VALIDATION_GATE"
   ],
   "conditions": [
     "ACTOR_IDENTITY_MUST_BE_TRACEABLE_TO_A_HUMAN_OR_AUTHORIZED_AGENT_SESSION",
     "CHANGES_MUST_PRESERVE_CHILD_REPOSITORY_CANONICAL_IMPLEMENTATION_TRUTH",
     "MATERIAL_CHANGES_REQUIRE_DIFF_TESTS_AND_ROLLBACK_PATH",
     "CONFLICT_OR_UNKNOWN_AUTHORITY_FAILS_CLOSED",
-    "PUSH_AND_DRAFT_PR_REQUIRE_A_CONFIGURED_REMOTE_AND_VALID_CREDENTIALS"
+    "REMOTE_ACTIONS_REQUIRE_A_CONFIGURED_REMOTE_VALID_CREDENTIALS_AND_EXACT_TARGET",
+    "MERGE_RELEASE_DEPLOYMENT_AND_SUBMISSION_REMAIN_SEPARATE_RECORDED_EVENTS",
+    "AUTHORIZATION_DOES_NOT_UPGRADE_REFERENCE_EVIDENCE_INTO_PRODUCTION_READINESS"
   ],
   "denied": [
-    "MERGE_TO_PROTECTED_OR_DEFAULT_BRANCH",
     "FORCE_PUSH",
-    "TAG_OR_RELEASE",
-    "DEPLOY_OR_RESTART_SERVICE",
     "MODIFY_SECRETS_OR_CREDENTIALS",
-    "GRANT_RUNTIME_PERMISSION",
-    "EXECUTE_EXTERNAL_OR_IRREVERSIBLE_ACTION",
-    "SUBMIT_TO_COMPETITION",
     "PAYMENT_OR_CONTRACT_ACTION",
     "CLAIM_ADOPTION_CERTIFICATION_PRODUCTION_OR_TRUTH",
-    "DESTRUCTIVE_DELETION"
+    "BYPASS_REQUIRED_CHECKS_REVIEW_OR_ACTION_GATE",
+    "DESTRUCTIVE_DELETION_WITHOUT_EXACT_TARGET_AND_RECOVERY_PLAN"
   ],
   "technical_effect": {
     "repository_acl_changed": false,
     "github_principal_mapped": false,
     "runtime_permission_created": false,
-    "reason": "DBA is a governance role, not a GitHub account or runtime identity. This file is the canonical policy grant until a separately verified technical mapping exists."
+    "reason": "The owner granted full project-management policy scope. DBA is still a governance role rather than a GitHub account or runtime identity; actual actions require a traceable authorized session, provider credentials, and the stated action-class gates."
   },
   "revocation": {
     "revocable": true,

@@ -5,14 +5,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
 import yaml
-
+from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_AGENT_IDS = {
@@ -107,15 +106,15 @@ def reference_decision(case: dict[str, Any]) -> tuple[str, str, bool]:
         return "BLOCK", "INPUT_MISMATCH", False
     if not all(check["passed"] for check in evidence["checks"]):
         return "BLOCK", "EVIDENCE_INVALID", False
-    if approval is not None:
-        if (
-            approval["status"] != "GRANTED"
-            or approval["request_id"] != request["request_id"]
-            or approval["request_binding"] != binding
+    if approval is not None and (
+        approval["status"] != "GRANTED"
+        or approval["request_id"] != request["request_id"]
+        or approval["request_binding"] != binding
             or approval["policy_id"] != policy["policy_id"]
             or approval["policy_version"] != policy["policy_version"]
-        ):
-            return "BLOCK", "APPROVAL_INVALID", False
+            or approval["ruleset_sha256"] != policy["ruleset_sha256"]
+    ):
+        return "BLOCK", "APPROVAL_INVALID", False
     if policy["effect"] == "REQUIRE_HUMAN_APPROVAL" and approval is None:
         return "REQUIRE_APPROVAL", "HUMAN_APPROVAL_REQUIRED", False
     if policy["effect"] in {"ALLOW_WITHOUT_APPROVAL", "REQUIRE_HUMAN_APPROVAL"}:
@@ -160,6 +159,9 @@ def main() -> int:
         "action-gate-decision.v0.1.schema.json",
         "skill-manifest.v0.1.schema.json",
         "mcp-server-manifest.v0.1.schema.json",
+        "mcp-tool-inputs.v0.1.schema.json",
+        "mcp-tool-result.v0.1.schema.json",
+        "agent-evidence-oap-v0.1.schema.json",
     ]
     validators: dict[str, Draft202012Validator] = {}
     for name in schema_names:
@@ -298,13 +300,13 @@ def main() -> int:
             print(f"FAIL: {failure}")
         return 1
 
-    print("MILESTONE_1_CONTRACT_VALIDATION=PASS")
+    print("REFERENCE_IMPLEMENTATION_CONTRACT_VALIDATION=PASS")
     print("SPECIALIZED_AGENT_IDENTITIES=5")
     print("VERSIONED_SKILLS=5")
-    print("MCP_TOOLS_SPECIFIED=6")
+    print("MCP_TOOLS_IMPLEMENTED=6")
     print("EVALUATION_CASES=4")
-    print("ACTION_GATE_IMPLEMENTED=false")
-    print("EXTERNAL_PROVIDER_MUTATION=false")
+    print("ACTION_GATE_IMPLEMENTED=true")
+    print("ACTION_GATE_MCP_EXTERNAL_PROVIDER_MUTATION=false")
     return 0
 
 

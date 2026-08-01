@@ -3,7 +3,7 @@
   "manifest_schema_version": "0.1.0",
   "name": "verify-agent-evidence",
   "version": "0.1.0",
-  "status": "SPECIFICATION_ONLY",
+  "status": "EXPERIMENTAL",
   "entrypoint": "SKILL.md",
   "compatibility": {
     "agentteams_release": "v1.2.0",

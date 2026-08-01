@@ -1,8 +1,8 @@
-# Planned GitHub workflow demo
+# GitHub workflow demo
 
-Status: `NOT_EXECUTED`
+Status: `EXECUTED_BOUNDED_PUBLIC_SANDBOX_NO_MERGE`
 
-The demo will use a disposable repository and least-privilege GitHub identity. It will not run against this repository's default branch or publish a release during milestone 1.
+The demo used the disposable public repository [`joy7758/titmas-action-gate-demo-sandbox`](https://github.com/joy7758/titmas-action-gate-demo-sandbox). It did not write to this repository's default branch, merge the sandbox PR, or publish a release.
 
 ## Scenario
 
@@ -23,6 +23,14 @@ The demo will use a disposable repository and least-privilege GitHub identity. I
 - a provider success is execution evidence, not certification;
 - a PR is not a merge, a merge is not a release, and a release is not a competition submission.
 
-## Completion evidence required
+## Retained evidence
 
-The executed demo must retain AgentTeams handoffs, normalized requests, policy version/digest, evidence bundle and verifier receipt, gate decisions, provider request/response metadata, approval record where applicable, final repository state, negative-case results, and exact component versions. Until that package exists and validates, `GITHUB_DEMO_EXECUTED=false` remains canonical.
+The public summary is [`../demo/evidence/github-sandbox-20260802.json`](../demo/evidence/github-sandbox-20260802.json). It records:
+
+- gate-bound push of commit `ceede38c23a2b952f171e13979cca6a2b6cf9185` to `demo/action-gate-ruleset-bound-20260802`;
+- gate-bound creation of [Draft PR #3](https://github.com/joy7758/titmas-action-gate-demo-sandbox/pull/3);
+- merge decision `REQUIRE_APPROVAL`, followed by `ALLOW` only after an exact scoped demo approval authenticated with the distinct approver credential and bound to the policy ruleset digest;
+- `merge_executed=false`, zero releases at observation, and empty local integrity issue lists;
+- the full local report digest without publishing local filesystem paths.
+
+The handoffs came from the AgentTeams CRD-compatible local harness. `live_agentteams_deployment_claimed=false` remains canonical.

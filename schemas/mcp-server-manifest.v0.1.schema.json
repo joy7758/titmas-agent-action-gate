@@ -17,7 +17,7 @@
         "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
       }
     },
-    "status": {"const": "SPECIFICATION_ONLY"},
+    "status": {"enum": ["SPECIFICATION_ONLY", "EXPERIMENTAL_REFERENCE_IMPLEMENTATION", "STABLE", "RETIRED"]},
     "transport": {"enum": ["streamable-http", "stdio"]},
     "holds_provider_credentials": {"const": false},
     "tools": {

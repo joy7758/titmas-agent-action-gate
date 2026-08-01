@@ -1,0 +1,55 @@
+{
+  "evidence_version": "1.0.0",
+  "observed_at": "2026-08-01T18:01:01Z",
+  "full_local_report_sha256": "ff82c595e3438661aafebfccd92af842caca312fee177f424547fe70ab683032",
+  "orchestration": {
+    "contract": "AgentTeams",
+    "release": "v1.2.0",
+    "commit": "793db242257a569d911b1aa59c1cd554af78511f",
+    "execution_mode": "LOCAL_AGENTTEAMS_CRD_COMPATIBLE_HANDOFF_HARNESS",
+    "live_agentteams_deployment_claimed": false
+  },
+  "provider": {
+    "repository": "joy7758/titmas-action-gate-demo-sandbox",
+    "mode": "GH_CLI_EXTERNAL_WRITE_ALLOWLISTED",
+    "external_write": true
+  },
+  "branch_push": {
+    "request_id": "aar-1f122778c8eab548c3e3c7f5",
+    "decision_id": "decision-b4b88b81e12b5731f52e9d9d4b677771fd41244c482e47f074f7b7cd5fa179ea",
+    "outcome": "ALLOW",
+    "receipt_status": "SUCCEEDED",
+    "branch": "demo/action-gate-ruleset-bound-20260802",
+    "commit": "ceede38c23a2b952f171e13979cca6a2b6cf9185"
+  },
+  "pull_request_create": {
+    "request_id": "aar-b07d99f5034c787dfacb3019",
+    "decision_id": "decision-548d2c09a948bf514f61c54a9313f3e1bd47adfe6aeadb3c20d08850175c5fcf",
+    "outcome": "ALLOW",
+    "receipt_status": "SUCCEEDED",
+    "pull_number": 3,
+    "url": "https://github.com/joy7758/titmas-action-gate-demo-sandbox/pull/3",
+    "remote_state_at_observation": "OPEN_DRAFT"
+  },
+  "release_decision": {
+    "request_id": "aar-36c7e72ae7cce8ca6809dc06",
+    "before_approval": "REQUIRE_APPROVAL",
+    "approval_id": "approval-7c0aef95ba319d01b3871ef7",
+    "approval_authentication": "DISTINCT_DEMO_APPROVER_TOKEN",
+    "approval_ruleset_sha256": "b63aa07263fccff0e505e6e793ce067457e969e4834fbb90381351bc87cd59a3",
+    "after_approval": "ALLOW",
+    "merge_executed": false
+  },
+  "integrity": {
+    "handoff_count": 4,
+    "action_store_chain_issues": [],
+    "agent_evidence_chain_issues": []
+  },
+  "non_claims": [
+    "NO_LIVE_AGENTTEAMS_DEPLOYMENT",
+    "NO_PULL_REQUEST_MERGE_EXECUTED",
+    "NO_RELEASE_OR_DEPLOYMENT",
+    "NO_COMPETITION_SUBMISSION",
+    "NO_PRODUCTION_READINESS_OR_CERTIFICATION"
+  ]
+}

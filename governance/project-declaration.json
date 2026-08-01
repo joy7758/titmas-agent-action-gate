@@ -10,13 +10,13 @@
     "local_path": "/Users/zhangbin/GitHub/titmas-agent-action-gate",
     "remote_repository": "https://github.com/joy7758/titmas-agent-action-gate",
     "remote_visibility": "PUBLIC",
-    "remote_observation": "PUBLIC_REPOSITORY_CREATED_NO_COMMIT_OBSERVED_AT_DECLARATION",
+    "remote_observation": "PUBLIC_REPOSITORY_WITH_M1_BASELINE_AND_DRAFT_DBA_ADMISSION_PR",
     "primary_repository": true,
     "primary_responsibility_domain": "GOVERNANCE_SERVICE_APPLICATION_BOUNDARY",
-    "purpose": "Provide a future fail-closed, auditable decision boundary for agent-proposed external or high-impact actions.",
+    "purpose": "Provide an experimental fail-closed, auditable decision boundary for agent-proposed external or high-impact actions.",
     "initial_use_case": "GOAI_COMPETITION_DIALOGUE_REQUIREMENTS_CONTEXT",
-    "maturity": "M1_SPECIFICATION_BASELINE",
-    "implementation_status": "NOT_STARTED"
+    "maturity": "M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
+    "implementation_status": "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_EVIDENCE"
   },
   "dba_request": {
     "existence_reported": true,
@@ -33,13 +33,12 @@
     "conflict_policy": "CHILD_REPOSITORY_CURRENT_COMMIT_AND_RETAINED_FAILURES_TAKE_PRECEDENCE"
   },
   "non_claims": [
-    "NO_IMPLEMENTATION",
-    "NO_RUNTIME",
-    "NO_MCP_SERVER_IMPLEMENTATION",
-    "NO_ACTION_GATE_RUNTIME",
+    "NO_PRODUCTION_RUNTIME",
+    "NO_LIVE_AGENTTEAMS_DEPLOYMENT",
     "NO_COMPETITION_AFFILIATION",
     "NO_COMPETITION_SUBMISSION",
     "NO_PORTFOLIO_ADMISSION_YET",
-    "NO_RELEASE_OR_DEPLOYMENT"
+    "NO_RELEASE_OR_DEPLOYMENT",
+    "NO_PRODUCTION_READINESS_OR_CERTIFICATION"
   ]
 }

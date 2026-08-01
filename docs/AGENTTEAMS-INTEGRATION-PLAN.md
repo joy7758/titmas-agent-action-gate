@@ -1,12 +1,12 @@
 # AgentTeams integration plan
 
-Status: `M1_SPECIFICATION_ONLY`
+Status: `RESOURCE_AND_HANDOFF_INTEGRATION_IMPLEMENTED_LIVE_DEPLOYMENT_NOT_RUN`
 
 ## Source pin
 
 The integration targets AgentTeams `v1.2.0` at commit `793db242257a569d911b1aa59c1cd554af78511f`. The observed public contract uses `agentteams.io/v1beta1` Worker, Team, Human, and Manager resources, Worker `skills`, and Worker `mcpServers` entries with `name`, `url`, and `transport`.
 
-The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) is deliberately not applied by milestone 1. Model names, human identity, endpoints, Kubernetes policy, secrets, and provider ACLs remain deployment inputs.
+The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) defines the five Workers, Team, Human, and Manager. The local harness executes the same narrow identities and records explicit handoffs, but it is not a substitute for native AgentTeams runtime evidence. The template was not applied because the observed environment had no running Docker daemon and no configured LLM credential names. Model names, human identity, endpoints, Kubernetes policy, secrets, and provider ACLs remain deployment inputs.
 
 ## Topology
 
@@ -20,7 +20,7 @@ The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/t
 
 The five identities are defined in [`../agents/registry.json`](../agents/registry.json). AgentTeams communication permission is not action authorization.
 
-## Planned handoff protocol
+## Implemented handoff protocol
 
 1. Manager sends the request to `workflow-lead` and records a correlation ID.
 2. `workflow-lead` assigns normalization to `request-analyst`.
@@ -31,7 +31,7 @@ The five identities are defined in [`../agents/registry.json`](../agents/registr
 7. On `ALLOW`, `github-operator` compares the provider invocation to the exact decision tuple, consumes the decision once, then attempts the call.
 8. `release-steward` packages execution evidence, invokes verification, and requests a new release decision.
 
-## Deployment controls required before use
+## Deployment controls required before live use
 
 - pin the AgentTeams container/chart and CRDs by digest;
 - separate service accounts for Manager, each Worker, gate service, evidence adapter, and provider MCP;

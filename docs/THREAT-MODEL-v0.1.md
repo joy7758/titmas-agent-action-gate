@@ -1,6 +1,6 @@
 # Threat model v0.1
 
-Status: design hypothesis, not a security assessment.
+Status: controls partially implemented and locally exercised; not an independent security assessment.
 
 ## Protected assets
 
@@ -10,7 +10,7 @@ Status: design hypothesis, not a security assessment.
 - retained rejection and failure history;
 - separation of analysis, approval, execution, and release.
 
-## Threats and planned controls
+## Threats and controls
 
 | Threat | Example | Fail-closed control | Required evaluation |
 |---|---|---|---|
@@ -33,4 +33,4 @@ Schemas cannot prove the correctness of policy, verifier, identity provider, sto
 
 ## Explicit exclusions
 
-Milestone 1 does not claim formal verification, sandbox escape resistance, supply-chain assurance, compliance, certification, or protection against every human administrator action.
+This reference implementation does not claim formal verification, sandbox escape resistance, supply-chain assurance, compliance, certification, or protection against every human administrator action.

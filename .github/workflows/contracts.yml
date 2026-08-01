@@ -18,11 +18,17 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install contract dependencies
+      - name: Install reference implementation dependencies
         run: python -m pip install -e '.[dev]'
+      - name: Lint
+        run: ruff check .
       - name: Validate governance boundary
         run: python scripts/validate_governance.py
       - name: Validate milestone contracts
         run: python scripts/validate_milestone.py
+      - name: Validate installed integrations
+        run: python -m titmas_action_gate.cli validate-install
       - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+        run: python -W error::ResourceWarning -m unittest discover -s tests -v
+      - name: Build source and wheel artifacts
+        run: python -m build

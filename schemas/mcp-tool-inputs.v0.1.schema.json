@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/mcp-tool-inputs.v0.1.schema.json",
+  "title": "TITMAS Action Gate MCP tool inputs v0.1",
+  "$defs": {
+    "callerToken": {"type": "string", "minLength": 16, "maxLength": 512},
+    "submitActionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_request", "caller_token"],
+      "properties": {
+        "action_request": {"$ref": "action-request.v0.1.schema.json"},
+        "caller_token": {"$ref": "#/$defs/callerToken"}
+      }
+    },
+    "attachEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "profile_path", "evidence_types", "caller_token"],
+      "properties": {
+        "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+        "profile_path": {"type": "string", "minLength": 1},
+        "evidence_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"}
+        },
+        "caller_token": {"$ref": "#/$defs/callerToken"}
+      }
+    },
+    "requestOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "caller_token"],
+      "properties": {
+        "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+        "caller_token": {"$ref": "#/$defs/callerToken"}
+      }
+    },
+    "recordHumanApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "subject", "identity_provider", "status", "approver_token"],
+      "properties": {
+        "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+        "subject": {"type": "string", "minLength": 1},
+        "identity_provider": {"type": "string", "minLength": 1},
+        "status": {"enum": ["GRANTED", "DENIED", "REVOKED"]},
+        "approver_token": {"$ref": "#/$defs/callerToken"}
+      }
+    }
+  }
+}

@@ -19,7 +19,7 @@ Exit evidence: JSON/YAML/schema/link validation and unit tests. This proves only
 
 ## M2 — deterministic core
 
-Status: `NOT_STARTED`.
+Status: `COMPLETE_AS_EXPERIMENTAL_REFERENCE`.
 
 - implement pure policy and Action Gate functions;
 - implement canonical serialization, digest binding, expiry, revocation, and one-time consumption;
@@ -30,7 +30,7 @@ Exit gate: deterministic conformance across all fixtures and adversarial cases. 
 
 ## M3 — evidence and MCP adapters
 
-Status: `NOT_STARTED`.
+Status: `COMPLETE_AS_LOCAL_EXPERIMENTAL_REFERENCE`.
 
 - integrate pinned `agent-evidence==0.6.0` without copying its validator;
 - implement the six MCP tools with authentication and structured errors;
@@ -41,19 +41,19 @@ Exit gate: positive and negative adapter evidence in a local isolated environmen
 
 ## M4 — AgentTeams and sandbox GitHub demo
 
-Status: `NOT_STARTED`.
+Status: `PARTIAL_REAL_GITHUB_SANDBOX_COMPLETE_LIVE_AGENTTEAMS_PENDING`.
 
-- deploy pinned AgentTeams resources in an isolated namespace;
+- deploy pinned AgentTeams resources in an isolated namespace (`PENDING_ENVIRONMENT_AND_MODEL_CREDENTIALS`);
 - provision least-privilege identities and gateway rules;
-- execute the full disposable-repository workflow;
-- demonstrate all four required cases plus replay, injection, and scope mutation;
-- independently rerun the agent recommendation gate.
+- execute the bounded disposable-repository workflow (`COMPLETE_NO_MERGE`);
+- demonstrate all four required cases plus replay, injection, and scope mutation (`COMPLETE_LOCAL`);
+- independently rerun the agent recommendation gate (`SELF_RERUN_COMPLETE_INDEPENDENT_REVIEW_PENDING`).
 
 Exit gate: validated evidence package and human review. Demo completion does not imply production readiness.
 
 ## M5 — competition material freeze
 
-Status: `NOT_STARTED_NOT_AUTHORIZED`.
+Status: `DOCUMENTATION_PACKAGE_IN_PROGRESS_SUBMISSION_NOT_AUTHORIZED`.
 
 - produce architecture narrative, runnable instructions, evaluation report, limitations, SBOM, license audit, and material manifest/hashes;
 - create an optional video only if the competition requires it;
