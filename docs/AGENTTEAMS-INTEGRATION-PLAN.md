@@ -1,12 +1,12 @@
 # AgentTeams integration plan
 
-Status: `RESOURCE_AND_HANDOFF_INTEGRATION_IMPLEMENTED_LIVE_DEPLOYMENT_NOT_RUN`
+Status: `NATIVE_LOCAL_SMOKE_OBSERVED_AUTONOMOUS_CHAIN_AND_LEAST_PRIVILEGE_ENFORCEMENT_PENDING`
 
 ## Source pin
 
 The integration targets AgentTeams `v1.2.0` at commit `793db242257a569d911b1aa59c1cd554af78511f`. The observed public contract uses `agentteams.io/v1beta1` Worker, Team, Human, and Manager resources, Worker `skills`, and Worker `mcpServers` entries with `name`, `url`, and `transport`.
 
-The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) defines the five Workers, Team, Human, and Manager. The local harness executes the same narrow identities and records explicit handoffs, but it is not a substitute for native AgentTeams runtime evidence. The template was not applied because the observed environment had no running Docker daemon and no configured LLM credential names. Model names, human identity, endpoints, Kubernetes policy, secrets, and provider ACLs remain deployment inputs.
+The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) defines the intended five Workers, Team, Human, and Manager. The local harness executes the same narrow identities and records explicit handoffs. A separate, non-idempotent profile in [`../deploy/agentteams/team.native-smoke.v1.2.0.yaml`](../deploy/agentteams/team.native-smoke.v1.2.0.yaml) was applied to an official local `v1.2.0` runtime on 2026-08-02. It reused the installer Manager and admin identity, used a preview model, and connected Workers to the real Action Gate MCP endpoint. It is native runtime evidence, but not the completed deployment described by the intended template.
 
 ## Topology
 
@@ -22,6 +22,8 @@ The five identities are defined in [`../agents/registry.json`](../agents/registr
 
 ## Implemented handoff protocol
 
+This is the intended protocol and remains normative even where the observed smoke deviated:
+
 1. Manager sends the request to `workflow-lead` and records a correlation ID.
 2. `workflow-lead` assigns normalization to `request-analyst`.
 3. `evidence-verifier` calls `verify_evidence` and returns the immutable verifier receipt.
@@ -30,6 +32,20 @@ The five identities are defined in [`../agents/registry.json`](../agents/registr
 6. On `REQUIRE_APPROVAL`, the Manager exposes the exact scope to the Human channel. A chat message alone is not approval; `record_human_approval` creates the signed/scoped record.
 7. On `ALLOW`, `github-operator` compares the provider invocation to the exact decision tuple, consumes the decision once, then attempts the call.
 8. `release-steward` packages execution evidence, invokes verification, and requests a new release decision.
+
+## Observed native-smoke deviations
+
+The retained evidence is [`../demo/evidence/agentteams-native-20260802.json`](../demo/evidence/agentteams-native-20260802.json).
+
+- Manager task creation and the first leader assignment succeeded, but the leader did not finish the remaining chain without operator prompts.
+- Four specialist Workers used Qwen `qwen3.8-max-preview` to invoke the MCP server; this is `OPERATOR_SUPERVISED_AGENT_EXECUTED`, not autonomous end-to-end completion.
+- `github-operator` called `evaluate_action_gate`, even though the agent registry allows it only `get_action_state`. All Workers shared one MCP endpoint and per-Worker tool ACLs were not enforced.
+- A concurrent prompt created an unrelated release request at global sequence 2. The append-only hash chain remained valid, but the orchestration was semantically contaminated.
+- Repository Skill names were declared on Workers, but Skill package materialization/discovery was not independently retained.
+- A model-only Worker update did not reconcile until another field changed; re-applying an existing Human through the multi-document path returned HTTP 405.
+- The resulting `ALLOW` expired after five minutes, no provider credential was present, and no GitHub action was attempted.
+
+The role registry is not widened to conform to the observed deviation. The next run must enforce the registry at the MCP gateway and demonstrate a clean, unassisted correlation-scoped chain.
 
 ## Deployment controls required before live use
 

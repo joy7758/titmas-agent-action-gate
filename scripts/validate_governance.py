@@ -39,8 +39,12 @@ def main() -> int:
 
     if declaration["dba_request"].get("portfolio_admitted") is not False:
         failures.append("portfolio admission must remain false until DBA decision")
-    if declaration["project"].get("implementation_status") != "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_EVIDENCE":
+    if declaration["project"].get("implementation_status") != "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE_EVIDENCE":
         failures.append("implementation status does not match the retained reference evidence boundary")
+    if declaration.get("dba_report_reference", {}).get("state") != "MERGED":
+        failures.append("DBA existence report merge observation is missing")
+    if declaration["dba_request"].get("admission_decision_recorded") is not False:
+        failures.append("DBA existence report must not be upgraded into an admission decision")
     if grant["technical_effect"].get("repository_acl_changed") is not False:
         failures.append("policy grant must not claim a repository ACL change")
     if grant["technical_effect"].get("runtime_permission_created") is not False:

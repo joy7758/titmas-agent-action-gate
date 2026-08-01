@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/native-agentteams-run-evidence.v0.1.schema.json",
+  "title": "TITMAS native AgentTeams run evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "evidence_version",
+    "run_id",
+    "observed_at",
+    "orchestration",
+    "model_trials",
+    "autonomy_result",
+    "operator_supervised_chain",
+    "retained_findings",
+    "provider_external_effects",
+    "runtime_disposition",
+    "non_claims"
+  ],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1},
+    "evidence_version": {"const": "0.1.0"},
+    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{7,127}$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "orchestration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "release",
+        "commit",
+        "mode",
+        "temporary_runtime",
+        "platform_constraint",
+        "manifest_manages_manager",
+        "manifest_apply_idempotent",
+        "repository_skills_materialized",
+        "resource_counts",
+        "images",
+        "manifest"
+      ],
+      "properties": {
+        "product": {"const": "AgentTeams"},
+        "release": {"const": "v1.2.0"},
+        "commit": {"const": "793db242257a569d911b1aa59c1cd554af78511f"},
+        "mode": {"const": "OFFICIAL_NATIVE_LOCAL_ISOLATED_RUNTIME"},
+        "temporary_runtime": {"const": true},
+        "platform_constraint": {"const": "MACOS_DOCKER_DESKTOP_HOST_DOCKER_INTERNAL"},
+        "manifest_manages_manager": {"const": false},
+        "manifest_apply_idempotent": {"const": false},
+        "repository_skills_materialized": {"const": false},
+        "resource_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["manager", "team", "human", "workers"],
+          "properties": {
+            "manager": {"const": 1},
+            "team": {"const": 1},
+            "human": {"const": 1},
+            "workers": {"const": 5}
+          }
+        },
+        "images": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["embedded", "manager", "worker"],
+          "properties": {
+            "embedded": {"$ref": "#/$defs/image"},
+            "manager": {"$ref": "#/$defs/image"},
+            "worker": {"$ref": "#/$defs/image"}
+          }
+        },
+        "manifest": {"const": "deploy/agentteams/team.native-smoke.v1.2.0.yaml"}
+      }
+    },
+    "model_trials": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["model", "status", "finding"],
+        "properties": {
+          "model": {"type": "string", "minLength": 1},
+          "status": {"enum": ["FAILED_AUTONOMY_BASELINE", "SELECTED_NATIVE_SMOKE"]},
+          "finding": {"type": "string", "minLength": 10},
+          "preview_model": {"type": "boolean"}
+        }
+      }
+    },
+    "autonomy_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manager_task_created", "manager_to_leader_handoff", "leader_end_to_end_completed", "classification", "finding"],
+      "properties": {
+        "manager_task_created": {"type": "boolean"},
+        "manager_to_leader_handoff": {"type": "boolean"},
+        "leader_end_to_end_completed": {"const": false},
+        "classification": {"const": "AUTONOMOUS_END_TO_END_NOT_COMPLETED"},
+        "finding": {"type": "string", "minLength": 10},
+        "matrix_event_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "operator_supervised_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "request_id", "agents_used", "global_chain", "records", "evidence_verification", "decision", "chain_issues"],
+      "properties": {
+        "classification": {"const": "OPERATOR_SUPERVISED_AGENT_EXECUTED"},
+        "request_id": {"const": "aar-native-highcap-001"},
+        "agents_used": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {"enum": ["request-analyst", "evidence-verifier", "github-operator", "release-steward"]}
+        },
+        "global_chain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["record_sequences", "hash_chain_issues", "semantic_anomalies", "independently_recomputable_from_public_summary"],
+          "properties": {
+            "record_sequences": {
+              "type": "array",
+              "prefixItems": [
+                {"const": 1}, {"const": 2}, {"const": 3}, {"const": 4}, {"const": 5}, {"const": 6}
+              ],
+              "items": false
+            },
+            "hash_chain_issues": {"type": "array", "maxItems": 0},
+            "semantic_anomalies": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+            "independently_recomputable_from_public_summary": {"const": false}
+          }
+        },
+        "records": {
+          "type": "array",
+          "minItems": 5,
+          "items": {"$ref": "#/$defs/record"}
+        },
+        "evidence_verification": {"$ref": "#/$defs/evidenceVerification"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "chain_issues": {"type": "array", "maxItems": 0}
+      }
+    },
+    "retained_findings": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "status", "description"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z0-9_-]+$"},
+          "severity": {"enum": ["INFO", "LOW", "MEDIUM", "HIGH"]},
+          "status": {"enum": ["OPEN", "MITIGATED_FOR_TEMPORARY_RUN", "RETAINED_AS_UPSTREAM_OBSERVATION"]},
+          "description": {"type": "string", "minLength": 10},
+          "record_sequence": {"type": "integer", "minimum": 1},
+          "record_hash": {"$ref": "#/$defs/sha256"},
+          "remediation": {"type": "string", "minLength": 10}
+        }
+      }
+    },
+    "provider_external_effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["github_provider_called", "external_action_executed", "human_approval_recorded", "merge", "tag", "release", "provider_deployment", "competition_submission"],
+      "properties": {
+        "github_provider_called": {"const": false},
+        "external_action_executed": {"const": false},
+        "human_approval_recorded": {"const": false},
+        "merge": {"const": false},
+        "tag": {"const": false},
+        "release": {"const": false},
+        "provider_deployment": {"const": false},
+        "competition_submission": {"const": false}
+      }
+    },
+    "runtime_disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposed_at",
+        "mcp_server_stopped",
+        "temporary_agentteams_stack_destroyed",
+        "dedicated_volume_removed",
+        "session_cookie_removed",
+        "temporary_action_gate_state_removed",
+        "user_provider_key_copied_into_repository"
+      ],
+      "properties": {
+        "disposed_at": {"type": "string", "format": "date-time"},
+        "mcp_server_stopped": {"const": true},
+        "temporary_agentteams_stack_destroyed": {"const": true},
+        "dedicated_volume_removed": {"const": true},
+        "session_cookie_removed": {"const": true},
+        "temporary_action_gate_state_removed": {"const": true},
+        "user_provider_key_copied_into_repository": {"const": false}
+      }
+    },
+    "non_claims": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z0-9_]+$"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "image_id"],
+      "properties": {
+        "reference": {"type": "string", "minLength": 1},
+        "image_id": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "record_type", "record_hash"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "record_type": {"enum": ["action_request", "evidence_attachment", "evidence_result", "policy_evaluation", "decision"]},
+        "record_hash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidenceVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "distribution_sha256", "bundle_sha256", "status", "checks"],
+      "properties": {
+        "name": {"const": "agent-evidence"},
+        "version": {"const": "0.6.0"},
+        "distribution_sha256": {"const": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e"},
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "status": {"const": "VALID"},
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["SCHEMA", "REFERENCES", "CONSISTENCY", "INTEGRITY"],
+          "properties": {
+            "SCHEMA": {"const": true},
+            "REFERENCES": {"const": true},
+            "CONSISTENCY": {"const": true},
+            "INTEGRITY": {"const": true}
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "outcome", "reason_code", "decided_at", "expires_at", "expired_at_publication", "external_action_executed"],
+      "properties": {
+        "decision_id": {"type": "string", "pattern": "^decision-[a-f0-9]{64}$"},
+        "outcome": {"const": "ALLOW"},
+        "reason_code": {"const": "ALL_BOUNDARIES_SATISFIED"},
+        "decided_at": {"type": "string", "format": "date-time"},
+        "expires_at": {"type": "string", "format": "date-time"},
+        "expired_at_publication": {"const": true},
+        "external_action_executed": {"const": false}
+      }
+    }
+  }
+}

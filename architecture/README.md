@@ -1,6 +1,6 @@
 # Reference architecture
 
-The experimental reference implementation enforces a fail-closed boundary between agent reasoning and external action. The AgentTeams resource template is pinned but not live-deployed in the retained demo.
+The experimental reference implementation enforces a fail-closed boundary between agent reasoning and external action. A temporary official AgentTeams `v1.2.0` deployment exercised the native Manager/Worker and MCP surfaces, but did not complete the intended end-to-end orchestration autonomously. The diagram below is the target/reference flow, not a claim that every edge completed in that native smoke.
 
 ```mermaid
 flowchart LR
@@ -22,6 +22,28 @@ flowchart LR
   AE --> RS["release-steward"]
   RS --> G2["New deterministic release gate"]
 ```
+
+## Observed native smoke flow
+
+```mermaid
+flowchart LR
+  M["Manager created and registered task"] --> L["workflow-lead received handoff"]
+  L --> A["First request-analyst assignment"]
+  L -. "autonomous chain stopped" .-> X["Operator supervision"]
+  X --> RA["request-analyst called MCP"]
+  X --> EV["evidence-verifier called MCP"]
+  X --> GO["github-operator called MCP"]
+  X --> RS["release-steward read final state"]
+  RA --> G["Append-only Action Gate state"]
+  EV --> G
+  GO --> G
+  G --> D["Expired ALLOW; no provider execution"]
+  RS --> D
+```
+
+The global hash chain was structurally valid, but a concurrent prompt also created an unrelated sequence-2 request. Structural chain validity therefore did not establish clean orchestration semantics. The shared smoke MCP endpoint exposed all six tools to every Worker; `soul` and `agents` prompts were advisory controls, and per-Worker tool ACLs were not technically enforced. In particular, `github-operator` invoked `evaluate_action_gate` outside its declared registry allowlist. These are retained gaps, not reasons to broaden the intended role contract.
+
+The smoke manifest declared repository Skill names, but retained evidence does not prove that the repository Skill packages were materialized or discovered inside each Worker. Skill-native integration therefore remains pending.
 
 ## Components and authority
 

@@ -5,7 +5,7 @@ Manifest: [`../mcp/server-manifest.v0.1.json`](../mcp/server-manifest.v0.1.json)
 
 ## Server boundary
 
-The `titmas-action-gate` MCP server is a deterministic contract adapter implemented with FastMCP. It supports stdio, SSE, and streamable HTTP, although only stdio is exercised in the retained integration test. It does not orchestrate agents, expose provider mutation tools, or hold GitHub credentials. The optional provider adapter is a separate process boundary reached only after an exact `ALLOW` is validated and atomically consumed.
+The `titmas-action-gate` MCP server is a deterministic contract adapter implemented with FastMCP. It supports stdio, SSE, and streamable HTTP. Stdio has a retained protocol integration test; streamable HTTP was exercised once as an unauthenticated-transport, token-protected bridge in the disposable native AgentTeams smoke. That bridge is not a persistent or hardened network deployment. The server does not orchestrate agents, expose provider mutation tools, or hold GitHub credentials. The optional provider adapter is a separate process boundary reached only after an exact `ALLOW` is validated and atomically consumed.
 
 ## Tools
 

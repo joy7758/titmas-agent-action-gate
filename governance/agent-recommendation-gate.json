@@ -1,14 +1,47 @@
 {
-  "gate_version": "1.0.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-001",
-  "evaluated_at": "2026-08-02T01:46:54+08:00",
+  "gate_version": "1.1.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-002",
+  "evaluated_at": "2026-08-02T04:09:59+08:00",
   "evaluator_class": "AI_AGENT",
   "customer_need": "Prevent an agent in a competition dialogue or delegated workflow from crossing an explicit action boundary without an auditable decision and authorization reference.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "The experimental reference implementation now has deterministic runtime tests, a real MCP stdio exchange, canonical agent-evidence verification, replay and mutation defenses, and a bounded real-GitHub sandbox trace. Product use remains not recommended because AgentTeams was not deployed live, demo signing keys are not production key management, and no independent security or operational review exists."
+    "reason": "The experimental reference implementation has deterministic runtime tests, MCP protocol exchanges, canonical agent-evidence verification, replay and mutation defenses, a bounded real-GitHub sandbox trace, and one official native AgentTeams v1.2.0 local smoke. Product use remains not recommended because the native run was operator-supervised, did not enforce per-Worker tool ACLs or prove repository Skill materialization, used a preview model, retained semantic contamination and role-boundary deviations, and no production key management or independent security and operational review exists."
   },
+  "advisory_agent_reviews": [
+    {
+      "agent": "Qwen qwen3.8-max-preview",
+      "scope": "NATIVE_AGENTTEAMS_SPECIALIST_EXECUTION_AND_RUNTIME_TRACE",
+      "result": "TRACE_RETAINED_WITH_AUTONOMY_ROLE_ACL_AND_CONCURRENCY_FAILURES",
+      "authorization_effect": "NONE",
+      "stable_runtime_contract": false
+    },
+    {
+      "agent": "Gemini 3.6 Flash",
+      "scope": "COMPLETE_LOCAL_CHANGESET_READ_ONLY_REVIEW",
+      "result": "APPROVE_WITH_LIMITATIONS",
+      "residual_risks": [
+        "PER_WORKER_MCP_TOOL_ACL_NOT_ENFORCED",
+        "PREVIEW_QWEN_MODEL_NOT_STABLE_CONTRACT",
+        "MANAGER_LEADER_CHAIN_NOT_AUTONOMOUS"
+      ],
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Gemini 3.1 Pro Preview",
+      "scope": "PLANNED_COMPLETE_LOCAL_CHANGESET_READ_ONLY_REVIEW",
+      "result": "NOT_EXECUTED_QUOTA_LIMIT_ZERO",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Jules API",
+      "scope": "PLANNED_REMOTE_REPOSITORY_READ_ONLY_REVIEW",
+      "result": "NOT_EXECUTED_SESSION_CREATE_FAILED_PRECONDITION",
+      "authorization_effect": "NONE"
+    }
+  ],
   "non_recommendation_reasons": [
     {
       "id": "NR-001",
@@ -22,8 +55,8 @@
     },
     {
       "id": "NR-003",
-      "reason": "The local handoff harness mirrors pinned AgentTeams resources, but no live AgentTeams Manager/Worker deployment was available in the current environment.",
-      "required_fix": "Deploy the pinned AgentTeams release with configured model credentials, apply the team resources, and retain native handoff evidence."
+      "reason": "Native local Manager/Worker smoke evidence exists, but it did not establish autonomous end-to-end orchestration, enforced per-Worker MCP tool ACLs, repository Skill materialization, a stable model contract, persistent deployment, or operational readiness.",
+      "required_fix": "Enforce registry-scoped MCP ACLs, package and attest Skills, qualify a stable model, and retain a clean unassisted correlation-scoped native trace in an isolated reproducible environment."
     },
     {
       "id": "NR-004",
@@ -46,11 +79,19 @@
     "SIX_TOOL_MCP_STDIO_REFERENCE_IMPLEMENTED",
     "AGENT_EVIDENCE_RUNTIME_ADAPTER_VALIDATED",
     "REAL_GITHUB_SANDBOX_BRANCH_AND_DRAFT_PR_CREATED",
-    "REPLAY_MUTATION_AND_CONFUSED_DEPUTY_TESTS_PASSED"
+    "REPLAY_MUTATION_AND_CONFUSED_DEPUTY_TESTS_PASSED",
+    "OFFICIAL_AGENTTEAMS_V1_2_0_NATIVE_LOCAL_SMOKE_RETAINED",
+    "QWEN_HIGH_CAPABILITY_SPECIALIST_MCP_TRACE_RETAINED",
+    "AUTONOMY_ROLE_ACL_AND_CONCURRENCY_FAILURES_RETAINED_AS_EVIDENCE",
+    "DBA_EXISTENCE_REPORT_MERGED_PR_100_G0_PENDING"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",
-    "LIVE_AGENTTEAMS_DEPLOYMENT_EVIDENCE",
+    "CLEAN_AUTONOMOUS_NATIVE_AGENTTEAMS_TRACE",
+    "ENFORCED_PER_WORKER_MCP_TOOL_ACL",
+    "REPOSITORY_SKILL_MATERIALIZATION_EVIDENCE",
+    "STABLE_MODEL_RUNTIME_CONTRACT",
+    "PERSISTENT_AGENTTEAMS_DEPLOYMENT_EVIDENCE",
     "INDEPENDENT_SECURITY_AND_OPERATIONAL_REVIEW",
     "PRODUCTION_KEY_AND_IDENTITY_MANAGEMENT",
     "COMPETITION_MATERIAL_REVIEW_AND_SEPARATELY_AUTHORIZED_SUBMISSION"

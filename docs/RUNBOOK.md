@@ -58,4 +58,20 @@ Before push, the adapter verifies the exact repository allowlist, worktree root,
 
 ## AgentTeams deployment boundary
 
-The pinned resources are in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml). Replace every `CONFIGURE_*` placeholder, provision independent service identities, and satisfy the controls in [`AGENTTEAMS-INTEGRATION-PLAN.md`](AGENTTEAMS-INTEGRATION-PLAN.md) before applying them. A local handoff report is not native AgentTeams runtime evidence.
+The reviewable resources are in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml). Replace every `CONFIGURE_*` placeholder, provision independent service identities, and satisfy the controls in [`AGENTTEAMS-INTEGRATION-PLAN.md`](AGENTTEAMS-INTEGRATION-PLAN.md) before applying them. A local handoff report is not native AgentTeams runtime evidence.
+
+The observed macOS Docker Desktop profile is [`../deploy/agentteams/team.native-smoke.v1.2.0.yaml`](../deploy/agentteams/team.native-smoke.v1.2.0.yaml). It is intentionally not a standalone or idempotent deployment: the official AgentTeams `v1.2.0` installer must already have created its `default` Manager and local admin identity, `host.docker.internal` must resolve, model/gateway configuration is external, and repository Skills are not packaged by this file.
+
+For an isolated bridge smoke only, start the MCP endpoint with explicit network exposure:
+
+```bash
+export TITMAS_ACTION_GATE_STATE_DIR='artifacts/runtime/agentteams-native-smoke'
+export TITMAS_ACTION_GATE_CALLER_TOKEN='replace-with-a-random-agent-token'
+export TITMAS_ACTION_GATE_APPROVER_TOKEN='replace-with-a-distinct-approver-token'
+export TITMAS_ACTION_GATE_DEMO_MODE='true'
+export TITMAS_ACTION_GATE_MCP_TRANSPORT='streamable-http'
+export TITMAS_ACTION_GATE_MCP_HOST='0.0.0.0'
+.venv/bin/titmas-action-gate-mcp
+```
+
+Binding `0.0.0.0` expands network exposure and supplies no authentication beyond the reference tokens. Keep the host isolated, expose no provider-action credential, and destroy the exact temporary AgentTeams containers, their dedicated smoke volume, state directory, and session cookie after evidence capture. Do not use broad container or volume deletion commands. The retained run evidence is [`../demo/evidence/agentteams-native-20260802.json`](../demo/evidence/agentteams-native-20260802.json).

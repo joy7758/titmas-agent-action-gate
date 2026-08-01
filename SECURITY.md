@@ -12,8 +12,11 @@ Do not open a public issue containing secrets, exploitable credentials, or priva
 
 - demo record signatures and distinct caller/approver tokens use local static material and do not implement production key custody, identity proofing, rotation, revocation, or hardware protection;
 - SQLite hash chaining detects many local mutations but is not an independently anchored immutable ledger;
-- the retained AgentTeams evidence is a CRD-compatible local handoff harness, not a live Manager/Worker deployment;
-- the MCP stdio test proves protocol interoperability, not hardened network authentication or multi-tenant isolation;
+- retained AgentTeams evidence includes both a CRD-compatible local handoff harness and one temporary native local Manager/Worker smoke; neither is a persistent or production deployment;
+- the native smoke was operator-supervised, did not complete the Manager/leader chain autonomously, and did not prove repository Skill materialization;
+- every native Worker shared one MCP endpoint, and per-Worker tool ACLs were not technically enforced; `github-operator` invoked a tool outside its declared registry allowlist;
+- an operator diagnostic exposed an ephemeral internal AgentTeams consumer credential and local administrator material in local output; no user provider key was exposed, the exact temporary stack and state were destroyed, and that internal credential must never be reused;
+- the MCP stdio test and disposable HTTP bridge smoke prove interoperability, not hardened network authentication or multi-tenant isolation;
 - `agent-evidence` verifies its evidence profile contract; verification is neither factual truth nor action authorization;
 - a valid gate decision does not override GitHub permissions and does not imply execution success;
 - a compromised gate process, provider credential, workstation, or administrator can bypass reference controls.

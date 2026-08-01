@@ -41,13 +41,15 @@ Exit gate: positive and negative adapter evidence in a local isolated environmen
 
 ## M4 — AgentTeams and sandbox GitHub demo
 
-Status: `PARTIAL_REAL_GITHUB_SANDBOX_COMPLETE_LIVE_AGENTTEAMS_PENDING`.
+Status: `PARTIAL_NATIVE_AGENTTEAMS_LOCAL_SMOKE_AND_REAL_GITHUB_SANDBOX_COMPLETE_AUTONOMOUS_CHAIN_PENDING`.
 
-- deploy pinned AgentTeams resources in an isolated namespace (`PENDING_ENVIRONMENT_AND_MODEL_CREDENTIALS`);
-- provision least-privilege identities and gateway rules;
+- deploy pinned AgentTeams resources in an isolated namespace (`TEMPORARY_NATIVE_SMOKE_COMPLETE_PERSISTENT_DEPLOYMENT_PENDING`);
+- provision least-privilege identities and gateway rules (`PENDING_PER_WORKER_MCP_TOOL_ACL`);
 - execute the bounded disposable-repository workflow (`COMPLETE_NO_MERGE`);
 - demonstrate all four required cases plus replay, injection, and scope mutation (`COMPLETE_LOCAL`);
-- independently rerun the agent recommendation gate (`SELF_RERUN_COMPLETE_INDEPENDENT_REVIEW_PENDING`).
+- independently rerun the agent recommendation gate (`QWEN_NATIVE_REVIEW_EVIDENCE_RETAINED_INDEPENDENT_SECURITY_REVIEW_PENDING`).
+
+The retained native run is operator-supervised specialist execution. The Manager/leader chain did not finish autonomously, repository Skill materialization was not proven, one concurrent request contaminated the global sequence, and the shared MCP endpoint did not enforce the registry's per-Worker tool boundaries. These remain M4 exit blockers even though the deterministic target request chain was structurally valid.
 
 Exit gate: validated evidence package and human review. Demo completion does not imply production readiness.
 

@@ -1,0 +1,163 @@
+# Local-only native AgentTeams v1.2.0 smoke manifest for macOS Docker Desktop.
+# It is not a complete or idempotent deployment description: it reuses the
+# installer-created `default` Manager, the existing local admin identity, and
+# host.docker.internal. Repository Skill names were declared but their packages
+# were not independently shown to be materialized inside the Workers.
+# This grants no provider authority.
+# The Human resource is collaboration identity only; Action Gate approval remains a
+# separately authenticated, request-scoped MCP input.
+apiVersion: agentteams.io/v1beta1
+kind: Human
+metadata:
+  name: titmas-action-gate-reviewer
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+spec:
+  displayName: TITMAS Local Reviewer
+  username: admin
+  permissionLevel: 2
+  accessibleTeams:
+    - titmas-action-gate
+  identitySource:
+    issuer: local-matrix
+    subject: "@admin:matrix-local.agentteams.io:18080"
+  note: Collaboration identity only; scoped approvals are separate signed records.
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: workflow-lead
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+    titmas.dev/skills-materialized: "false"
+    titmas.dev/model-risk: preview-model-not-a-stable-runtime-contract
+spec:
+  model: qwen3.8-max-preview
+  runtime: openclaw
+  identity: Transparent coordinator; routing is not authorization.
+  soul: Decompose and route through AgentTeams rooms. Never decide, approve, execute, merge, tag, or release; require machine-readable completion receipts.
+  agents: Read AGENTS.md and the agent registry. Preserve correlation and decision boundaries. Delegate only through AgentTeams rooms and require machine-readable completion receipts.
+  skills:
+    - use-action-gate
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://host.docker.internal:8766/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: request-analyst
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+    titmas.dev/skills-materialized: "false"
+    titmas.dev/model-risk: preview-model-not-a-stable-runtime-contract
+spec:
+  model: qwen3.8-max-preview
+  runtime: openclaw
+  identity: Request normalizer and uncertainty reporter.
+  soul: Convert proposals into explicit schema-valid requests without granting permission; call the assigned MCP tool directly and preserve its receipt fields.
+  agents: Do not infer credentials, approval, policy outcome, or provider success. Use the assigned MCP tool directly and return its exact receipt fields.
+  skills:
+    - analyze-action-request
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://host.docker.internal:8766/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: evidence-verifier
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+    titmas.dev/skills-materialized: "false"
+    titmas.dev/model-risk: preview-model-not-a-stable-runtime-contract
+spec:
+  model: qwen3.8-max-preview
+  runtime: openclaw
+  identity: Operator of the pinned canonical agent-evidence adapter.
+  soul: Return pinned-verifier receipts without rewriting failures or making policy decisions; preserve every failed check.
+  agents: Verification is evidence input, not authorization, truth, certification, or compliance. Use the pinned adapter through MCP and preserve every failed check.
+  skills:
+    - verify-agent-evidence
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://host.docker.internal:8766/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: github-operator
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+    titmas.dev/skills-materialized: "false"
+    titmas.dev/model-risk: preview-model-not-a-stable-runtime-contract
+spec:
+  model: qwen3.8-max-preview
+  runtime: openclaw
+  identity: Exact-action operator with no ambient provider authority.
+  soul: Stop unless the Action Gate returns an exact live ALLOW and provider ACL checks pass; in smoke mode stop after the decision because no provider credential is present.
+  agents: Never broaden target or parameters; never infer approval from chat. In smoke mode stop after reading an exact deterministic decision because no provider credential is present.
+  skills:
+    - execute-github-action
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://host.docker.internal:8766/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: release-steward
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+    titmas.dev/skills-materialized: "false"
+    titmas.dev/model-risk: preview-model-not-a-stable-runtime-contract
+spec:
+  model: qwen3.8-max-preview
+  runtime: openclaw
+  identity: Post-execution evidence and release-decision requester.
+  soul: Assemble evidence and request a new gate decision; never merge, tag, release, or upgrade provider success into authorization.
+  agents: Provider success is not release authorization or competition submission. Return chain issues and the latest deterministic state without upgrading claims.
+  skills:
+    - prepare-release-decision
+  mcpServers:
+    - name: titmas-action-gate
+      url: http://host.docker.internal:8766/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Team
+metadata:
+  name: titmas-action-gate
+  annotations:
+    titmas.dev/profile: native-smoke-only
+    titmas.dev/platform: macos-docker-desktop
+spec:
+  description: Evidence-verified deterministic external-action boundary demo.
+  teamName: titmas-action-gate
+  workerMembers:
+    - name: workflow-lead
+      role: team_leader
+    - name: request-analyst
+      role: worker
+    - name: evidence-verifier
+      role: worker
+    - name: github-operator
+      role: worker
+    - name: release-steward
+      role: worker
+  peerMentions: true
+  admin:
+    name: titmas-action-gate-reviewer
+  humanMembers:
+    - name: titmas-action-gate-reviewer
+      role: coordinator
