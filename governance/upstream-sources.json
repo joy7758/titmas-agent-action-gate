@@ -35,6 +35,22 @@
       "path": "digital-biosphere-architecture/architecture/open-infrastructure-strategy-constitution.md",
       "sha256": "ca34af2be5152e395454a83a0e9d2f085861497b601e980adee39e0a36113954",
       "integration_policy": "VERBATIM_NON_NORMATIVE_LOCAL_SNAPSHOT_WITH_FAIL_CLOSED_HASH_CHECK"
+    },
+    {
+      "id": "actions-checkout",
+      "role": "CI_SOURCE_CHECKOUT",
+      "repository": "https://github.com/actions/checkout",
+      "release": "v7.0.1",
+      "commit": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "integration_policy": "PIN_EXACT_COMMIT"
+    },
+    {
+      "id": "actions-setup-python",
+      "role": "CI_PYTHON_RUNTIME_SETUP",
+      "repository": "https://github.com/actions/setup-python",
+      "release": "v7.0.0",
+      "commit": "5fda3b95a4ea91299a34e894583c3862153e4b97",
+      "integration_policy": "PIN_EXACT_COMMIT"
     }
   ]
 }
