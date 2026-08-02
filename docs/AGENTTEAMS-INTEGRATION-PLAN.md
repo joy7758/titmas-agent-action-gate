@@ -6,19 +6,19 @@ Status: `NATIVE_LOCAL_SMOKE_OBSERVED_AUTONOMOUS_CHAIN_AND_LEAST_PRIVILEGE_ENFORC
 
 The integration targets AgentTeams `v1.2.0` at commit `793db242257a569d911b1aa59c1cd554af78511f`. The observed public contract uses `agentteams.io/v1beta1` Worker, Team, Human, and Manager resources, Worker `skills`, and Worker `mcpServers` entries with `name`, `url`, and `transport`.
 
-The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) defines the intended five Workers, Team, Human, and Manager. The local harness executes the same narrow identities and records explicit handoffs. A separate, non-idempotent profile in [`../deploy/agentteams/team.native-smoke.v1.2.0.yaml`](../deploy/agentteams/team.native-smoke.v1.2.0.yaml) was applied to an official local `v1.2.0` runtime on 2026-08-02. It reused the installer Manager and admin identity, used a preview model, and connected Workers to the real Action Gate MCP endpoint. It is native runtime evidence, but not the completed deployment described by the intended template.
+The template in [`../deploy/agentteams/team.v1.2.0.yaml`](../deploy/agentteams/team.v1.2.0.yaml) defines the intended six Workers, Team, Human, and Manager. The historical, non-idempotent five-Worker profile in [`../deploy/agentteams/team.native-smoke.v1.2.0.yaml`](../deploy/agentteams/team.native-smoke.v1.2.0.yaml) was applied to an official local `v1.2.0` runtime on 2026-08-02. It reused the installer Manager and admin identity, used a preview model, and connected Workers to the earlier Action Gate MCP endpoint. It is retained native runtime evidence, not evidence for the new autonomous or Alibaba Cloud integration.
 
 ## Topology
 
 - one Manager for dispatch, status, and human-visible coordination;
 - one Team with `workflow-lead` as `team_leader`;
-- four specialized Worker members;
+- five specialized Worker members, including the bounded `cloud-context-inspector`;
 - one Human resource as the review-channel identity, not an implicit approval;
 - local Skill directories mounted or packaged into the Workers;
 - the Action Gate MCP server exposed through an authenticated gateway;
 - provider GitHub MCP exposed only to `github-operator`, after independent gateway and provider ACL checks.
 
-The five identities are defined in [`../agents/registry.json`](../agents/registry.json). AgentTeams communication permission is not action authorization.
+The six identities are defined in [`../agents/registry.json`](../agents/registry.json). AgentTeams communication permission is not action authorization.
 
 ## Implemented handoff protocol
 
@@ -31,7 +31,9 @@ This is the intended protocol and remains normative even where the observed smok
 5. On `BLOCK`, the team records the rejection and stops.
 6. On `REQUIRE_APPROVAL`, the Manager exposes the exact scope to the Human channel. A chat message alone is not approval; `record_human_approval` creates the signed/scoped record.
 7. On `ALLOW`, `github-operator` compares the provider invocation to the exact decision tuple, consumes the decision once, then attempts the call.
-8. `release-steward` packages execution evidence, invokes verification, and requests a new release decision.
+8. `release-steward` submits the exact deployment-related release request without evaluating it.
+9. `cloud-context-inspector` invokes only the typed current-account Resource Center search. Missing credentials or permission remains `NOT_ASSESSED`; the Skill cannot decide the gate.
+10. `release-steward` packages execution plus the service-verified cloud receipt, invokes canonical verification, and requests a new deterministic release decision.
 
 ## Observed native-smoke deviations
 
@@ -58,6 +60,7 @@ The role registry is not widened to conform to the observed deviation. The next 
 - enforce egress, namespace, resource, and audit-log policies;
 - retain rejected actions and verifier failures;
 - run the threat-model and conformance suites before any external write.
+- keep Alibaba Cloud credentials server-side, prove the RAM identity is read-only, prohibit all cloud writes in code, and retain aggregate-only cloud evidence.
 
 ## Compatibility gate
 

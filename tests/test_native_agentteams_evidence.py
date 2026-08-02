@@ -9,7 +9,7 @@ import unittest
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
-from scripts.validate_milestone import EXPECTED_AGENT_IDS, ROOT
+from scripts.validate_milestone import HISTORICAL_SMOKE_AGENT_IDS, ROOT
 
 
 class NativeAgentTeamsEvidenceTests(unittest.TestCase):
@@ -33,8 +33,8 @@ class NativeAgentTeamsEvidenceTests(unittest.TestCase):
         self.assertEqual(len(workers), 5)
         self.assertEqual(len(teams), 1)
         self.assertEqual(len(humans), 1)
-        self.assertEqual({worker["metadata"]["name"] for worker in workers}, EXPECTED_AGENT_IDS)
-        self.assertEqual({agent["id"] for agent in self.registry["agents"]}, EXPECTED_AGENT_IDS)
+        self.assertEqual({worker["metadata"]["name"] for worker in workers}, HISTORICAL_SMOKE_AGENT_IDS)
+        self.assertTrue(HISTORICAL_SMOKE_AGENT_IDS.issubset({agent["id"] for agent in self.registry["agents"]}))
         self.assertEqual(sum(member["role"] == "team_leader" for member in teams[0]["spec"]["workerMembers"]), 1)
         for worker in workers:
             annotations = worker["metadata"]["annotations"]

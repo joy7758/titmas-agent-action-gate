@@ -11,7 +11,7 @@
   },
   "inputs": ["untrusted natural-language request", "schemas/action-request.v0.1.schema.json"],
   "outputs": ["schemas/action-request.v0.1.schema.json"],
-  "mcp_tools": ["submit_action_request", "get_action_state"],
+  "mcp_tools": ["submit_action_request", "generate_evidence_profile", "get_action_state"],
   "authority": {"may_propose": true, "may_decide": false, "may_approve": false, "may_execute": false},
   "examples": ["examples/example.json"],
   "tests": ["../../tests/test_contracts.py", "../../tests/test_boundaries.py"]

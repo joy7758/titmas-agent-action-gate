@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_AGENT_IDS = {
@@ -19,8 +20,10 @@ EXPECTED_AGENT_IDS = {
     "request-analyst",
     "evidence-verifier",
     "github-operator",
+    "cloud-context-inspector",
     "release-steward",
 }
+HISTORICAL_SMOKE_AGENT_IDS = EXPECTED_AGENT_IDS - {"cloud-context-inspector"}
 EXPECTED_SKILLS = {
     "analyze-action-request",
     "verify-agent-evidence",
@@ -110,9 +113,9 @@ def reference_decision(case: dict[str, Any]) -> tuple[str, str, bool]:
         approval["status"] != "GRANTED"
         or approval["request_id"] != request["request_id"]
         or approval["request_binding"] != binding
-            or approval["policy_id"] != policy["policy_id"]
-            or approval["policy_version"] != policy["policy_version"]
-            or approval["ruleset_sha256"] != policy["ruleset_sha256"]
+        or approval["policy_id"] != policy["policy_id"]
+        or approval["policy_version"] != policy["policy_version"]
+        or approval["ruleset_sha256"] != policy["ruleset_sha256"]
     ):
         return "BLOCK", "APPROVAL_INVALID", False
     if policy["effect"] == "REQUIRE_HUMAN_APPROVAL" and approval is None:
@@ -130,6 +133,11 @@ def validate_markdown_links(failures: list[str]) -> None:
         if path.is_relative_to(ROOT / "governance/upstream"):
             # The pinned constitution is a verbatim single-file snapshot. Its
             # upstream-relative ADR links are intentionally not copied here.
+            continue
+        if path.is_relative_to(ROOT / "skills/alibabacloud-resourcecenter-search"):
+            # This directory is an exact source-locked upstream subtree.  Links
+            # to sibling upstream documentation are retained verbatim and are
+            # not rewritten or fabricated locally.
             continue
         for target in link_pattern.findall(path.read_text(encoding="utf-8")):
             clean = target.strip("<>").split("#", 1)[0]
@@ -163,6 +171,12 @@ def main() -> int:
         "mcp-tool-result.v0.1.schema.json",
         "agent-evidence-oap-v0.1.schema.json",
         "native-agentteams-run-evidence.v0.1.schema.json",
+        "native-agentteams-run-evidence.v0.2.schema.json",
+        "runtime-scope.v0.1.schema.json",
+        "cloud-context-query.v0.1.schema.json",
+        "cloud-context-result.v0.1.schema.json",
+        "native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
+        "native-runtime-mcp-manifest.v0.2.schema.json",
     ]
     validators: dict[str, Draft202012Validator] = {}
     for name in schema_names:
@@ -178,7 +192,7 @@ def main() -> int:
     registry = load_json("agents/registry.json")
     agents = registry.get("agents", [])
     if {agent.get("id") for agent in agents} != EXPECTED_AGENT_IDS:
-        failures.append("agent registry must contain the five planned identities")
+        failures.append("agent registry must contain the six planned identities")
     if sum(agent.get("agentteams_role") == "team_leader" for agent in agents) != 1:
         failures.append("agent registry must contain exactly one team leader")
     for agent in agents:
@@ -229,11 +243,52 @@ def main() -> int:
             if not (ROOT / target).is_file():
                 failures.append(f"MCP tool {tool['name']} has missing {field}: {target}")
 
+    native_mcp_manifest = load_json("mcp/native-runtime-server-manifest.v0.2.json")
+    native_mcp_validator = validators.get("native-runtime-mcp-manifest.v0.2.schema.json")
+    if native_mcp_validator:
+        for error in native_mcp_validator.iter_errors(native_mcp_manifest):
+            failures.append(f"native runtime MCP manifest schema: {error.message}")
+    native_tools = {item["name"]: item for item in native_mcp_manifest.get("tools", [])}
+    if native_tools.get("load_external_alibabacloud_skill", {}).get("principals") != ["cloud-context-inspector"]:
+        failures.append("Alibaba Cloud external Skill load tool must be exclusive to cloud-context-inspector")
+    if native_tools.get("inspect_alibabacloud_resources", {}).get("principals") != ["cloud-context-inspector"]:
+        failures.append("Alibaba Cloud inspector MCP tool must be exclusive to cloud-context-inspector")
+    if native_tools.get("inspect_alibabacloud_resources", {}).get("external_write") is not False:
+        failures.append("Alibaba Cloud inspector MCP tool must prohibit external writes")
+
+    native_cloud_evidence = load_json("demo/evidence/agentteams-native-alibabacloud-skill-20260802.json")
+    native_cloud_schema = load_json("schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json")
+    cloud_context_schema = load_json("schemas/cloud-context-result.v0.1.schema.json")
+    native_cloud_registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema)) for schema in (native_cloud_schema, cloud_context_schema))
+    native_cloud_validator = Draft202012Validator(
+        native_cloud_schema,
+        registry=native_cloud_registry,
+        format_checker=FormatChecker(),
+    )
+    if "native-agentteams-cloud-skill-run-evidence.v0.1.schema.json" in validators:
+        for error in native_cloud_validator.iter_errors(native_cloud_evidence):
+            failures.append(f"native Alibaba Cloud Worker evidence schema: {error.message}")
+    expected_native_cloud_exit = {
+        "AGENTTEAMS_NATIVE_WORKER_TURN_RETAINED": True,
+        "RUNTIME_LOADING_PROVEN": True,
+        "SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION": True,
+        "OFFICIAL_SKILL_ACTUALLY_INVOKED": True,
+        "REAL_RESOURCECENTER_QUERY_REUSED": True,
+        "EMPTY_RESULT_INTERPRETED_CORRECTLY": True,
+        "WORKER_DECISION_RECORD_COUNT": 0,
+        "CLOUD_RESOURCE_WRITE_EXECUTED": False,
+        "UPSTREAM_SKILL_BYTES_DISTRIBUTED": False,
+        "AGENT_EVIDENCE_RECEIPT_VALID": True,
+        "SECRETS_COMMITTED": False,
+    }
+    if native_cloud_evidence.get("exit_criteria") != expected_native_cloud_exit:
+        failures.append("native Alibaba Cloud Worker evidence exit criteria mismatch")
+
     deployment_path = ROOT / "deploy/agentteams/team.v1.2.0.yaml"
     deployment_text = deployment_path.read_text(encoding="utf-8")
     documents = list(yaml.safe_load_all(deployment_text))
-    if len(documents) != 8:
-        failures.append("AgentTeams template must contain Manager, Human, five Workers, and Team")
+    if len(documents) != 9:
+        failures.append("AgentTeams template must contain Manager, Human, six Workers, and Team")
     if any(doc.get("apiVersion") != "agentteams.io/v1beta1" for doc in documents):
         failures.append("AgentTeams template apiVersion mismatch")
     workers = [doc for doc in documents if doc.get("kind") == "Worker"]
@@ -244,11 +299,7 @@ def main() -> int:
         failures.append("AgentTeams template must contain one Team")
     elif sum(member["role"] == "team_leader" for member in teams[0]["spec"]["workerMembers"]) != 1:
         failures.append("AgentTeams Team must contain exactly one team leader")
-    if "github" in " ".join(
-        server.get("url", "")
-        for worker in workers
-        for server in worker.get("spec", {}).get("mcpServers", [])
-    ).lower():
+    if "github" in " ".join(server.get("url", "") for worker in workers for server in worker.get("spec", {}).get("mcpServers", [])).lower():
         failures.append("milestone-1 AgentTeams template must not expose provider GitHub MCP")
     if "CONFIGURE_" not in deployment_text:
         failures.append("deployment template must retain explicit configuration placeholders")
@@ -261,8 +312,8 @@ def main() -> int:
     if any(doc.get("apiVersion") != "agentteams.io/v1beta1" for doc in native_documents):
         failures.append("native AgentTeams smoke manifest apiVersion mismatch")
     native_workers = [doc for doc in native_documents if doc.get("kind") == "Worker"]
-    if {doc["metadata"]["name"] for doc in native_workers} != EXPECTED_AGENT_IDS:
-        failures.append("native AgentTeams Worker identities do not match registry")
+    if {doc["metadata"]["name"] for doc in native_workers} != HISTORICAL_SMOKE_AGENT_IDS:
+        failures.append("historical native smoke Worker identities do not match its retained five-Worker scope")
     native_teams = [doc for doc in native_documents if doc.get("kind") == "Team"]
     if len(native_teams) != 1:
         failures.append("native AgentTeams smoke manifest must contain one Team")
@@ -363,8 +414,9 @@ def main() -> int:
         return 1
 
     print("REFERENCE_IMPLEMENTATION_CONTRACT_VALIDATION=PASS")
-    print("SPECIALIZED_AGENT_IDENTITIES=5")
+    print("SPECIALIZED_AGENT_IDENTITIES=6")
     print("VERSIONED_SKILLS=5")
+    print("PINNED_OFFICIAL_EXTERNAL_SKILLS=1")
     print("MCP_TOOLS_IMPLEMENTED=6")
     print("EVALUATION_CASES=4")
     print("ACTION_GATE_IMPLEMENTED=true")

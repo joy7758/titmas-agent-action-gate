@@ -1,0 +1,1090 @@
+{
+  "$schema": "../../schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
+  "action_request": {
+    "action": "github.release.create",
+    "created_at": "2026-08-02T08:25:18.226759Z",
+    "evidence_requirements": [
+      "SOURCE_PIN",
+      "TEST_RESULT",
+      "TAG_STATE",
+      "RELEASE_MANIFEST",
+      "CLOUD_CONTEXT"
+    ],
+    "idempotency_key": "alibaba-cloud-preflight-20260802",
+    "parameters": {
+      "draft": true,
+      "tag": "competition-demo-not-created"
+    },
+    "parameters_sha256": "9c38fecc71c8e5cb3dfed538e6536a1f5772c0db9a609e4f27911f72f8f17508",
+    "request_id": "aar-alibaba-cloud-preflight-20260802",
+    "requested_by": {
+      "agent_id": "release-steward",
+      "team_id": "titmas-action-gate"
+    },
+    "schema_version": "0.1.0",
+    "target": {
+      "provider": "github",
+      "repository": "joy7758/titmas-agent-action-gate",
+      "resource_ref": "release/competition-demo-not-created"
+    },
+    "uncertainty": [
+      "Cloud context is read-only evidence and grants no deployment or release authority.",
+      "This native Worker turn creates no cloud resource and produces no Action Gate decision."
+    ]
+  },
+  "agent_evidence_profile": {
+    "actor": {
+      "id": "actor:cloud-context-inspector",
+      "name": "cloud-context-inspector",
+      "runtime": "titmas-action-gate-local-service",
+      "type": "agent"
+    },
+    "constraints": [
+      {
+        "description": "Required evidence type CLOUD_CONTEXT is present.",
+        "id": "constraint:cloud-context"
+      }
+    ],
+    "evidence": {
+      "artifacts": [
+        {
+          "artifact_id": "artifact:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+          "digest": "sha256:8405ca82eff295e49781935fda0226e3d7cc19d65f4b8466e494f1f09c0443d7",
+          "locator": "urn:titmas:artifact:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+          "type": "execution-log"
+        }
+      ],
+      "id": "evidence:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "integrity": {
+        "artifacts_digest": "sha256:10ed733dbc8d3802039ec734d086607dde3a6f5c63cbe3f8800f32716eb6780f",
+        "references_digest": "sha256:9f6880334610fd4268855b90b628192e91e7cf5d8cc025e880e987601193ddf4",
+        "statement_digest": "sha256:40c1dd59dd8b2371fab286589e7ae16dbd462816bf32c35836681e8f64af18ca"
+      },
+      "operation_ref": "op:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "policy_ref": "policy:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "references": [
+        {
+          "digest": "sha256:2c2c7cd54b69093ec9ac8b13e3ddbe543b5854886c3bd76e9c7ab4cbc6aae5bd",
+          "locator": "urn:titmas:action-request:aar-alibaba-cloud-preflight-20260802",
+          "object_id": "obj:aar-alibaba-cloud-preflight-20260802",
+          "ref_id": "ref:aar-alibaba-cloud-preflight-20260802:request",
+          "role": "input"
+        },
+        {
+          "digest": "sha256:ccffcf86fa605344ad27bde6c91d5f611b31a24d8895f05ee0b99fee9e3e305d",
+          "locator": "urn:titmas:action-output:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+          "object_id": "obj:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight-output",
+          "ref_id": "ref:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight-output",
+          "role": "output"
+        }
+      ],
+      "subject_ref": "obj:aar-alibaba-cloud-preflight-20260802"
+    },
+    "operation": {
+      "description": "TITMAS Action Gate cloud-context-preflight evidence for one bounded request.",
+      "id": "op:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "input_refs": [
+        "ref:aar-alibaba-cloud-preflight-20260802:request"
+      ],
+      "output_refs": [
+        "ref:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight-output"
+      ],
+      "policy_ref": "policy:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "result": {
+        "status": "failed",
+        "summary": "cloud-context-preflight evidence captured"
+      },
+      "subject_ref": "obj:aar-alibaba-cloud-preflight-20260802",
+      "type": "alibabacloud.resourcecenter.search-resources"
+    },
+    "policy": {
+      "constraint_refs": [
+        "constraint:cloud-context"
+      ],
+      "id": "policy:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "name": "titmas-action-gate-evidence-requirements"
+    },
+    "profile": {
+      "name": "execution-evidence-operation-accountability-profile",
+      "version": "0.1"
+    },
+    "provenance": {
+      "actor_ref": "actor:cloud-context-inspector",
+      "id": "prov:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "input_refs": [
+        "ref:aar-alibaba-cloud-preflight-20260802:request"
+      ],
+      "operation_ref": "op:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "output_refs": [
+        "ref:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight-output"
+      ],
+      "subject_ref": "obj:aar-alibaba-cloud-preflight-20260802"
+    },
+    "statement_id": "eeoap:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+    "subject": {
+      "digest": "sha256:2c2c7cd54b69093ec9ac8b13e3ddbe543b5854886c3bd76e9c7ab4cbc6aae5bd",
+      "id": "obj:aar-alibaba-cloud-preflight-20260802",
+      "locator": "urn:titmas:action-request:aar-alibaba-cloud-preflight-20260802",
+      "type": "action-request"
+    },
+    "timestamp": "2026-08-02T08:26:06.210366Z",
+    "validation": {
+      "evidence_ref": "evidence:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "id": "validation:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "method": "schema+reference+consistency",
+      "policy_ref": "policy:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "provenance_ref": "prov:aar-alibaba-cloud-preflight-20260802:cloud-context-preflight",
+      "status": "verifiable",
+      "validator": "agent-evidence validate-profile"
+    }
+  },
+  "agent_evidence_receipt": {
+    "bundle_sha256": "b3f2e448c8386d56d7c277fe872e9793580ca99b2d6abac9df76dab10a63ee11",
+    "checks": [
+      {
+        "check_id": "ATTACHMENT_DIGEST",
+        "passed": true
+      },
+      {
+        "check_id": "SUBJECT_ID",
+        "passed": true
+      },
+      {
+        "check_id": "SUBJECT_LOCATOR",
+        "passed": true
+      },
+      {
+        "check_id": "SUBJECT_DIGEST",
+        "passed": true
+      },
+      {
+        "check_id": "EVIDENCE_TYPES",
+        "passed": true
+      },
+      {
+        "check_id": "SCHEMA",
+        "passed": true
+      },
+      {
+        "check_id": "REFERENCES",
+        "passed": true
+      },
+      {
+        "check_id": "CONSISTENCY",
+        "passed": true
+      },
+      {
+        "check_id": "INTEGRITY",
+        "passed": true
+      }
+    ],
+    "evidence_types": [
+      "CLOUD_CONTEXT"
+    ],
+    "request_binding": {
+      "action": "github.release.create",
+      "parameters_sha256": "9c38fecc71c8e5cb3dfed538e6536a1f5772c0db9a609e4f27911f72f8f17508",
+      "provider": "github",
+      "repository": "joy7758/titmas-agent-action-gate",
+      "resource_ref": "release/competition-demo-not-created"
+    },
+    "request_id": "aar-alibaba-cloud-preflight-20260802",
+    "schema_version": "0.1.0",
+    "status": "VALID",
+    "verified_at": "2026-08-02T08:26:06.212342Z",
+    "verifier": {
+      "distribution_sha256": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e",
+      "name": "agent-evidence",
+      "version": "0.6.0"
+    }
+  },
+  "authority": {
+    "deterministic_action_gate_sole_authority": true,
+    "worker_decision_record_count": 0,
+    "worker_produced_gate_outcome": false
+  },
+  "cloud_context": {
+    "checks": [
+      {
+        "check_id": "SKILL_SOURCE_HASH",
+        "passed": true
+      },
+      {
+        "check_id": "READ_ONLY_OPERATION_ALLOWLIST",
+        "passed": true
+      },
+      {
+        "check_id": "USER_PARAMETER_CONFIRMATION",
+        "passed": true
+      },
+      {
+        "check_id": "CREDENTIAL_REFERENCE_PRESENT",
+        "passed": true
+      },
+      {
+        "check_id": "READ_ONLY_POLICY_REFERENCE",
+        "passed": true
+      },
+      {
+        "check_id": "LIVE_READ_ONLY_IDENTITY_BINDING",
+        "passed": true
+      },
+      {
+        "check_id": "CLI_EXIT_STATUS_ZERO",
+        "passed": true
+      },
+      {
+        "check_id": "PAGINATION_COMPLETE",
+        "passed": true
+      },
+      {
+        "check_id": "NONEMPTY_VISIBLE_RESULT",
+        "passed": false
+      },
+      {
+        "check_id": "SANITIZED_OUTPUT_ONLY",
+        "passed": true
+      }
+    ],
+    "credential": {
+      "credential_ref": "sha256:e57f614cb4f8c0a70c79a3da9ded4b50155972476f07d08a1d61b36d6d7b34d1",
+      "permission_identity_ref": "sha256:d5dfdaf092de944ea6a34dbc7edc16903b6aac180f69c0fb48d8b1a903c4dda1",
+      "permission_policy_ref": "sha256:0f96840f957667994e562b1792758ac205b54b596be3566668f598f457cb536f",
+      "permission_role_ref": "sha256:c172f1e2c0106e474ae5e0327854abf05c051f7e9a59fea9b1d97ae0b4b18a3f",
+      "read_only_policy_verified": "PASS"
+    },
+    "invocation": {
+      "argv_template_sha256": "8677a4d1979f1fd7f8769b58657e6a25d503f1ab3cf54a039d11b245bd35d1a5",
+      "cli_version": "3.4.11",
+      "command": "aliyun resourcecenter search-resources --max-results 1 --include-deleted-resources=false --endpoint resourcecenter.aliyuncs.com --profile <runtime-profile> --user-agent AlibabaCloud-Agent-Skills/alibabacloud-resourcecenter-search",
+      "exit_status": 0,
+      "invoked": true,
+      "next_token_present": false,
+      "provider_http_attempts": "NOT_ASSESSED",
+      "region_count": 0,
+      "request_id_ref": "sha256:39959b82074d9da39ad2020ffd47e8cbb5b7d969334a7b0dc1b92aec82f352f9",
+      "resource_type_count": 0,
+      "result_class": "EMPTY_RESULT",
+      "returned_resource_count": 0,
+      "steps": [
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "VERIFY_PINNED_ALIYUN_CLI"
+        },
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "VERIFY_PINNED_RESOURCECENTER_PLUGIN"
+        },
+        {
+          "effect": "LOCAL_CONFIG_WRITE",
+          "exit_status": 0,
+          "step_id": "ENABLE_AI_MODE"
+        },
+        {
+          "effect": "LOCAL_CONFIG_WRITE",
+          "exit_status": 0,
+          "step_id": "SET_FIXED_USER_AGENT"
+        },
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "VERIFY_CLI_VERSION"
+        },
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "VERIFY_PROFILE_CONFIGURATION"
+        },
+        {
+          "effect": "CLOUD_READ",
+          "exit_status": 0,
+          "step_id": "VERIFY_LIVE_CALLER_IDENTITY"
+        },
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "REVERIFY_PINNED_RESOURCECENTER_PLUGIN_BEFORE_QUERY"
+        },
+        {
+          "effect": "CLOUD_READ",
+          "exit_status": 0,
+          "step_id": "RESOURCECENTER_SEARCH_RESOURCES"
+        },
+        {
+          "effect": "LOCAL_READ",
+          "exit_status": 0,
+          "step_id": "REVERIFY_PINNED_RESOURCECENTER_PLUGIN_AFTER_QUERY"
+        },
+        {
+          "effect": "LOCAL_CONFIG_WRITE",
+          "exit_status": 0,
+          "step_id": "DISABLE_AI_MODE"
+        }
+      ],
+      "user_agent": "AlibabaCloud-Agent-Skills/alibabacloud-resourcecenter-search"
+    },
+    "observed_at": "2026-08-02T08:26:04.335062Z",
+    "preflight_id": "cloud-preflight-e1049fe40be578b5bcf239d2516aa719",
+    "query": {
+      "confirmation_ref": "confirmation:e3f602a4fd564910313383ab1f553d8317d06e4b440c1b49b600178a013d288c",
+      "filter_keys": [],
+      "include_deleted_resources": false,
+      "max_results": 1,
+      "operation": "resourcecenter.search-resources"
+    },
+    "request_id": "aar-alibaba-cloud-preflight-20260802",
+    "resourcecenter_write_api_calls": 0,
+    "schema_version": "0.1.0",
+    "skill": {
+      "discovered": true,
+      "external_path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+      "invocation_scope": "SKILL_BOUND_ADAPTER",
+      "load_scope": "EXTERNAL_SKILL_SOURCE_VERIFICATION",
+      "loaded": true,
+      "name": "alibabacloud-resourcecenter-search",
+      "native_agentteams_loaded": true,
+      "repository": "https://github.com/aliyun/alibabacloud-aiops-skills",
+      "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+      "runtime_invoked": true,
+      "runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY",
+      "source_lock_sha256": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461"
+    },
+    "status": "NOT_ASSESSED_NO_VISIBLE_RESOURCE",
+    "uncertainty": [
+      "ZERO_RESULTS_ONLY_MEAN_NO_RESOURCES_VISIBLE_TO_THIS_BOUNDED_IDENTITY"
+    ]
+  },
+  "effects": {
+    "cloud_resource_created_for_nonempty_result": false,
+    "cloud_resource_write_executed": false,
+    "effect_scope": "NATIVE_WORKER_TURN_RESOURCECENTER_AND_CLOUD_WORKLOAD_ONLY",
+    "prior_setup_iam_control_plane_write_executed": true,
+    "resourcecenter_read_api_calls": 1,
+    "resourcecenter_write_api_calls": 0,
+    "sts_identity_read_api_calls": 1
+  },
+  "exit_criteria": {
+    "AGENTTEAMS_NATIVE_WORKER_TURN_RETAINED": true,
+    "AGENT_EVIDENCE_RECEIPT_VALID": true,
+    "CLOUD_RESOURCE_WRITE_EXECUTED": false,
+    "EMPTY_RESULT_INTERPRETED_CORRECTLY": true,
+    "OFFICIAL_SKILL_ACTUALLY_INVOKED": true,
+    "REAL_RESOURCECENTER_QUERY_REUSED": true,
+    "RUNTIME_LOADING_PROVEN": true,
+    "SECRETS_COMMITTED": false,
+    "SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION": true,
+    "UPSTREAM_SKILL_BYTES_DISTRIBUTED": false,
+    "WORKER_DECISION_RECORD_COUNT": 0
+  },
+  "frozen_query": {
+    "confirmation_ref": "confirmation:e3f602a4fd564910313383ab1f553d8317d06e4b440c1b49b600178a013d288c",
+    "filters": {},
+    "include_deleted_resources": false,
+    "max_results": 1,
+    "operation": "resourcecenter.search-resources",
+    "parameters_confirmed_by_user": true,
+    "schema_version": "0.1.0"
+  },
+  "native_runtime": {
+    "classification": "OFFICIAL_AGENTTEAMS_NATIVE_LLM_WORKER_TURN",
+    "current_worker_credential_ref": "sha256:0b7a3649a09a836fa6e675833b83b7061caff247c8d14de989003303b87e1454",
+    "initial_prompt_count": 1,
+    "matrix_turn_trace": {
+      "initial_prompt_event_id": "$mA8PLLVnRfqToYntK0WzJL5zY1qCh9i52btHznD0140",
+      "initial_prompt_sender": "@admin:matrix-local.agentteams.io:18080",
+      "observed_message_events_after_baseline": [
+        {
+          "event_id": "$mA8PLLVnRfqToYntK0WzJL5zY1qCh9i52btHznD0140",
+          "origin_server_ts": "1785659118308",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@admin:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$5C6dY4lYPOA-V49Adfb-S1JWIU7dB04uChMEEsfYZ_o",
+          "origin_server_ts": "1785659151139",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$vWHTxtyQ8xrUv-5zbr_MI2oORpcUEi7H6cpQLT-oO9s",
+          "origin_server_ts": "1785659152165",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$o_Hv--lj-hgRG92NNXKKXANYPxWDlDB2TXP7AmNNa4g",
+          "origin_server_ts": "1785659155821",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$yYKVl31YB8ZoXscjivS_t6kxuoS2aLtYnfMzV3YexJ4",
+          "origin_server_ts": "1785659168852",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$76_PZtLCovHPgDRoxRcaKkjLetyd7TzV9xwxu2GMX08",
+          "origin_server_ts": "1785659169916",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$V9nxWkhPe1Bb2y1QrYPa4ny6iin6hEcOSTyOKMM8p2E",
+          "origin_server_ts": "1785659170936",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$XhagWfNHODmTR2c6CyBffY-8MuWsPfmg7PlgnIDYNFY",
+          "origin_server_ts": "1785659171949",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        },
+        {
+          "event_id": "$_GPnG5YPdhYd4U7ELiYVO2ZLuyd_lZjeWeILzECRpFI",
+          "origin_server_ts": "1785659172970",
+          "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+          "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+        }
+      ],
+      "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080"
+    },
+    "mcp_surface": "AUTHENTICATED_FASTMCP_STREAMABLE_HTTP",
+    "operator_followup_prompt_count": 0,
+    "prior_exposed_disposable_worker_credential_rotated_before_run": true,
+    "prompt_event_id": "$mA8PLLVnRfqToYntK0WzJL5zY1qCh9i52btHznD0140",
+    "response_events": [
+      {
+        "body": "Running",
+        "event_id": "$5C6dY4lYPOA-V49Adfb-S1JWIU7dB04uChMEEsfYZ_o",
+        "origin_server_ts": "1785659151139",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Running the bounded preflight — two mcporter calls in sequence.",
+        "event_id": "$vWHTxtyQ8xrUv-5zbr_MI2oORpcUEi7H6cpQLT-oO9s",
+        "origin_server_ts": "1785659152165",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Running the bounded preflight — two mcporter calls in sequence.",
+        "event_id": "$o_Hv--lj-hgRG92NNXKKXANYPxWDlDB2TXP7AmNNa4g",
+        "origin_server_ts": "1785659155821",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "Bounded cloud",
+        "event_id": "$yYKVl31YB8ZoXscjivS_t6kxuoS2aLtYnfMzV3YexJ4",
+        "origin_server_ts": "1785659168852",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Bounded cloud preflight complete. Two mcporter calls executed; consolidated result:\n\n```json\n{\n  \"skill_name\": \"alibabacloud-resourcecenter-search\",\n  \"external_path_reference\": \"",
+        "event_id": "$76_PZtLCovHPgDRoxRcaKkjLetyd7TzV9xwxu2GMX08",
+        "origin_server_ts": "1785659169916",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Bounded cloud preflight complete. Two mcporter calls executed; consolidated result:\n\n```json\n{\n  \"skill_name\": \"alibabacloud-resourcecenter-search\",\n  \"external_path_reference\": \"external://titmas/skills/alibabacloud-resourcecenter-search\",\n  \"revision\": \"92bd723f7cc217b252feab574c1883fa0aa46b3c\",\n  \"digest\": \"26346f8c1b44b49fdf036f71dc4",
+        "event_id": "$V9nxWkhPe1Bb2y1QrYPa4ny6iin6hEcOSTyOKMM8p2E",
+        "origin_server_ts": "1785659170936",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Bounded cloud preflight complete. Two mcporter calls executed; consolidated result:\n\n```json\n{\n  \"skill_name\": \"alibabacloud-resourcecenter-search\",\n  \"external_path_reference\": \"external://titmas/skills/alibabacloud-resourcecenter-search\",\n  \"revision\": \"92bd723f7cc217b252feab574c1883fa0aa46b3c\",\n  \"digest\": \"26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461\",\n  \"runtime_load_result\": \"LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY\",\n  \"invocation_result\": \"EMPTY_RESULT",
+        "event_id": "$XhagWfNHODmTR2c6CyBffY-8MuWsPfmg7PlgnIDYNFY",
+        "origin_server_ts": "1785659171949",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      },
+      {
+        "body": "* Bounded cloud preflight complete. Two mcporter calls executed; consolidated result:\n\n```json\n{\n  \"skill_name\": \"alibabacloud-resourcecenter-search\",\n  \"external_path_reference\": \"external://titmas/skills/alibabacloud-resourcecenter-search\",\n  \"revision\": \"92bd723f7cc217b252feab574c1883fa0aa46b3c\",\n  \"digest\": \"26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461\",\n  \"runtime_load_result\": \"LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY\",\n  \"invocation_result\": \"EMPTY_RESULT\",\n  \"status\": \"NOT_ASSESSED_NO_VISIBLE_RESOURCE\",\n  \"cli_exit_status\": 0,\n  \"resourcecenter_write_api_calls\": 0,\n  \"agent_evidence_status\": \"VALID\",\n  \"worker_decision_record_count\": 0\n}",
+        "event_id": "$_GPnG5YPdhYd4U7ELiYVO2ZLuyd_lZjeWeILzECRpFI",
+        "origin_server_ts": "1785659172970",
+        "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+        "sender": "@cloud-context-inspector:matrix-local.agentteams.io:18080"
+      }
+    ],
+    "worker": {
+      "container_state": "running",
+      "matrix_user_id": "@cloud-context-inspector:matrix-local.agentteams.io:18080",
+      "model": "qwen3.7-max",
+      "name": "cloud-context-inspector",
+      "phase": "Running",
+      "room_id": "!JmUHGm4xzZOyJMfPMQ:matrix-local.agentteams.io:18080",
+      "runtime": "openclaw"
+    },
+    "worker_container": {
+      "container_id": "e93fa416323cbe6185e28972ec7da6ce7937594c021ca7f0493e22f23e1350c9",
+      "image_id": "sha256:daf587ad042f9564abb2347db5c4205ecc25d1b322e09fdd0d58a2a16c2d5c85",
+      "image_ref": "higress-registry.cn-hangzhou.cr.aliyuncs.com/agentteams/agentteams-worker:v1.2.0",
+      "started_at": "2026-08-02T08:25:16.403219142Z"
+    }
+  },
+  "non_claims": [
+    "NO_ACTION_GATE_DECISION_BY_WORKER",
+    "NO_RESOURCECENTER_OR_CLOUD_WORKLOAD_WRITE_IN_NATIVE_WORKER_TURN",
+    "PRIOR_IAM_CONTROL_PLANE_PROVISIONING_WRITE_REMAINS_DISCLOSED",
+    "NO_PERSISTENT_OR_PRODUCTION_DEPLOYMENT",
+    "NO_RELEASE_OR_COMPETITION_SUBMISSION",
+    "NO_LICENSE_CLEARANCE_OR_CERTIFICATION_CLAIM"
+  ],
+  "observed_at": "2026-08-02T08:26:13.914875Z",
+  "package_boundary": {
+    "agentteams_package_apply": {
+      "applied_at": "2026-08-02T08:25:15.616224Z",
+      "apply_exit_status": 0,
+      "apply_result": "AGENTTEAMS_WORKER_PACKAGE_APPLIED",
+      "worker_container_recreated": true,
+      "worker_container_started_at": "2026-08-02T08:25:16.403219142Z"
+    },
+    "distribution_scope": "TRACKED_GIT_WORKER_ZIP_WHEEL_AND_SDIST",
+    "external_skill_reference_only": true,
+    "local_external_installation_exists": true,
+    "package_member_count": 24,
+    "package_members": [
+      "config/AGENTS.md",
+      "config/SOUL.md",
+      "manifest.json",
+      "schemas/action-gate-decision.v0.1.schema.json",
+      "schemas/action-request.v0.1.schema.json",
+      "schemas/agent-evidence-oap-v0.1.schema.json",
+      "schemas/agent-index.schema.json",
+      "schemas/alibabacloud-ram-policy-observation.v0.1.schema.json",
+      "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json",
+      "schemas/cloud-context-query.v0.1.schema.json",
+      "schemas/cloud-context-result.v0.1.schema.json",
+      "schemas/evidence-verification-result.v0.1.schema.json",
+      "schemas/human-approval.v0.1.schema.json",
+      "schemas/mcp-server-manifest.v0.1.schema.json",
+      "schemas/mcp-tool-inputs.v0.1.schema.json",
+      "schemas/mcp-tool-result.v0.1.schema.json",
+      "schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
+      "schemas/native-agentteams-run-evidence.v0.1.schema.json",
+      "schemas/native-agentteams-run-evidence.v0.2.schema.json",
+      "schemas/native-runtime-mcp-manifest.v0.2.schema.json",
+      "schemas/policy-evaluation-result.v0.1.schema.json",
+      "schemas/runtime-scope.v0.1.schema.json",
+      "schemas/skill-manifest.v0.1.schema.json",
+      "skill-attestation.json"
+    ],
+    "package_sha256": "aa1b64212e48d95e259226367febe49623f1f43cc1b4eb829d8f8d889023e428",
+    "runtime_worker_filesystem_scan": {
+      "scan_exit_status": 0,
+      "upstream_file_digest_match_count": 0,
+      "workspace_reference": "agentteams://workers/cloud-context-inspector/workspace"
+    },
+    "upstream_skill_bytes_distributed": false
+  },
+  "run_id": "run-native-alibaba-cloud-20260802-001",
+  "schema_version": "0.1.0",
+  "secrets": {
+    "credential_bytes_in_evidence": false,
+    "credential_bytes_in_git": false,
+    "credential_bytes_in_private_mcp_log": false,
+    "credential_bytes_in_prompt": false,
+    "credential_bytes_in_worker_response": false,
+    "profile_name_in_evidence": false,
+    "raw_provider_output_retained": false
+  },
+  "skill_load": {
+    "digest": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461",
+    "external_path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+    "record_hash": "7d799962f3c7786574a6ebc42becdf8119a0594c9ace6fc51f79391a8848a89b",
+    "record_sequence": 2,
+    "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+    "runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY",
+    "skill_name": "alibabacloud-resourcecenter-search",
+    "verified_before_invocation": true
+  },
+  "source": {
+    "agent_evidence_version": "0.6.0",
+    "agentteams_commit": "793db242257a569d911b1aa59c1cd554af78511f",
+    "agentteams_release": "v1.2.0",
+    "official_skill_source_lock_sha256": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461",
+    "repository_base_commit": "6f1c83bf87e6ee96a0eda281e1fa91b8f80a32e1"
+  },
+  "trace": {
+    "agent_evidence_chain_issues": [],
+    "agent_evidence_events": [
+      {
+        "event": {
+          "actor": "release-steward",
+          "context": {
+            "ancestor_span_ids": [],
+            "attributes": {
+              "request_id": "aar-alibaba-cloud-preflight-20260802"
+            },
+            "component": "action-gate",
+            "name": null,
+            "parent_span_id": null,
+            "source": "titmas-action-gate",
+            "source_event_type": null,
+            "span_id": null,
+            "tags": [
+              "titmas",
+              "action-gate",
+              "aar-alibaba-cloud-preflight-20260802"
+            ]
+          },
+          "event_id": "2a1667f0-0d80-4e77-a765-9b94578e8133",
+          "event_type": "action_request.submitted",
+          "inputs": {
+            "request_sha256": "2c2c7cd54b69093ec9ac8b13e3ddbe543b5854886c3bd76e9c7ab4cbc6aae5bd"
+          },
+          "metadata": {},
+          "outputs": {
+            "record_hash": "39b986ba32b5387c68c5efd4243e8e7031080cb79d3b5319157898805da29d0a"
+          },
+          "timestamp": "2026-08-02T08:25:18.240755Z"
+        },
+        "hashes": {
+          "chain_hash": "e092210597277f17cfffdaffe058d9fd4c2fffdbd5420bf9ae0524801953f0db",
+          "event_hash": "9e51f31ef9d109ec6fba60a78c1864c757f1f052049a7f6938af924b6770807b",
+          "previous_event_hash": null
+        },
+        "schema_version": "2.0.0"
+      },
+      {
+        "event": {
+          "actor": "cloud-context-inspector",
+          "context": {
+            "ancestor_span_ids": [],
+            "attributes": {
+              "request_id": "aar-alibaba-cloud-preflight-20260802"
+            },
+            "component": "action-gate",
+            "name": null,
+            "parent_span_id": null,
+            "source": "titmas-action-gate",
+            "source_event_type": null,
+            "span_id": null,
+            "tags": [
+              "titmas",
+              "action-gate",
+              "aar-alibaba-cloud-preflight-20260802"
+            ]
+          },
+          "event_id": "fefb6036-cab6-4b96-b9c5-ea51af1138de",
+          "event_type": "external_skill.loaded",
+          "inputs": {
+            "digest": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461",
+            "external_path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+            "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+            "skill_name": "alibabacloud-resourcecenter-search"
+          },
+          "metadata": {},
+          "outputs": {
+            "record_hash": "7d799962f3c7786574a6ebc42becdf8119a0594c9ace6fc51f79391a8848a89b",
+            "runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY"
+          },
+          "timestamp": "2026-08-02T08:25:56.766561Z"
+        },
+        "hashes": {
+          "chain_hash": "eae0014859245e2ef0a1c9d375b3114c37c0e1775ce429e6b6c98b25f35f9a02",
+          "event_hash": "d371c7f2cc8a0244f793107bbb409e3593803d514c871b55ba945b8c77f60358",
+          "previous_event_hash": "9e51f31ef9d109ec6fba60a78c1864c757f1f052049a7f6938af924b6770807b"
+        },
+        "schema_version": "2.0.0"
+      },
+      {
+        "event": {
+          "actor": "cloud-context-inspector",
+          "context": {
+            "ancestor_span_ids": [],
+            "attributes": {
+              "request_id": "aar-alibaba-cloud-preflight-20260802"
+            },
+            "component": "action-gate",
+            "name": null,
+            "parent_span_id": null,
+            "source": "titmas-action-gate",
+            "source_event_type": null,
+            "span_id": null,
+            "tags": [
+              "titmas",
+              "action-gate",
+              "aar-alibaba-cloud-preflight-20260802"
+            ]
+          },
+          "event_id": "e34823ac-93a0-4bc2-91d1-a92a3aa21186",
+          "event_type": "cloud_context.preflight_recorded",
+          "inputs": {
+            "preflight_sha256": "53c04392f11e462ed84e4a818e9acb00e8df801e37c5ff37e8ac5bfdbe51f29c"
+          },
+          "metadata": {},
+          "outputs": {
+            "agent_evidence_status": "VALID",
+            "record_hash": "f8be2a3571ed6ee0f3b20800e5a46f4f80cdff3f84332150c2509f2e0990cff2",
+            "semantic_usable": false,
+            "status": "NOT_ASSESSED_NO_VISIBLE_RESOURCE"
+          },
+          "timestamp": "2026-08-02T08:26:06.215091Z"
+        },
+        "hashes": {
+          "chain_hash": "046f8942b97116ff1d6f0a7bd96a4358e42db0cc11f541958b228e5e672e610a",
+          "event_hash": "6c175095c25e5bf243543e16751cd6da3db26ca2aa078621aa2cc28ff11910a7",
+          "previous_event_hash": "d371c7f2cc8a0244f793107bbb409e3593803d514c871b55ba945b8c77f60358"
+        },
+        "schema_version": "2.0.0"
+      }
+    ],
+    "record_chain_issues": [],
+    "records": [
+      {
+        "created_at": "2026-08-02T08:25:18.238801Z",
+        "payload": {
+          "action": "github.release.create",
+          "created_at": "2026-08-02T08:25:18.226759Z",
+          "evidence_requirements": [
+            "SOURCE_PIN",
+            "TEST_RESULT",
+            "TAG_STATE",
+            "RELEASE_MANIFEST",
+            "CLOUD_CONTEXT"
+          ],
+          "idempotency_key": "alibaba-cloud-preflight-20260802",
+          "parameters": {
+            "draft": true,
+            "tag": "competition-demo-not-created"
+          },
+          "parameters_sha256": "9c38fecc71c8e5cb3dfed538e6536a1f5772c0db9a609e4f27911f72f8f17508",
+          "request_id": "aar-alibaba-cloud-preflight-20260802",
+          "requested_by": {
+            "agent_id": "release-steward",
+            "team_id": "titmas-action-gate"
+          },
+          "schema_version": "0.1.0",
+          "target": {
+            "provider": "github",
+            "repository": "joy7758/titmas-agent-action-gate",
+            "resource_ref": "release/competition-demo-not-created"
+          },
+          "uncertainty": [
+            "Cloud context is read-only evidence and grants no deployment or release authority.",
+            "This native Worker turn creates no cloud resource and produces no Action Gate decision."
+          ]
+        },
+        "previous_hash": null,
+        "record_hash": "39b986ba32b5387c68c5efd4243e8e7031080cb79d3b5319157898805da29d0a",
+        "record_id": "aar-alibaba-cloud-preflight-20260802",
+        "record_type": "action_request",
+        "request_id": "aar-alibaba-cloud-preflight-20260802",
+        "sequence": 1
+      },
+      {
+        "created_at": "2026-08-02T08:25:56.764493Z",
+        "payload": {
+          "digest": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461",
+          "external_path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+          "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+          "runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY",
+          "skill_name": "alibabacloud-resourcecenter-search"
+        },
+        "previous_hash": "39b986ba32b5387c68c5efd4243e8e7031080cb79d3b5319157898805da29d0a",
+        "record_hash": "7d799962f3c7786574a6ebc42becdf8119a0594c9ace6fc51f79391a8848a89b",
+        "record_id": "external-skill-load-41d60cdb2a3b2f0a821372c58a4fcff3",
+        "record_type": "external_skill_load",
+        "request_id": "aar-alibaba-cloud-preflight-20260802",
+        "sequence": 2
+      },
+      {
+        "created_at": "2026-08-02T08:26:06.209368Z",
+        "payload": {
+          "checks": [
+            {
+              "check_id": "SKILL_SOURCE_HASH",
+              "passed": true
+            },
+            {
+              "check_id": "READ_ONLY_OPERATION_ALLOWLIST",
+              "passed": true
+            },
+            {
+              "check_id": "USER_PARAMETER_CONFIRMATION",
+              "passed": true
+            },
+            {
+              "check_id": "CREDENTIAL_REFERENCE_PRESENT",
+              "passed": true
+            },
+            {
+              "check_id": "READ_ONLY_POLICY_REFERENCE",
+              "passed": true
+            },
+            {
+              "check_id": "LIVE_READ_ONLY_IDENTITY_BINDING",
+              "passed": true
+            },
+            {
+              "check_id": "CLI_EXIT_STATUS_ZERO",
+              "passed": true
+            },
+            {
+              "check_id": "PAGINATION_COMPLETE",
+              "passed": true
+            },
+            {
+              "check_id": "NONEMPTY_VISIBLE_RESULT",
+              "passed": false
+            },
+            {
+              "check_id": "SANITIZED_OUTPUT_ONLY",
+              "passed": true
+            }
+          ],
+          "credential": {
+            "credential_ref": "sha256:e57f614cb4f8c0a70c79a3da9ded4b50155972476f07d08a1d61b36d6d7b34d1",
+            "permission_identity_ref": "sha256:d5dfdaf092de944ea6a34dbc7edc16903b6aac180f69c0fb48d8b1a903c4dda1",
+            "permission_policy_ref": "sha256:0f96840f957667994e562b1792758ac205b54b596be3566668f598f457cb536f",
+            "permission_role_ref": "sha256:c172f1e2c0106e474ae5e0327854abf05c051f7e9a59fea9b1d97ae0b4b18a3f",
+            "read_only_policy_verified": "PASS"
+          },
+          "invocation": {
+            "argv_template_sha256": "8677a4d1979f1fd7f8769b58657e6a25d503f1ab3cf54a039d11b245bd35d1a5",
+            "cli_version": "3.4.11",
+            "command": "aliyun resourcecenter search-resources --max-results 1 --include-deleted-resources=false --endpoint resourcecenter.aliyuncs.com --profile <runtime-profile> --user-agent AlibabaCloud-Agent-Skills/alibabacloud-resourcecenter-search",
+            "exit_status": 0,
+            "invoked": true,
+            "next_token_present": false,
+            "provider_http_attempts": "NOT_ASSESSED",
+            "region_count": 0,
+            "request_id_ref": "sha256:39959b82074d9da39ad2020ffd47e8cbb5b7d969334a7b0dc1b92aec82f352f9",
+            "resource_type_count": 0,
+            "result_class": "EMPTY_RESULT",
+            "returned_resource_count": 0,
+            "steps": [
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "VERIFY_PINNED_ALIYUN_CLI"
+              },
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "VERIFY_PINNED_RESOURCECENTER_PLUGIN"
+              },
+              {
+                "effect": "LOCAL_CONFIG_WRITE",
+                "exit_status": 0,
+                "step_id": "ENABLE_AI_MODE"
+              },
+              {
+                "effect": "LOCAL_CONFIG_WRITE",
+                "exit_status": 0,
+                "step_id": "SET_FIXED_USER_AGENT"
+              },
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "VERIFY_CLI_VERSION"
+              },
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "VERIFY_PROFILE_CONFIGURATION"
+              },
+              {
+                "effect": "CLOUD_READ",
+                "exit_status": 0,
+                "step_id": "VERIFY_LIVE_CALLER_IDENTITY"
+              },
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "REVERIFY_PINNED_RESOURCECENTER_PLUGIN_BEFORE_QUERY"
+              },
+              {
+                "effect": "CLOUD_READ",
+                "exit_status": 0,
+                "step_id": "RESOURCECENTER_SEARCH_RESOURCES"
+              },
+              {
+                "effect": "LOCAL_READ",
+                "exit_status": 0,
+                "step_id": "REVERIFY_PINNED_RESOURCECENTER_PLUGIN_AFTER_QUERY"
+              },
+              {
+                "effect": "LOCAL_CONFIG_WRITE",
+                "exit_status": 0,
+                "step_id": "DISABLE_AI_MODE"
+              }
+            ],
+            "user_agent": "AlibabaCloud-Agent-Skills/alibabacloud-resourcecenter-search"
+          },
+          "observed_at": "2026-08-02T08:26:04.335062Z",
+          "preflight_id": "cloud-preflight-e1049fe40be578b5bcf239d2516aa719",
+          "query": {
+            "confirmation_ref": "confirmation:e3f602a4fd564910313383ab1f553d8317d06e4b440c1b49b600178a013d288c",
+            "filter_keys": [],
+            "include_deleted_resources": false,
+            "max_results": 1,
+            "operation": "resourcecenter.search-resources"
+          },
+          "request_id": "aar-alibaba-cloud-preflight-20260802",
+          "resourcecenter_write_api_calls": 0,
+          "schema_version": "0.1.0",
+          "skill": {
+            "discovered": true,
+            "external_path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+            "invocation_scope": "SKILL_BOUND_ADAPTER",
+            "load_scope": "EXTERNAL_SKILL_SOURCE_VERIFICATION",
+            "loaded": true,
+            "name": "alibabacloud-resourcecenter-search",
+            "native_agentteams_loaded": true,
+            "repository": "https://github.com/aliyun/alibabacloud-aiops-skills",
+            "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+            "runtime_invoked": true,
+            "runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY",
+            "source_lock_sha256": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461"
+          },
+          "status": "NOT_ASSESSED_NO_VISIBLE_RESOURCE",
+          "uncertainty": [
+            "ZERO_RESULTS_ONLY_MEAN_NO_RESOURCES_VISIBLE_TO_THIS_BOUNDED_IDENTITY"
+          ]
+        },
+        "previous_hash": "7d799962f3c7786574a6ebc42becdf8119a0594c9ace6fc51f79391a8848a89b",
+        "record_hash": "0fcaabce4f1737cf6a3a7731bdc10e052c757a68b17e13ced895a6da1b94b14e",
+        "record_id": "cloud-preflight-e1049fe40be578b5bcf239d2516aa719",
+        "record_type": "cloud_context_preflight",
+        "request_id": "aar-alibaba-cloud-preflight-20260802",
+        "sequence": 3
+      },
+      {
+        "created_at": "2026-08-02T08:26:06.213239Z",
+        "payload": {
+          "bundle_sha256": "b3f2e448c8386d56d7c277fe872e9793580ca99b2d6abac9df76dab10a63ee11",
+          "checks": [
+            {
+              "check_id": "ATTACHMENT_DIGEST",
+              "passed": true
+            },
+            {
+              "check_id": "SUBJECT_ID",
+              "passed": true
+            },
+            {
+              "check_id": "SUBJECT_LOCATOR",
+              "passed": true
+            },
+            {
+              "check_id": "SUBJECT_DIGEST",
+              "passed": true
+            },
+            {
+              "check_id": "EVIDENCE_TYPES",
+              "passed": true
+            },
+            {
+              "check_id": "SCHEMA",
+              "passed": true
+            },
+            {
+              "check_id": "REFERENCES",
+              "passed": true
+            },
+            {
+              "check_id": "CONSISTENCY",
+              "passed": true
+            },
+            {
+              "check_id": "INTEGRITY",
+              "passed": true
+            }
+          ],
+          "evidence_types": [
+            "CLOUD_CONTEXT"
+          ],
+          "request_binding": {
+            "action": "github.release.create",
+            "parameters_sha256": "9c38fecc71c8e5cb3dfed538e6536a1f5772c0db9a609e4f27911f72f8f17508",
+            "provider": "github",
+            "repository": "joy7758/titmas-agent-action-gate",
+            "resource_ref": "release/competition-demo-not-created"
+          },
+          "request_id": "aar-alibaba-cloud-preflight-20260802",
+          "schema_version": "0.1.0",
+          "status": "VALID",
+          "verified_at": "2026-08-02T08:26:06.212342Z",
+          "verifier": {
+            "distribution_sha256": "3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e",
+            "name": "agent-evidence",
+            "version": "0.6.0"
+          }
+        },
+        "previous_hash": "0fcaabce4f1737cf6a3a7731bdc10e052c757a68b17e13ced895a6da1b94b14e",
+        "record_hash": "f8be2a3571ed6ee0f3b20800e5a46f4f80cdff3f84332150c2509f2e0990cff2",
+        "record_id": "cloud-evidence-72b7fc5a36a1a1bb69fa84122cf4e4e6",
+        "record_type": "cloud_context_evidence_result",
+        "request_id": "aar-alibaba-cloud-preflight-20260802",
+        "sequence": 4
+      }
+    ],
+    "security_chain_issues": [],
+    "security_events": [
+      {
+        "business_state_delta": 1,
+        "correlation_id": "corr-native-alibaba-cloud-20260802-001",
+        "created_at": "2026-08-02T08:25:18.241797Z",
+        "details": {
+          "request_id": "aar-alibaba-cloud-preflight-20260802"
+        },
+        "event_id": "security-1311df97adb044fea3527ae6f1f19692",
+        "outcome": "ALLOW_CALL",
+        "previous_hash": null,
+        "principal_id": "release-steward",
+        "reason_code": "MCP_TOOL_ALLOWED",
+        "record_hash": "719d0f72bb2ec9fb9c0801922fc7904b6f4f22c7b82c66a24276f992d1b62ce9",
+        "run_id": "run-native-alibaba-cloud-20260802-001",
+        "sequence": 1,
+        "task_id": "task-native-alibaba-cloud-20260802-001",
+        "tool_name": "submit_action_request"
+      },
+      {
+        "business_state_delta": 1,
+        "correlation_id": "corr-native-alibaba-cloud-20260802-001",
+        "created_at": "2026-08-02T08:25:56.766712Z",
+        "details": {
+          "request_id": "aar-alibaba-cloud-preflight-20260802"
+        },
+        "event_id": "security-1d86329ec3fb4392b5027228b3842c0c",
+        "outcome": "ALLOW_CALL",
+        "previous_hash": "719d0f72bb2ec9fb9c0801922fc7904b6f4f22c7b82c66a24276f992d1b62ce9",
+        "principal_id": "cloud-context-inspector",
+        "reason_code": "MCP_TOOL_ALLOWED",
+        "record_hash": "bf5fb820e6f4313c3c82c616f7b789c67dbd3c855341b53c7b5a2318075b4e67",
+        "run_id": "run-native-alibaba-cloud-20260802-001",
+        "sequence": 2,
+        "task_id": "task-native-alibaba-cloud-20260802-001",
+        "tool_name": "load_external_alibabacloud_skill"
+      },
+      {
+        "business_state_delta": 2,
+        "correlation_id": "corr-native-alibaba-cloud-20260802-001",
+        "created_at": "2026-08-02T08:26:06.215284Z",
+        "details": {
+          "request_id": "aar-alibaba-cloud-preflight-20260802"
+        },
+        "event_id": "security-cf8bd3c1b6a548b9ae3b2457688095be",
+        "outcome": "ALLOW_CALL",
+        "previous_hash": "bf5fb820e6f4313c3c82c616f7b789c67dbd3c855341b53c7b5a2318075b4e67",
+        "principal_id": "cloud-context-inspector",
+        "reason_code": "MCP_TOOL_ALLOWED",
+        "record_hash": "df27dcd500c1770f01b133d1439fa545f15d4a4327e1332ad5f79fc78fd6e1b2",
+        "run_id": "run-native-alibaba-cloud-20260802-001",
+        "sequence": 3,
+        "task_id": "task-native-alibaba-cloud-20260802-001",
+        "tool_name": "inspect_alibabacloud_resources"
+      }
+    ]
+  }
+}

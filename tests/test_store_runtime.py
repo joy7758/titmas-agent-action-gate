@@ -8,6 +8,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
+from titmas_action_gate.canonical import sha256_json
 from titmas_action_gate.errors import ConflictError
 from titmas_action_gate.store import AppendOnlyStore
 
@@ -20,7 +21,7 @@ def allow_decision() -> dict:
         "provider": "github",
         "repository": "joy7758/action-gate-demo",
         "resource_ref": "refs/heads/docs-demo",
-        "parameters_sha256": "a" * 64,
+        "parameters_sha256": sha256_json({"title": "demo"}),
     }
     return {
         "decision_id": "decision-" + "b" * 64,
@@ -67,7 +68,7 @@ class StoreRuntimeTests(unittest.TestCase):
 
     def test_scope_expansion_is_rejected_before_consumption(self) -> None:
         decision = allow_decision()
-        invocation = {"decision_id": decision["decision_id"], **decision["request_binding"], "parameters": {}}
+        invocation = {"decision_id": decision["decision_id"], **decision["request_binding"], "parameters": {"title": "demo"}}
         invocation["action"] = "github.pull_request.merge"
         with self.assertRaises(ConflictError) as context:
             self.store.consume_decision(decision, invocation, actor="github-operator", consumed_at=CHECKED_AT)
@@ -76,7 +77,7 @@ class StoreRuntimeTests(unittest.TestCase):
 
     def test_concurrent_replay_allows_only_one_consumer(self) -> None:
         decision = allow_decision()
-        invocation = {"decision_id": decision["decision_id"], **decision["request_binding"], "parameters": {}}
+        invocation = {"decision_id": decision["decision_id"], **decision["request_binding"], "parameters": {"title": "demo"}}
 
         def consume() -> str:
             try:

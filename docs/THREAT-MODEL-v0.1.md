@@ -28,6 +28,11 @@ Status: controls partially implemented and locally exercised; not an independent
 | Cross-task contamination | concurrent prompt writes an unrelated request into the same workflow | task/correlation-scoped admission and assignment checks | concurrent-request isolation test |
 | Declarative reconciliation drift | model or Human update is accepted but not converged as expected | read-after-write status verification and pinned upgrade gate | AgentTeams update/re-apply test |
 | Secret leakage | token appears in prompt/evidence/log | secret manager, redaction, no secret inputs | leak scanning |
+| Cloud Skill scope expansion | upstream search Skill instructs enable/disable or full-access actions | server-side typed adapter permits only current-account `search-resources`; Worker has no credential bytes or arbitrary CLI | write-operation pre-process denial tests |
+| Cloud permission ambiguity | permission denial is interpreted as an empty inventory | distinct `NOT_ASSESSED_PERMISSION_DENIED`; no zero-resource inference | denied RAM identity test |
+| Cloud response leakage | resource IDs, names, tags, IPs, tokens, or raw stderr enter evidence | aggregate allowlist, hashed request ID, no raw stdout/stderr retention | secret and sensitive-field absence tests |
+| Cloud evidence semantic spoofing | Worker labels an incomplete or denied query as valid context | deterministic typed receipt semantic check precedes canonical integrity verification | forged or unusable receipt rejection test |
+| Cloud Skill supply-chain drift | installed Skill differs from pinned official revision | exact subtree revision and per-file SHA-256; package exact-member attestation | modified Skill load-rejection test |
 | Audit deletion | rejected attempt disappears | append-only store and retention checks | deletion attempt test |
 
 ## Residual risk

@@ -2,17 +2,52 @@
 
 ```text
 PROJECT_ID=TITMAS-AGENT-ACTION-GATE
-OBSERVED_AT=2026-08-02T04:15:20+08:00
+OBSERVED_AT=2026-08-02T17:12:17+08:00
 REPOSITORY=https://github.com/joy7758/titmas-agent-action-gate
 REPOSITORY_VISIBILITY=PUBLIC
-BRANCH=agent/native-agentteams-runtime
-SOURCE_BASE_COMMIT=ec00633711067947949128816bc40526c2e43837
-CURRENT_MILESTONE=M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE
+BRANCH=codex/close-m4-runtime-blockers
+SOURCE_BASE_COMMIT=6f1c83bf87e6ee96a0eda281e1fa91b8f80a32e1
+CURRENT_MILESTONE=M4_RUNTIME_BLOCKER_CLOSURE_IN_PROGRESS
+FULL_M4_COMPLETE=false
+ALIBABA_CLOUD_OFFICIAL_SKILL_SUBMILESTONE=COMPLETE_BOUNDED_NATIVE_WORKER_EVIDENCE
 AGENTTEAMS_PIN=v1.2.0@793db242257a569d911b1aa59c1cd554af78511f
 AGENT_EVIDENCE_PIN=0.6.0
 AGENT_EVIDENCE_WHEEL_SHA256=3bec73551c252c4665ea54e49243190d2d27df430a92b5c6d1846d4e025d0b8e
-SPECIALIZED_AGENT_IDENTITIES=5
-VERSIONED_SKILL_MANIFESTS=5
+SPECIALIZED_AGENT_IDENTITIES=6
+VERSIONED_FIRST_PARTY_SKILL_MANIFESTS=5
+OFFICIAL_EXTERNAL_SKILLS_INSTALLED=1
+OFFICIAL_ALIBABA_CLOUD_SKILL_REVISION=92bd723f7cc217b252feab574c1883fa0aa46b3c
+OFFICIAL_ALIBABA_CLOUD_SKILL_SOURCE_HASHES_VERIFIED=true
+OFFICIAL_ALIBABA_CLOUD_SKILL_DISCOVERED=true
+OFFICIAL_ALIBABA_CLOUD_SKILL_RUNTIME_LOADED=true
+OFFICIAL_ALIBABA_CLOUD_SKILL_ACTUALLY_INVOKED=true
+OFFICIAL_ALIBABA_CLOUD_SKILL_BOUND_ADAPTER_ACTUALLY_INVOKED=true
+READ_ONLY_ALIBABA_CLOUD_RAM_IDENTITY_USED=true
+ALIBABA_CLOUD_AGENT_EVIDENCE_RECEIPT_VALID=true
+ALIBABA_CLOUD_AGENT_EVIDENCE_PROFILE_AND_CHAINS_REPLAYABLE=true
+ALIBABA_CLOUD_PUBLIC_EVIDENCE_FAIL_CLOSED_VALIDATOR=true
+ALIBABA_CLOUD_LIVE_STS_PROFILE_IDENTITY_BOUND=true
+ALIBABA_CLOUD_ROLE_POLICY_ATTACHMENT_SET_EXCLUSIVE=true
+ALIBABA_CLOUD_CLI_BINARY_SHA256_PINNED=true
+ALIBABA_CLOUD_RESOURCECENTER_PLUGIN_PRE_POST_DIGEST_RECHECK=true
+ALIBABA_CLOUD_RAM_OBSERVATION_REPRODUCIBLE_PRODUCER=true
+ALIBABA_CLOUD_AUTHENTICATED_MCP_RUNTIME_PROVEN=true
+ALIBABA_CLOUD_NATIVE_AGENTTEAMS_LLM_WORKER_TURN=true
+ALIBABA_CLOUD_NATIVE_WORKER_TURN_RETAINED=true
+ALIBABA_CLOUD_SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION=true
+ALIBABA_CLOUD_EMPTY_RESULT_INTERPRETED_CORRECTLY=true
+ALIBABA_CLOUD_WORKER_DECISION_RECORD_COUNT=0
+ALIBABA_CLOUD_UPSTREAM_SKILL_BYTES_DISTRIBUTED=false
+ALIBABA_CLOUD_RUNTIME_EVIDENCE=demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json
+ALIBABA_CLOUD_NATIVE_RUNTIME_EVIDENCE=demo/evidence/agentteams-native-alibabacloud-skill-20260802.json
+ALIBABA_CLOUD_FROZEN_EVIDENCE_SET=demo/evidence/alibabacloud-evidence-set-freeze-20260802.json
+ALIBABA_CLOUD_FROZEN_EVIDENCE_SET_VALID=true
+ALIBABA_CLOUD_IAM_PROVISIONING_WRITE_EXECUTED=true
+ALIBABA_CLOUD_RESOURCECENTER_WRITE_API_CALLS=0
+ALIBABA_CLOUD_SEMANTIC_CONTEXT_USABLE_FOR_RELEASE=false
+ALIBABA_CLOUD_RUNTIME_LOCAL_CLI_CONFIG_WRITES=3
+ALIBABA_CLOUD_RUNTIME_PLUGIN_UPDATE_EXECUTED=false
+ALIBABA_CLOUD_SKILL_LICENSE_CONCLUSION=NOT_ASSESSED_NOASSERTION
 MCP_TOOLS_SPECIFIED=6
 EVALUATION_CASES=4
 ACTION_GATE_IMPLEMENTED=true
@@ -50,4 +85,4 @@ TITMAS_CORE_PROTOCOLS_CHANGED=false
 TITMAS_DRIFT_CHECK=PASS
 ```
 
-This is an experimental reference implementation with local runtime tests, one bounded public GitHub sandbox trace, and one temporary native AgentTeams smoke trace. The native trace was operator-supervised, did not finish the Manager/leader chain autonomously, did not enforce per-Worker MCP tool ACLs, and executed no provider action. It is not a persistent or production AgentTeams deployment, release, certification, compliance assessment, or competition submission.
+This is an experimental reference implementation with local runtime tests, one bounded public GitHub sandbox trace, one temporary historical five-Worker native AgentTeams smoke trace, and one disposable native `cloud-context-inspector` turn on official AgentTeams `v1.2.0`. The Worker resolved the externally installed official Skill, verified its source-lock digest before invoking the typed adapter, and received a real Resource Center `EMPTY_RESULT`, interpreted as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. Provider readbacks verify the complete one-policy role attachment set, and a same-profile live STS call binds the runtime identity and normalized role before each search. The result entered the evidence path but cannot satisfy a release request's semantic `CLOUD_CONTEXT` requirement. The Worker produced zero decision records and Resource Center write calls; separately recorded IAM credential provisioning and local CLI configuration writes remain disclosed. No upstream Skill bytes entered the repository or Worker package. This bounded specialist turn does not prove the broader autonomous M4 chain, persistent or production deployment, release, certification, compliance assessment, or competition submission.

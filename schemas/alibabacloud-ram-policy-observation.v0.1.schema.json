@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/alibabacloud-ram-policy-observation.v0.1.schema.json",
+  "title": "Sanitized Alibaba Cloud RAM read-only policy observation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "observed_at",
+    "identity",
+    "attachment",
+    "policy",
+    "read_trace",
+    "effects"
+  ],
+  "properties": {
+    "$schema": {"const": "../schemas/alibabacloud-ram-policy-observation.v0.1.schema.json"},
+    "schema_version": {"const": "0.1.0"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "identity_ref", "role_ref"],
+      "properties": {
+        "type": {"const": "AssumedRoleUser"},
+        "identity_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "role_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role_ref",
+        "policy_type",
+        "policy_name",
+        "total_attachment_count",
+        "system_policy_count",
+        "custom_policy_count",
+        "matching_attachment_count",
+        "unexpected_attachment_count"
+      ],
+      "properties": {
+        "role_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "policy_type": {"const": "System"},
+        "policy_name": {"const": "AliyunResourceCenterReadOnlyAccess"},
+        "total_attachment_count": {"const": 1},
+        "system_policy_count": {"const": 1},
+        "custom_policy_count": {"const": 0},
+        "matching_attachment_count": {"const": 1},
+        "unexpected_attachment_count": {"const": 0}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version_id",
+        "document_sha256",
+        "allow_actions",
+        "deny_statement_count",
+        "write_operation_marker_count"
+      ],
+      "properties": {
+        "version_id": {"const": "v2"},
+        "document_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "allow_actions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "deny_statement_count": {"const": 0},
+        "write_operation_marker_count": {"const": 0}
+      }
+    },
+    "read_trace": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operation", "exit_status", "request_id_ref"],
+        "properties": {
+          "operation": {"enum": ["ram.GetPolicy", "ram.GetPolicyVersion", "ram.ListPoliciesForRole", "sts.GetCallerIdentity"]},
+          "exit_status": {"const": 0},
+          "request_id_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+        }
+      }
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloud_read_calls", "cloud_write_calls", "local_cli_config_writes"],
+      "properties": {
+        "cloud_read_calls": {"const": 4},
+        "cloud_write_calls": {"const": 0},
+        "local_cli_config_writes": {"const": 3}
+      }
+    }
+  }
+}

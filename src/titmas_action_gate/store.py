@@ -41,6 +41,36 @@ class AppendOnlyStore:
                     invocation_sha256 TEXT NOT NULL,
                     record_hash TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS runtime_request_scopes (
+                    request_id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL,
+                    correlation_id TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    repository TEXT NOT NULL,
+                    commit_sha TEXT NOT NULL,
+                    submitted_by TEXT NOT NULL,
+                    bound_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS runtime_scope_idx
+                    ON runtime_request_scopes(run_id, correlation_id, task_id, request_id);
+                CREATE TABLE IF NOT EXISTS runtime_security_events (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_id TEXT NOT NULL UNIQUE,
+                    run_id TEXT NOT NULL,
+                    correlation_id TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    principal_id TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    outcome TEXT NOT NULL,
+                    reason_code TEXT NOT NULL,
+                    business_state_delta INTEGER NOT NULL,
+                    details_json TEXT NOT NULL,
+                    previous_hash TEXT,
+                    record_hash TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS runtime_security_run_idx
+                    ON runtime_security_events(run_id, sequence);
                 """
             )
 
@@ -191,6 +221,8 @@ class AppendOnlyStore:
         actual_binding = {key: invocation.get(key) for key in expected_binding}
         if actual_binding != expected_binding or invocation.get("decision_id") != decision["decision_id"]:
             raise ConflictError("INVOCATION_MISMATCH", "Provider invocation does not match the exact ALLOW binding.")
+        if sha256_json(invocation.get("parameters")) != expected_binding["parameters_sha256"]:
+            raise ConflictError("INVOCATION_DIGEST_MISMATCH", "Provider parameters do not match the exact ALLOW digest.")
         invocation_sha256 = sha256_json(invocation)
         with self._transaction() as connection:
             existing = connection.execute(
@@ -223,3 +255,193 @@ class AppendOnlyStore:
         with closing(self._connect()) as connection:
             row = connection.execute("SELECT 1 FROM decision_consumptions WHERE decision_id = ?", (decision_id,)).fetchone()
         return row is not None
+
+    @staticmethod
+    def _scope_tuple(scope: dict[str, str]) -> tuple[str, str, str, str, str]:
+        return (
+            scope["run_id"],
+            scope["correlation_id"],
+            scope["task_id"],
+            scope["repository"],
+            scope["commit"],
+        )
+
+    def bind_request_scope(
+        self,
+        request_id: str,
+        scope: dict[str, str],
+        *,
+        principal_id: str,
+        bound_at: datetime | None = None,
+    ) -> dict[str, str]:
+        """Bind one request to an immutable native runtime scope."""
+
+        expected = self._scope_tuple(scope)
+        with self._transaction() as connection:
+            existing = connection.execute(
+                "SELECT * FROM runtime_request_scopes WHERE request_id = ?",
+                (request_id,),
+            ).fetchone()
+            if existing is not None:
+                actual = (
+                    existing["run_id"],
+                    existing["correlation_id"],
+                    existing["task_id"],
+                    existing["repository"],
+                    existing["commit_sha"],
+                )
+                if actual != expected or existing["submitted_by"] != principal_id:
+                    raise ConflictError(
+                        "CORRELATION_CONFLICT",
+                        "request_id is already bound to a different runtime scope or principal.",
+                    )
+            else:
+                connection.execute(
+                    """
+                    INSERT INTO runtime_request_scopes(
+                        request_id,run_id,correlation_id,task_id,repository,commit_sha,submitted_by,bound_at
+                    ) VALUES(?,?,?,?,?,?,?,?)
+                    """,
+                    (request_id, *expected, principal_id, format_datetime(bound_at or utc_now())),
+                )
+        return {"request_id": request_id, **scope, "submitted_by": principal_id}
+
+    def scope_for_request(self, request_id: str) -> dict[str, str]:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_request_scopes WHERE request_id = ?",
+                (request_id,),
+            ).fetchone()
+        if row is None:
+            raise NotFoundError("RUNTIME_SCOPE_NOT_BOUND", f"request has no runtime scope: {request_id}")
+        return {
+            "run_id": row["run_id"],
+            "correlation_id": row["correlation_id"],
+            "task_id": row["task_id"],
+            "repository": row["repository"],
+            "commit": row["commit_sha"],
+        }
+
+    def assert_request_scope(self, request_id: str, scope: dict[str, str]) -> None:
+        actual = self.scope_for_request(request_id)
+        if actual["run_id"] != scope["run_id"]:
+            raise ConflictError("CROSS_RUN_ACCESS_DENIED", "request belongs to a different runtime run.")
+        if actual != scope:
+            raise ConflictError("CORRELATION_MISMATCH", "request runtime scope does not match the admitted correlation and task.")
+
+    def append_security_event(
+        self,
+        *,
+        event_id: str,
+        scope: dict[str, str],
+        principal_id: str,
+        tool_name: str,
+        outcome: str,
+        reason_code: str,
+        business_state_delta: int,
+        details: dict[str, Any] | None = None,
+        created_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Append a per-run security record without mutating request business state."""
+
+        observed = created_at or utc_now()
+        payload = details or {}
+        with self._transaction() as connection:
+            prior = connection.execute(
+                "SELECT record_hash FROM runtime_security_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
+                (scope["run_id"],),
+            ).fetchone()
+            previous_hash = prior["record_hash"] if prior else None
+            material = {
+                "event_id": event_id,
+                "run_id": scope["run_id"],
+                "correlation_id": scope["correlation_id"],
+                "task_id": scope["task_id"],
+                "principal_id": principal_id,
+                "tool_name": tool_name,
+                "outcome": outcome,
+                "reason_code": reason_code,
+                "business_state_delta": business_state_delta,
+                "details": payload,
+                "previous_hash": previous_hash,
+            }
+            record_hash = sha256_json(material)
+            cursor = connection.execute(
+                """
+                INSERT INTO runtime_security_events(
+                    event_id,run_id,correlation_id,task_id,principal_id,tool_name,outcome,reason_code,
+                    business_state_delta,details_json,previous_hash,record_hash,created_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    event_id,
+                    scope["run_id"],
+                    scope["correlation_id"],
+                    scope["task_id"],
+                    principal_id,
+                    tool_name,
+                    outcome,
+                    reason_code,
+                    business_state_delta,
+                    canonical_json_text(payload),
+                    previous_hash,
+                    record_hash,
+                    format_datetime(observed),
+                ),
+            )
+            sequence = int(cursor.lastrowid)
+        return {**material, "sequence": sequence, "record_hash": record_hash, "created_at": format_datetime(observed)}
+
+    def security_events_for_run(self, run_id: str) -> list[dict[str, Any]]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT * FROM runtime_security_events WHERE run_id = ? ORDER BY sequence",
+                (run_id,),
+            ).fetchall()
+        return [
+            {
+                "sequence": row["sequence"],
+                "event_id": row["event_id"],
+                "run_id": row["run_id"],
+                "correlation_id": row["correlation_id"],
+                "task_id": row["task_id"],
+                "principal_id": row["principal_id"],
+                "tool_name": row["tool_name"],
+                "outcome": row["outcome"],
+                "reason_code": row["reason_code"],
+                "business_state_delta": row["business_state_delta"],
+                "details": json.loads(row["details_json"]),
+                "previous_hash": row["previous_hash"],
+                "record_hash": row["record_hash"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def verify_security_chain(self, run_id: str) -> list[str]:
+        issues: list[str] = []
+        previous_hash: str | None = None
+        for record in self.security_events_for_run(run_id):
+            material = {
+                key: record[key]
+                for key in (
+                    "event_id",
+                    "run_id",
+                    "correlation_id",
+                    "task_id",
+                    "principal_id",
+                    "tool_name",
+                    "outcome",
+                    "reason_code",
+                    "business_state_delta",
+                    "details",
+                    "previous_hash",
+                )
+            }
+            if record["previous_hash"] != previous_hash:
+                issues.append(f"security event {record['sequence']}: previous_hash mismatch")
+            expected = sha256_json(material)
+            if record["record_hash"] != expected:
+                issues.append(f"security event {record['sequence']}: record_hash mismatch")
+            previous_hash = expected
+        return issues

@@ -94,6 +94,22 @@ spec:
 apiVersion: agentteams.io/v1beta1
 kind: Worker
 metadata:
+  name: cloud-context-inspector
+spec:
+  model: CONFIGURE_MODEL_ID
+  runtime: openclaw
+  identity: Bounded read-only Alibaba Cloud context observer with no credential bytes or decision authority.
+  soul: Use only the typed inspect_alibabacloud_resources adapter. Never run enable, disable, create, update, delete, cross-account, or arbitrary CLI operations.
+  agents: Load the exact pinned official Skill, but treat the local typed adapter as the enforceable boundary. Missing credentials or permission is NOT_ASSESSED, never an empty inventory.
+  package: CONFIGURE_CONTENT_ADDRESSED_CLOUD_CONTEXT_INSPECTOR_PACKAGE
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://CONFIGURE_AUTHENTICATED_MCP_ENDPOINT/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
   name: release-steward
 spec:
   model: CONFIGURE_MODEL_ID
@@ -123,6 +139,8 @@ spec:
     - name: evidence-verifier
       role: worker
     - name: github-operator
+      role: worker
+    - name: cloud-context-inspector
       role: worker
     - name: release-steward
       role: worker

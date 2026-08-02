@@ -19,6 +19,10 @@ SCHEMA_FILES = {
     "evidence_result": "evidence-verification-result.v0.1.schema.json",
     "human_approval": "human-approval.v0.1.schema.json",
     "decision": "action-gate-decision.v0.1.schema.json",
+    "runtime_scope": "runtime-scope.v0.1.schema.json",
+    "cloud_context_query": "cloud-context-query.v0.1.schema.json",
+    "cloud_context_result": "cloud-context-result.v0.1.schema.json",
+    "alibabacloud_ram_policy_observation": "alibabacloud-ram-policy-observation.v0.1.schema.json",
 }
 
 
@@ -70,6 +74,10 @@ def validate_action_request(request: dict[str, Any]) -> None:
             "parameters_sha256 does not match RFC 8785 canonical parameters.",
             details={"expected": expected, "actual": request["parameters_sha256"]},
         )
+
+
+def validate_runtime_scope(scope: dict[str, Any]) -> None:
+    validate_contract("runtime_scope", scope)
 
 
 def validate_bound_input(request: dict[str, Any], payload: dict[str, Any], contract: str) -> None:

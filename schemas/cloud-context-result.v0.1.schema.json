@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/cloud-context-result.v0.1.schema.json",
+  "title": "Sanitized Alibaba Cloud Resource Center preflight result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preflight_id",
+    "request_id",
+    "status",
+    "observed_at",
+    "skill",
+    "query",
+    "credential",
+    "invocation",
+    "checks",
+    "resourcecenter_write_api_calls",
+    "uncertainty"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "preflight_id": {"type": "string", "pattern": "^cloud-preflight-[a-f0-9]{32}$"},
+    "request_id": {"type": "string", "pattern": "^aar-[a-z0-9-]{8,64}$"},
+    "status": {
+      "enum": [
+        "CLOUD_CONTEXT_AVAILABLE",
+        "NOT_ASSESSED_NO_VISIBLE_RESOURCE",
+        "BLOCKED_BY_SKILL_BOUNDARY",
+        "NOT_ASSESSED",
+        "NOT_ASSESSED_PERMISSION_DENIED",
+        "SKILL_LOAD_REJECTED",
+        "INVOCATION_FAILED"
+      ]
+    },
+    "observed_at": {"type": "string", "format": "date-time"},
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "repository", "revision", "source_lock_sha256", "external_path_reference", "discovered", "loaded", "load_scope", "native_agentteams_loaded", "runtime_load_result", "runtime_invoked", "invocation_scope"],
+      "properties": {
+        "name": {"const": "alibabacloud-resourcecenter-search"},
+        "repository": {"const": "https://github.com/aliyun/alibabacloud-aiops-skills"},
+        "revision": {"const": "92bd723f7cc217b252feab574c1883fa0aa46b3c"},
+        "source_lock_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "external_path_reference": {"const": "external://titmas/skills/alibabacloud-resourcecenter-search"},
+        "discovered": {"type": "boolean"},
+        "loaded": {"type": "boolean"},
+        "load_scope": {"const": "EXTERNAL_SKILL_SOURCE_VERIFICATION"},
+        "native_agentteams_loaded": {"type": "boolean"},
+        "runtime_load_result": {"enum": ["SOURCE_VERIFIED_NOT_NATIVE_LOADED", "SOURCE_VERIFIED_THROUGH_AUTHENTICATED_MCP", "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY", "LOAD_REJECTED"]},
+        "runtime_invoked": {"type": "boolean"},
+        "invocation_scope": {"const": "SKILL_BOUND_ADAPTER"}
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "max_results", "filter_keys", "include_deleted_resources", "confirmation_ref"],
+      "properties": {
+        "operation": {"enum": ["resourcecenter.search-resources", "REJECTED"]},
+        "max_results": {"type": "integer", "minimum": 1, "maximum": 100},
+        "filter_keys": {"type": "array", "uniqueItems": true, "items": {"enum": ["ResourceType", "RegionId"]}},
+        "include_deleted_resources": {"type": "boolean"},
+        "confirmation_ref": {"type": "string", "pattern": "^(confirmation:[a-f0-9]{64}|NOT_CONFIRMED)$"}
+      }
+    },
+    "credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["credential_ref", "permission_identity_ref", "permission_role_ref", "permission_policy_ref", "read_only_policy_verified"],
+      "properties": {
+        "credential_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "permission_identity_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "permission_role_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "permission_policy_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "read_only_policy_verified": {"enum": ["PASS", "FAIL", "NOT_ASSESSED"]}
+      }
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoked",
+        "result_class",
+        "cli_version",
+        "command",
+        "user_agent",
+        "exit_status",
+        "returned_resource_count",
+        "next_token_present",
+        "resource_type_count",
+        "region_count",
+        "request_id_ref",
+        "argv_template_sha256",
+        "provider_http_attempts",
+        "steps"
+      ],
+      "properties": {
+        "invoked": {"type": "boolean"},
+        "result_class": {"enum": ["NOT_INVOKED", "EMPTY_RESULT", "NONEMPTY_RESULT", "FAILED"]},
+        "cli_version": {"type": ["string", "null"], "maxLength": 64},
+        "command": {"type": ["string", "null"], "maxLength": 512},
+        "user_agent": {"type": ["string", "null"], "maxLength": 256},
+        "exit_status": {"type": ["integer", "null"], "minimum": 0, "maximum": 255},
+        "returned_resource_count": {"type": ["integer", "null"], "minimum": 0},
+        "next_token_present": {"type": ["boolean", "null"]},
+        "resource_type_count": {"type": ["integer", "null"], "minimum": 0},
+        "region_count": {"type": ["integer", "null"], "minimum": 0},
+        "request_id_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "argv_template_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "provider_http_attempts": {"const": "NOT_ASSESSED"},
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step_id", "effect", "exit_status"],
+            "properties": {
+              "step_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"},
+              "effect": {"enum": ["LOCAL_READ", "LOCAL_CONFIG_WRITE", "CLOUD_READ"]},
+              "exit_status": {"type": "integer", "minimum": 0, "maximum": 255}
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "passed"],
+        "properties": {
+          "check_id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"},
+          "passed": {"type": "boolean"}
+        }
+      }
+    },
+    "resourcecenter_write_api_calls": {"const": 0},
+    "uncertainty": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 512}}
+  }
+}

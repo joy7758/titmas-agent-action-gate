@@ -1,0 +1,106 @@
+{
+  "schema_version": "1.0.0",
+  "status": "EXTERNAL_SOURCE_LOCK_AND_NATIVE_AGENTTEAMS_READ_ONLY_BOUNDARY_INVOCATION_VERIFIED",
+  "observed_at": "2026-08-02T16:20:00+08:00",
+  "skill": {
+    "name": "alibabacloud-resourcecenter-search",
+    "publisher": "Alibaba Cloud",
+    "repository": "https://github.com/aliyun/alibabacloud-aiops-skills",
+    "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+    "branch_observed": "master",
+    "git_tree": "aa1ffc6bf879686490646e607c4c59cd1d499b11",
+    "source_path": "skills/migrationom/entconsole/alibabacloud-resourcecenter-search",
+    "version_identity": "git-92bd723f7cc217b252feab574c1883fa0aa46b3c",
+    "release_tag": null
+  },
+  "installation": {
+    "path_reference": "external://titmas/skills/alibabacloud-resourcecenter-search",
+    "path_configuration_env": "TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH",
+    "installed_at": "2026-08-02T11:59:38+08:00",
+    "method": "npx --yes skills@1.5.21 add <exact-local-checkout> --skill alibabacloud-resourcecenter-search --agent openclaw --yes --copy --full-depth",
+    "materializer": "scripts/install_official_alibabacloud_skill.py",
+    "skills_cli_version": "1.5.21",
+    "source_checkout_revision_verified_before_install": true,
+    "source_and_installed_tree_diff_exit_status": 0,
+    "ephemeral_source_path_retained": false,
+    "repository_tree_contains_upstream_bytes": false,
+    "python_distribution_excluded": true
+  },
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "6f6290be0a9f0c6ad93a3a1e3a8be5bee5eee07ce3f13c89a89f2a7b6258eddd"
+    },
+    {
+      "path": "references/acceptance-criteria.md",
+      "sha256": "7620dac51436387d516e376cae61ecf4678dddec5724703e9f7215f3b0999904"
+    },
+    {
+      "path": "references/cli-installation-guide.md",
+      "sha256": "93abdd4f4a067822cca6894aa890855a50e723a6f6243f208887f171d6635170"
+    },
+    {
+      "path": "references/error-codes.md",
+      "sha256": "041376693feaf36f1ca18c31d64c718734b66c1550cdcc82ca9e67de0800859b"
+    },
+    {
+      "path": "references/ram-policies.md",
+      "sha256": "84facc0bd85656e8862d93383a359c27255be972f4bd1323f39500f6d8221e3a"
+    },
+    {
+      "path": "references/related-apis.md",
+      "sha256": "f33c2e947b0346c250ca46ab93c282ca5f973cfbd194a87ea9a345331c7962fe"
+    },
+    {
+      "path": "references/verification-method.md",
+      "sha256": "f2b2d03a26d322f059c45f055eefe8cdc0bb64e5724561d33657f30a21ff6add"
+    },
+    {
+      "path": "scripts/query-resource-types.py",
+      "sha256": "2f4ee2deb67e886ad6d0c1ac984dd5e5a96d116fecfc4d851fcb580b89cf448b"
+    }
+  ],
+  "license_observation": {
+    "status": "NOT_ASSESSED",
+    "root_license_file_present": false,
+    "target_skill_license_file_present": false,
+    "readme_license_section": "Apache-2.0",
+    "readme_skills_statement": "MIT",
+    "readme_license_claims_conflict": true,
+    "readme_sha256": "2e33341c7efb9c682a08a6f74ab0503b5787c1800fb73648c84b022cbe6783b2",
+    "readme_cn_sha256": "f200daf231a2c53c62efe8313a44a0c19cec85ff319ce89e9d9bab9e7150f129",
+    "spdx_license_identifier": "NOASSERTION",
+    "redistribution_permission": "NOT_ASSESSED",
+    "license_compatibility": "NOT_ASSESSED",
+    "claim": "NO_UNAMBIGUOUS_LICENSE_CONCLUSION"
+  },
+  "integration_boundary": {
+    "upstream_skill_contains_read_and_write_workflows": true,
+    "allowed_operation": "resourcecenter.search-resources",
+    "read_only": true,
+    "runtime_authorized": true,
+    "provider_credentials_provisioned": true,
+    "credential_material_retained_only_in_user_cli_config_mode_0600": true,
+    "read_only_ram_policy_verified": true,
+    "read_only_ram_policy_observation": "governance/alibabacloud-ram-policy-observation-20260802.json",
+    "read_only_ram_policy_observation_producer": "scripts/capture_alibabacloud_ram_policy_observation.py",
+    "cloud_execution_tested": true,
+    "skill_bound_adapter_invoked": true,
+    "native_agentteams_skill_loaded": true,
+    "native_agentteams_worker_turn_retained": true,
+    "native_runtime_load_result": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY",
+    "native_runtime_evidence": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json",
+    "runtime_evidence": "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
+    "may_decide_action_gate": false,
+    "may_approve": false,
+    "may_execute_cloud_write": false,
+    "credential_material_allowed_in_repository": false,
+    "runtime_dependency": {
+      "aliyun_cli_version": "3.4.11",
+      "aliyun_cli_sha256": "7a418ea428dcbfeaab2af8760938aeda8d2f16bd77b586cbe4c75b07034df8fb",
+      "resourcecenter_plugin_version": "0.7.0",
+      "resourcecenter_plugin_sha256": "5a18d50b91c10a8db1c603aa28b86b69bb1a6614921ef06198a186862261a145",
+      "runtime_auto_install_or_update_allowed": false
+    }
+  }
+}

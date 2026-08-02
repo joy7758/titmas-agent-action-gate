@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json",
+  "title": "Alibaba Cloud Resource Center runtime evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "evaluation_id",
+    "observed_at",
+    "request_id",
+    "provenance",
+    "action_request",
+    "runtime",
+    "cloud_context",
+    "permission_observation",
+    "agent_evidence_profile",
+    "agent_evidence_receipt",
+    "record_chain",
+    "security_chain",
+    "agent_evidence_event_chain",
+    "authority",
+    "external_effects",
+    "secrets",
+    "non_claims"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "0.1.0"},
+    "evaluation_id": {"const": "TITMAS-AAG-ALIBABACLOUD-RESOURCECENTER-20260802"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "request_id": {"type": "string"},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_commit",
+        "dirty",
+        "git_status_sha256",
+        "workspace_manifest_sha256",
+        "runner_sha256",
+        "adapter_sha256",
+        "service_sha256",
+        "evidence_adapter_sha256",
+        "public_evidence_validator_sha256",
+        "result_schema_sha256",
+        "policy_observation_schema_sha256",
+        "policy_observation_producer_sha256",
+        "public_evidence_schema_sha256",
+        "source_lock_sha256",
+        "cli_version",
+        "aliyun_cli_sha256",
+        "resourcecenter_plugin_version",
+        "resourcecenter_plugin_sha256",
+        "policy_observation_sha256"
+      ],
+      "properties": {
+        "base_commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "dirty": {"type": "boolean"},
+        "git_status_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "workspace_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "runner_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "adapter_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "service_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "evidence_adapter_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "public_evidence_validator_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "result_schema_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "policy_observation_schema_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "policy_observation_producer_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "public_evidence_schema_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "source_lock_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "cli_version": {"type": "string"},
+        "aliyun_cli_sha256": {"const": "7a418ea428dcbfeaab2af8760938aeda8d2f16bd77b586cbe4c75b07034df8fb"},
+        "resourcecenter_plugin_version": {"const": "0.7.0"},
+        "resourcecenter_plugin_sha256": {"const": "5a18d50b91c10a8db1c603aa28b86b69bb1a6614921ef06198a186862261a145"},
+        "policy_observation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "action_request": {"type": "object"},
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "principal", "tool", "allowed_call_recorded", "negative_principal", "negative_result", "native_agentteams_llm_worker_turn"],
+      "properties": {
+        "surface": {"const": "AUTHENTICATED_FASTMCP_STREAMABLE_HTTP"},
+        "principal": {"const": "cloud-context-inspector"},
+        "tool": {"const": "inspect_alibabacloud_resources"},
+        "allowed_call_recorded": {"const": true},
+        "negative_principal": {"const": "request-analyst"},
+        "negative_result": {"const": "MCP_TOOL_NOT_ALLOWED"},
+        "native_agentteams_llm_worker_turn": {"type": "boolean"}
+      }
+    },
+    "cloud_context": {"$ref": "./cloud-context-result.v0.1.schema.json"},
+    "permission_observation": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json"},
+    "agent_evidence_profile": {"type": "object"},
+    "agent_evidence_receipt": {"type": "object"},
+    "record_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issues", "records"],
+      "properties": {
+        "issues": {"type": "array", "maxItems": 0},
+        "records": {"type": "array", "minItems": 3, "items": {"type": "object"}}
+      }
+    },
+    "security_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issues", "events"],
+      "properties": {
+        "issues": {"type": "array", "maxItems": 0},
+        "events": {"type": "array", "minItems": 2, "items": {"type": "object"}}
+      }
+    },
+    "agent_evidence_event_chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issues", "events"],
+      "properties": {
+        "issues": {"type": "array", "maxItems": 0},
+        "events": {"type": "array", "minItems": 2, "items": {"type": "object"}}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worker_produced_gate_outcome", "decision_record_count", "deterministic_gate_authority_preserved"],
+      "properties": {
+        "worker_produced_gate_outcome": {"const": false},
+        "decision_record_count": {"const": 0},
+        "deterministic_gate_authority_preserved": {"const": true}
+      }
+    },
+    "external_effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourcecenter_cli_processes",
+        "resourcecenter_provider_http_attempts",
+        "runtime_sts_identity_read_calls",
+        "runtime_cloud_read_calls",
+        "permission_observation_cloud_read_calls",
+        "resourcecenter_write_api_calls",
+        "iam_control_plane_provisioning_writes_occurred",
+        "runtime_local_cli_config_writes",
+        "runtime_plugin_install_or_update_executed",
+        "setup_plugin_update_previously_executed",
+        "github_write_calls",
+        "release_or_deployment_executed"
+      ],
+      "properties": {
+        "resourcecenter_cli_processes": {"const": 1},
+        "resourcecenter_provider_http_attempts": {"const": "NOT_ASSESSED"},
+        "runtime_sts_identity_read_calls": {"const": 1},
+        "runtime_cloud_read_calls": {"const": 2},
+        "permission_observation_cloud_read_calls": {"const": 4},
+        "resourcecenter_write_api_calls": {"const": 0},
+        "iam_control_plane_provisioning_writes_occurred": {"const": true},
+        "runtime_local_cli_config_writes": {"type": "integer", "minimum": 3},
+        "runtime_plugin_install_or_update_executed": {"const": false},
+        "setup_plugin_update_previously_executed": {"const": true},
+        "github_write_calls": {"const": 0},
+        "release_or_deployment_executed": {"const": false}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["credential_bytes_in_artifact", "profile_name_in_artifact", "raw_provider_output_retained"],
+      "properties": {
+        "credential_bytes_in_artifact": {"const": false},
+        "profile_name_in_artifact": {"const": false},
+        "raw_provider_output_retained": {"const": false}
+      }
+    },
+    "non_claims": {"type": "array", "items": {"type": "string"}}
+  }
+}

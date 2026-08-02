@@ -8,9 +8,9 @@ Evidence-verified, deterministic authorization boundaries for AgentTeams workflo
 
 TITMAS Agent Action Gate is a production-oriented reference architecture and competition demo candidate for the GOAI 2026 Agent Infra track. It separates uncertain agent analysis from deterministic authorization, evidence verification, policy evaluation, and human approval.
 
-Current milestone: `M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE`.
+Current milestone: `M4_RUNTIME_BLOCKER_CLOSURE_IN_PROGRESS`; the bounded Alibaba Cloud official Skill sub-milestone is `COMPLETE`, while full M4 remains `INCOMPLETE`.
 
-The deterministic Action Gate, append-only state store, six-tool MCP server, pinned `agent-evidence` adapter, five-role handoff harness, and allowlisted GitHub provider adapter are implemented and locally tested. A bounded public sandbox run created a branch and Draft PR. On 2026-08-02, an isolated temporary deployment of official AgentTeams `v1.2.0` started one Manager and five Workers against the Action Gate MCP server. Specialist Workers produced an operator-supervised request → verification → decision trace; the complete Manager → leader → Worker workflow did not finish autonomously. No provider action was attempted.
+The deterministic Action Gate, append-only state store, pinned `agent-evidence` adapter, authenticated native MCP boundary, six-role target topology, and allowlisted in-memory GitHub provider adapter are implemented in the current worktree. A bounded public sandbox run previously created a branch and Draft PR. On 2026-08-02, a historical isolated deployment of official AgentTeams `v1.2.0` started one Manager and five Workers; it remains operator-supervised negative evidence. A separate disposable `cloud-context-inspector` ran one native Qwen Worker turn: it resolved the externally installed official Alibaba Cloud Resource Center Skill, verified the source-lock digest, invoked the frozen typed read-only adapter, and returned `EMPTY_RESULT` as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. The retained chains and canonical `agent-evidence` receipt validate, while Worker decision records and Resource Center write calls remain zero. This proves only the bounded specialist turn, not a complete cloud inventory, broader autonomous M4 completion, or deployment authorization.
 
 This repository is not submitted to, endorsed by, or affiliated with GOAI, and it makes no certification, compliance, production-readiness, or security guarantee.
 
@@ -32,6 +32,7 @@ Agents are useful at interpreting ambiguous requests, decomposing work, and expl
 | `request-analyst` | Normalize requests, risk signals, and uncertainty | Grant permission or validate its own output |
 | `evidence-verifier` | Invoke the pinned `agent-evidence` verifier and return its receipt | Rewrite evidence or decide policy |
 | `github-operator` | Execute an exact GitHub action after a matching `ALLOW` | Bypass the gate or approve releases |
+| `cloud-context-inspector` | Request one typed, current-account Resource Center search and return sanitized context | Receive credential bytes, run arbitrary CLI/cloud operations, write cloud state, or decide the gate |
 | `release-steward` | Assemble post-execution evidence and request the release decision | Merge, tag, or release without a new decision |
 
 Agent identities and intended tool boundaries are machine-readable in [`agents/registry.json`](agents/registry.json). The reviewable deployment template is [`deploy/agentteams/team.v1.2.0.yaml`](deploy/agentteams/team.v1.2.0.yaml); the non-idempotent macOS Docker Desktop smoke profile is [`deploy/agentteams/team.native-smoke.v1.2.0.yaml`](deploy/agentteams/team.native-smoke.v1.2.0.yaml).
@@ -66,6 +67,7 @@ Agent request
   -> pre-action evidence verification
   -> deterministic Action Gate
   -> exact GitHub action after ALLOW
+  -> official Alibaba Cloud read-only context preflight before a deployment-related release request is evaluated
   -> post-action evidence generation
   -> agent-evidence verification
   -> deterministic release decision
@@ -73,6 +75,8 @@ Agent request
 ```
 
 The end-to-end scenario and retained public evidence are documented in [`docs/GITHUB-WORKFLOW-DEMO.md`](docs/GITHUB-WORKFLOW-DEMO.md). The repository contains four reproducible runtime cases: valid execution, missing evidence, tampered evidence, and a high-risk release action requiring approval.
+
+The historical adapter-only Alibaba Cloud evidence is [`demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json`](demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json). The later native Worker-turn evidence is [`demo/evidence/agentteams-native-alibabacloud-skill-20260802.json`](demo/evidence/agentteams-native-alibabacloud-skill-20260802.json). The frozen four-file evidence set is [`demo/evidence/alibabacloud-evidence-set-freeze-20260802.json`](demo/evidence/alibabacloud-evidence-set-freeze-20260802.json). Together they retain exact external Skill source verification, pinned CLI/plugin digests, same-profile live STS identity binding, the complete one-policy RAM attachment set, sanitized invocation trace, CLI exit `0`, native AgentTeams Worker and Matrix receipts, replayable `VALID` `agent-evidence`, and scoped zero-write accounting. The Worker ZIP contains reference metadata but no upstream Skill bytes.
 
 ## Run and validate
 
@@ -82,10 +86,23 @@ Python 3.11 or newer is required.
 python3 -m pip install -e '.[dev]'
 python3 scripts/validate_milestone.py
 python3 scripts/validate_governance.py
-python3 -W error::ResourceWarning -m unittest discover -s tests -v
+python3 scripts/validate_alibabacloud_runtime_evidence.py
+python3 scripts/validate_alibabacloud_evidence_set.py
+python3 scripts/validate_native_agentteams_cloud_skill_evidence.py \
+  demo/evidence/agentteams-native-alibabacloud-skill-20260802.json
+python3 -m unittest discover -s tests -v
 python3 -m titmas_action_gate.cli evaluate-fixtures
 python3 -m titmas_action_gate.cli demo --state-dir artifacts/runtime/local-demo
 python3 -m titmas_action_gate.cli validate-install
+```
+
+Run the real Alibaba Cloud preflight only after configuring an external read-only RAM profile and independently verifying its policy. The runner does not accept credential bytes:
+
+```bash
+TITMAS_ALIBABA_CLOUD_PROFILE='<read-only-profile-label>' \
+TITMAS_ALIBABA_RAM_POLICY_OBSERVATION='governance/alibabacloud-ram-policy-observation-20260802.json' \
+python3 scripts/run_alibabacloud_skill_evaluation.py \
+  --confirmation-ref '<explicit-user-confirmation-reference>'
 ```
 
 The tests execute the deterministic engine, pinned `agent-evidence` validator, append-only chain, MCP stdio protocol, all six tools, AgentTeams-compatible local handoffs, in-memory provider workflow, native-smoke manifest/evidence checks, and negative boundaries. They do not prove persistent AgentTeams deployment, autonomous orchestration, production security, or operational readiness.
@@ -110,6 +127,7 @@ The real GitHub runner requires a separately provisioned sandbox repository and 
 - [`docs/SKILL-SPECIFICATION-v0.1.md`](docs/SKILL-SPECIFICATION-v0.1.md): reusable Skill package contract;
 - [`docs/MCP-TOOL-SPECIFICATION-v0.1.md`](docs/MCP-TOOL-SPECIFICATION-v0.1.md): MCP server and tool contract;
 - [`docs/THREAT-MODEL-v0.1.md`](docs/THREAT-MODEL-v0.1.md): trust boundaries and bypass threats;
+- [`docs/ALIBABA-CLOUD-SKILL-INTEGRATION.md`](docs/ALIBABA-CLOUD-SKILL-INTEGRATION.md): exact official Skill source, typed read-only boundary, credential isolation, evidence path, and current exit status;
 - [`docs/EXECUTION-ROADMAP.md`](docs/EXECUTION-ROADMAP.md): implementation and evaluation gates;
 - [`docs/RUNBOOK.md`](docs/RUNBOOK.md): reproducible local and sandbox commands;
 - [`SECURITY.md`](SECURITY.md): security model, reporting, and non-production limitations;
@@ -132,6 +150,8 @@ NATIVE_LOCAL_SMOKE_NE_PERSISTENT_OR_PRODUCTION_DEPLOYMENT=true
 OPERATOR_SUPERVISED_NE_AUTONOMOUS_END_TO_END=true
 HASH_CHAIN_VALID_NE_SEMANTIC_ORCHESTRATION_CLEAN=true
 PROMPT_ROLE_BOUNDARY_NE_ENFORCED_PER_WORKER_ACL=true
+CLOUD_CONTEXT_NE_DEPLOYMENT_AUTHORIZATION=true
+CLOUD_READ_SUCCESS_NE_COMPLETE_INVENTORY_OR_READ_ONLY_POLICY_PROOF=true
 GITHUB_PR_CREATED_NE_GITHUB_PR_MERGED=true
 COMPETITION_REPOSITORY_NE_COMPETITION_SUBMISSION=true
 TITMAS_CORE_PROTOCOLS_CHANGED=false
@@ -139,4 +159,6 @@ TITMAS_CORE_PROTOCOLS_CHANGED=false
 
 ## License
 
-Apache-2.0. See [`LICENSE`](LICENSE).
+Original project code is Apache-2.0. See [`LICENSE`](LICENSE).
+
+The externally installed third-party `alibabacloud-resourcecenter-search` subtree has `SPDX-License-Identifier: NOASSERTION` in this repository's source lock because upstream has no applicable license file and its README contains conflicting Apache-2.0 and MIT statements. Installation and byte provenance do not establish redistribution, derivative-work, commercial-use, or compatibility clearance. The subtree is absent from the repository, Worker packages, wheel, and sdist; it must not be included in a public commit or release. See [`governance/alibabacloud-resourcecenter-search-source-lock.json`](governance/alibabacloud-resourcecenter-search-source-lock.json).

@@ -52,6 +52,8 @@ class AgentEvidenceAdapter:
         output: dict[str, Any],
         evidence_types: list[str],
         timestamp: datetime | None = None,
+        operation_type: str | None = None,
+        actor_runtime: str = "titmas-action-gate-local-service",
     ) -> dict[str, Any]:
         observed_at = timestamp or utc_now()
         request_id = request["request_id"]
@@ -63,14 +65,13 @@ class AgentEvidenceAdapter:
         input_ref = f"ref:{request_id}:request"
         output_ref = f"ref:{request_id}:{phase}-output"
         constraints = [
-            {"id": f"constraint:{value.lower().replace('_', '-')}", "description": f"Required evidence type {value} is present."}
-            for value in evidence_types
+            {"id": f"constraint:{value.lower().replace('_', '-')}", "description": f"Required evidence type {value} is present."} for value in evidence_types
         ]
         profile = {
             "profile": {"name": "execution-evidence-operation-accountability-profile", "version": "0.1"},
             "statement_id": f"eeoap:{request_id}:{phase}",
             "timestamp": format_datetime(observed_at),
-            "actor": {"id": f"actor:{actor}", "name": actor, "runtime": "agentteams-v1.2.0-contract", "type": "agent"},
+            "actor": {"id": f"actor:{actor}", "name": actor, "runtime": actor_runtime, "type": "agent"},
             "subject": {
                 "id": subject_id,
                 "type": "action-request",
@@ -79,7 +80,7 @@ class AgentEvidenceAdapter:
             },
             "operation": {
                 "id": operation_id,
-                "type": request["action"],
+                "type": operation_type or request["action"],
                 "description": f"TITMAS Action Gate {phase} evidence for one bounded request.",
                 "subject_ref": subject_id,
                 "policy_ref": policy_id,
@@ -154,12 +155,29 @@ class AgentEvidenceAdapter:
         path.write_text(json.dumps(profile, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
         return path
 
+    @staticmethod
+    def declared_evidence_types(profile: dict[str, Any]) -> list[str]:
+        """Derive evidence types from the validated profile, never from an attachment caller."""
+
+        prefix = "Required evidence type "
+        suffix = " is present."
+        values: list[str] = []
+        for constraint in profile.get("constraints", []):
+            description = constraint.get("description") if isinstance(constraint, dict) else None
+            if not isinstance(description, str) or not description.startswith(prefix) or not description.endswith(suffix):
+                continue
+            value = description[len(prefix) : -len(suffix)]
+            if value and value.replace("_", "").isalnum() and value.upper() == value:
+                values.append(value)
+        return list(dict.fromkeys(values))
+
     def verify_profile(
         self,
         request: dict[str, Any],
         profile_path: str | Path,
         *,
         evidence_types: list[str],
+        expected_sha256: str | None = None,
         verified_at: datetime | None = None,
     ) -> dict[str, Any]:
         path = self._resolve_profile(profile_path)
@@ -170,32 +188,56 @@ class AgentEvidenceAdapter:
             "resource_ref": request["target"]["resource_ref"],
             "parameters_sha256": request["parameters_sha256"],
         }
+        binding_checks: list[dict[str, Any]] = []
         if not path.is_file():
             status = "MISSING"
             digest = None
             checks: list[dict[str, Any]] = []
         else:
             digest = sha256_file(path)
+            if expected_sha256 is not None:
+                binding_checks.append({"check_id": "ATTACHMENT_DIGEST", "passed": digest == expected_sha256})
             try:
                 schema_path = schema_directory() / "agent-evidence-oap-v0.1.schema.json"
                 if sha256_file(schema_path) != AGENT_EVIDENCE_OAP_SCHEMA_SHA256:
                     raise ActionGateError("VERIFIER_SCHEMA_DIGEST_MISMATCH", "Pinned agent-evidence OAP schema digest does not match the source lock.")
                 report = validate_profile_file(path, schema_path=schema_path, fail_fast=False)
+                profile = json.loads(path.read_text(encoding="utf-8"))
             except (ValueError, json.JSONDecodeError):
                 report = {"ok": False, "issues": [{"code": "schema_violation"}], "stages": []}
+                profile = {}
             issue_codes = {item["code"] for item in report.get("issues", [])}
+            declared_types = self.declared_evidence_types(profile)
             if report.get("ok"):
                 status = "VALID"
             elif any(code.endswith("_digest_mismatch") for code in issue_codes):
                 status = "TAMPERED"
             else:
                 status = "INVALID"
-            checks = [
-                {"check_id": str(stage["name"]).upper().replace("-", "_"), "passed": bool(stage.get("ok"))}
-                for stage in report.get("stages", [])
-            ]
+            checks = [{"check_id": str(stage["name"]).upper().replace("-", "_"), "passed": bool(stage.get("ok"))} for stage in report.get("stages", [])]
+            request_digest = f"sha256:{sha256_json(request)}"
+            subject = profile.get("subject", {})
+            binding_checks.extend(
+                [
+                    {"check_id": "SUBJECT_ID", "passed": subject.get("id") == f"obj:{request['request_id']}"},
+                    {
+                        "check_id": "SUBJECT_LOCATOR",
+                        "passed": subject.get("locator") == f"urn:titmas:action-request:{request['request_id']}",
+                    },
+                    {"check_id": "SUBJECT_DIGEST", "passed": subject.get("digest") == request_digest},
+                    {
+                        "check_id": "EVIDENCE_TYPES",
+                        "passed": set(declared_types) == set(evidence_types),
+                    },
+                ]
+            )
+            if binding_checks and not all(item["passed"] for item in binding_checks):
+                status = "TAMPERED"
+            checks = binding_checks + checks
             if not checks:
                 checks = [{"check_id": "SCHEMA", "passed": False}]
+        if not path.is_file():
+            declared_types = []
         return {
             "schema_version": "0.1.0",
             "request_id": request["request_id"],
@@ -207,7 +249,7 @@ class AgentEvidenceAdapter:
             },
             "status": status,
             "bundle_sha256": digest,
-            "evidence_types": list(dict.fromkeys(evidence_types)),
+            "evidence_types": declared_types,
             "checks": checks,
             "verified_at": format_datetime(verified_at or utc_now()),
         }

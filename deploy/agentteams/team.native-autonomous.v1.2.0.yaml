@@ -1,0 +1,175 @@
+# Template for one disposable, operator-unassisted AgentTeams v1.2.0 M4 run.
+# The runner replaces CONFIGURE_PACKAGE_URI_* with content-addressed package URIs
+# returned by `agt apply worker --zip`. Credentials remain outside this file.
+# Apply order is Workers -> Team -> Human. The default installer Manager is reused.
+# This manifest never selects a real provider, release, deploy, or submission path.
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: workflow-lead
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skill-source: external-reference-only
+    titmas.dev/upstream-skill-bytes-distributed: "false"
+    titmas.dev/leader-contract: copaw-projectflow-taskflow
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: copaw
+  package: CONFIGURE_PACKAGE_URI_WORKFLOW_LEAD
+  identity: Transparent coordinator; native project and task state is not authorization.
+  soul: Use projectflow and taskflow for the fixed DAG. Never synthesize a gate result, approval, execution success, release, or submission.
+  agents: Load the packaged use-action-gate Skill. Preserve every supplied scope field and require exact TASK_COMPLETED receipts.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: request-analyst
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skills-materialized: package-readback-and-digest-required
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: openclaw
+  package: CONFIGURE_PACKAGE_URI_REQUEST_ANALYST
+  identity: Request normalizer and uncertainty reporter.
+  soul: Submit only the supplied exact request and generate its request-bound analysis evidence without granting permission.
+  agents: Load the packaged analyze-action-request Skill and return an exact TASK_COMPLETED receipt to the Team Leader.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: evidence-verifier
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skills-materialized: package-readback-and-digest-required
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: openclaw
+  package: CONFIGURE_PACKAGE_URI_EVIDENCE_VERIFIER
+  identity: Operator of the pinned canonical agent-evidence adapter.
+  soul: Attach the assigned immutable profile and return the canonical verifier receipt without rewriting failures or deciding policy.
+  agents: Load the packaged verify-agent-evidence Skill and return an exact TASK_COMPLETED receipt to the Team Leader.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: github-operator
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skills-materialized: package-readback-and-digest-required
+    titmas.dev/provider-mode: in-memory-no-external-write-only
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: openclaw
+  package: CONFIGURE_PACKAGE_URI_GITHUB_OPERATOR
+  identity: Exact-action operator with no ambient or external provider authority.
+  soul: Consume only an exact live ALLOW through execute_in_memory_github_action. Never analyze, approve, rewrite evidence, or call a real GitHub provider.
+  agents: Load the packaged execute-github-action Skill and return an exact TASK_COMPLETED receipt to the Team Leader.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: cloud-context-inspector
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skills-materialized: package-readback-and-digest-required
+    titmas.dev/provider-mode: typed-read-only-resource-search-only
+    titmas.dev/credential-boundary: server-side-no-worker-secret-material
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: openclaw
+  package: CONFIGURE_PACKAGE_URI_CLOUD_CONTEXT_INSPECTOR
+  identity: Read-only cloud context observer without Action Gate, approval, release, or cloud write authority.
+  soul: Load the external source-locked Skill projection, then invoke only the typed inspect_alibabacloud_resources adapter for the assigned release request. The mcporter bridge is transport only; never call aliyun directly, request credentials, or interpret cloud context as authorization.
+  agents: Resolve and SHA-256 verify the external official alibabacloud-resourcecenter-search Skill through load_external_alibabacloud_skill, then invoke only inspect_alibabacloud_resources with the frozen typed query through the installed mcporter bridge. The package contains no upstream Skill bytes, and the server-side typed adapter is the sole credential-bearing capability. Never produce an Action Gate decision.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Worker
+metadata:
+  name: release-steward
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+    titmas.dev/skills-materialized: package-readback-and-digest-required
+    titmas.dev/model-contract: stable-non-preview-live-probe-required
+spec:
+  model: qwen3.7-max
+  runtime: openclaw
+  package: CONFIGURE_PACKAGE_URI_RELEASE_STEWARD
+  identity: Post-execution evidence assembler and final deterministic-decision requester.
+  soul: Generate post-execution evidence, invoke canonical verification, and request a new deterministic decision. Never self-approve, merge, release, deploy, or submit.
+  agents: Load the packaged prepare-release-decision Skill and return an exact TASK_COMPLETED receipt to the Team Leader.
+  mcpServers:
+    - name: titmas-action-gate-native-runtime
+      url: http://host.docker.internal:8767/mcp
+      transport: http
+---
+apiVersion: agentteams.io/v1beta1
+kind: Team
+metadata:
+  name: titmas-action-gate
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+spec:
+  description: One disposable evidence-verified deterministic action-boundary run.
+  teamName: titmas-action-gate
+  workerMembers:
+    - name: workflow-lead
+      role: team_leader
+    - name: request-analyst
+      role: worker
+    - name: evidence-verifier
+      role: worker
+    - name: github-operator
+      role: worker
+    - name: cloud-context-inspector
+      role: worker
+    - name: release-steward
+      role: worker
+  peerMentions: true
+  admin:
+    name: titmas-action-gate-reviewer
+  humanMembers:
+    - name: titmas-action-gate-reviewer
+      role: coordinator
+---
+apiVersion: agentteams.io/v1beta1
+kind: Human
+metadata:
+  name: titmas-action-gate-reviewer
+  annotations:
+    titmas.dev/profile: native-autonomous-disposable
+spec:
+  displayName: TITMAS Local Reviewer
+  username: admin
+  permissionLevel: 2
+  accessibleTeams:
+    - titmas-action-gate
+  identitySource:
+    issuer: local-matrix
+    subject: "@admin:matrix-local.agentteams.io:18080"
+  note: Collaboration identity only. This run grants no human approval input.

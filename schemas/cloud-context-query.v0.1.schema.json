@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/cloud-context-query.v0.1.schema.json",
+  "title": "Bounded Alibaba Cloud Resource Center query v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "max_results",
+    "filters",
+    "include_deleted_resources",
+    "parameters_confirmed_by_user",
+    "confirmation_ref"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "operation": {"const": "resourcecenter.search-resources"},
+    "max_results": {"type": "integer", "minimum": 1, "maximum": 100},
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resource_type": {"type": "string", "minLength": 1, "maxLength": 256},
+        "region_id": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "include_deleted_resources": {"type": "boolean"},
+    "parameters_confirmed_by_user": {"type": "boolean"},
+    "confirmation_ref": {"type": "string", "pattern": "^confirmation:[a-f0-9]{64}$"}
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "policy_id": "github-demo-policy",
+  "version": "0.2.0",
+  "supersedes": "github-demo-policy.v0.1.json@0.1.0",
+  "default": {
+    "effect": "DENY",
+    "risk_class": "CRITICAL",
+    "required_evidence_types": ["SOURCE_PIN", "REQUEST_AUTHORIZATION"]
+  },
+  "rules": [
+    {
+      "action": "github.branch.push",
+      "effect": "ALLOW_WITHOUT_APPROVAL",
+      "risk_class": "MEDIUM",
+      "required_evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT"]
+    },
+    {
+      "action": "github.pull_request.create",
+      "effect": "ALLOW_WITHOUT_APPROVAL",
+      "risk_class": "MEDIUM",
+      "required_evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT"]
+    },
+    {
+      "action": "github.pull_request.merge",
+      "effect": "REQUIRE_HUMAN_APPROVAL",
+      "risk_class": "HIGH",
+      "required_evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT", "PULL_REQUEST_STATE"]
+    },
+    {
+      "action": "github.tag.create",
+      "effect": "REQUIRE_HUMAN_APPROVAL",
+      "risk_class": "HIGH",
+      "required_evidence_types": ["SOURCE_PIN", "TEST_RESULT", "COMMIT_STATE"]
+    },
+    {
+      "action": "github.release.create",
+      "effect": "REQUIRE_HUMAN_APPROVAL",
+      "risk_class": "CRITICAL",
+      "required_evidence_types": ["SOURCE_PIN", "TEST_RESULT", "TAG_STATE", "RELEASE_MANIFEST", "CLOUD_CONTEXT"]
+    }
+  ],
+  "invariants": [
+    "UNKNOWN_ACTION_DENIED",
+    "EVIDENCE_FAILURE_CANNOT_BE_APPROVED_AWAY",
+    "EACH_PROVIDER_WRITE_REQUIRES_A_DISTINCT_DECISION",
+    "ALLOW_BINDS_EXACT_ACTION_TARGET_AND_PARAMETERS",
+    "DEPLOYMENT_RELATED_RELEASE_REQUIRES_TYPED_CLOUD_CONTEXT"
+  ]
+}
