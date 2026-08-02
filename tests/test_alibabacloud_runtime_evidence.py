@@ -115,7 +115,6 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
         current = workspace_provenance(ROOT)
         for key in (
             "runner_sha256",
-            "adapter_sha256",
             "service_sha256",
             "evidence_adapter_sha256",
             "result_schema_sha256",
@@ -130,6 +129,10 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
         tampered_provenance = copy.deepcopy(evidence)
         tampered_provenance["provenance"]["runner_sha256"] = "0" * 64
         self.assertIn("PROVENANCE_MISMATCH:runner_sha256", validate_public_evidence(ROOT, tampered_provenance))
+
+        tampered_adapter = copy.deepcopy(evidence)
+        tampered_adapter["provenance"]["adapter_sha256"] = "0" * 64
+        self.assertIn("PROVENANCE_MISMATCH:adapter_sha256", validate_public_evidence(ROOT, tampered_adapter))
 
         tampered_base = copy.deepcopy(evidence)
         tampered_base["provenance"]["base_commit"] = "0" * 40

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -12,6 +11,7 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 
 from .canonical import sha256_file
+from .cli import data_root
 from .cloud_context import CloudContextInspector, CloudCredentialContext, credential_from_policy_observation
 from .contracts import validate_action_request
 from .errors import ActionGateError, AuthenticationError
@@ -64,8 +64,7 @@ class NativeRuntimeMcp:
         self.caller_token = caller_token
         self.approver_token = approver_token
         self.providers: dict[str, InMemoryGitHubProvider] = {}
-        repository_root = Path(__file__).resolve().parents[2]
-        self.cloud_context_inspector = cloud_context_inspector or CloudContextInspector(repository_root)
+        self.cloud_context_inspector = cloud_context_inspector or CloudContextInspector(data_root())
         self.cloud_credential = cloud_credential
         self.native_agentteams_runtime = native_agentteams_runtime
         resource_host = "127.0.0.1" if host == "0.0.0.0" else host.strip("[]")

@@ -108,6 +108,97 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(argv[argv.index("--user-agent") + 1], OFFICIAL_USER_AGENT)
         self.assertEqual(argv[argv.index("--profile") + 1], "secret-profile-name-never-retained")
 
+    @staticmethod
+    def _resource_search_execution(
+        payload: object,
+        *,
+        returncode: int = 0,
+        stderr: str = "",
+    ) -> CliExecution:
+        arn = "acs:sts::opaque:assumed-role/test-role/session"
+        bound_credential = CloudCredentialContext(
+            profile_name="runtime-profile",
+            permission_identity="sha256:" + hashlib.sha256(f"identity:{arn}".encode()).hexdigest(),
+            permission_role_ref="sha256:" + hashlib.sha256(b"role:test-role").hexdigest(),
+            permission_policy_ref="sha256:" + "d" * 64,
+            read_only_policy_verified=True,
+        )
+
+        class ScriptedExecutor(AliyunCliReadOnlyExecutor):
+            def _run(self, argv: list[str]) -> CompletedProcess[str]:
+                if argv[1:] == ["version"]:
+                    return CompletedProcess(argv, 0, stdout="aliyun version 3.4.11", stderr="")
+                if argv[1:3] == ["sts", "GetCallerIdentity"]:
+                    return CompletedProcess(
+                        argv,
+                        0,
+                        stdout=json.dumps({"IdentityType": "AssumedRoleUser", "Arn": arn}),
+                        stderr="",
+                    )
+                if argv[1:3] == ["resourcecenter", "search-resources"]:
+                    return CompletedProcess(argv, returncode, stdout=json.dumps(payload), stderr=stderr)
+                return CompletedProcess(argv, 0, stdout="", stderr="")
+
+        def pinned_digest(path: Path) -> str:
+            return OFFICIAL_ALIYUN_CLI_SHA256 if path.name == "fake-aliyun" else OFFICIAL_RESOURCE_CENTER_PLUGIN_SHA256
+
+        with (
+            patch("titmas_action_gate.cloud_context.shutil.which", return_value="/tmp/fake-aliyun"),
+            patch("titmas_action_gate.cloud_context.Path.is_file", return_value=True),
+            patch("titmas_action_gate.cloud_context.sha256_file", side_effect=pinned_digest),
+        ):
+            return ScriptedExecutor().execute(confirmed_query(), bound_credential)
+
+    def test_resources_null_is_rejected(self) -> None:
+        result = self._resource_search_execution({"Resources": None})
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
+    def test_resources_string_is_rejected(self) -> None:
+        result = self._resource_search_execution({"Resources": "not-a-resource-list"})
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
+    def test_resources_with_non_object_item_is_rejected(self) -> None:
+        result = self._resource_search_execution({"Resources": ["not-a-resource-object"]})
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
+    def test_empty_resources_remain_a_valid_empty_result(self) -> None:
+        result = self._resource_search_execution({"Resources": [], "RequestId": "opaque"})
+        self.assertEqual(result.status, "NOT_ASSESSED_NO_VISIBLE_RESOURCE")
+        self.assertEqual(result.returned_resource_count, 0)
+        observed = CloudContextInspector(ROOT, FakeExecutor(result)).inspect(
+            "aar-cloud-context-empty-result",
+            confirmed_query(),
+            credential(),
+        )
+        self.assertEqual(observed["invocation"]["result_class"], "EMPTY_RESULT")
+
+    def test_successful_resource_data_containing_forbidden_remains_successful(self) -> None:
+        result = self._resource_search_execution(
+            {
+                "Resources": [
+                    {
+                        "ResourceName": "Forbidden is ordinary resource data",
+                        "ResourceType": "ACS::ECS::Instance",
+                        "RegionId": "cn-test",
+                        "Tags": [{"Key": "note", "Value": "AccessDenied is also ordinary data"}],
+                    }
+                ]
+            }
+        )
+        self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
+        self.assertEqual(result.returned_resource_count, 1)
+
+    def test_structured_access_denied_provider_error_remains_permission_denied(self) -> None:
+        result = self._resource_search_execution(
+            {"Code": "AccessDenied", "Message": "redacted"},
+            returncode=1,
+        )
+        self.assertEqual(result.status, "NOT_ASSESSED_PERMISSION_DENIED")
+        self.assertEqual(result.uncertainty, ("RAM_PERMISSION_DENIED",))
+
     def test_policy_observation_rejects_extra_attachment(self) -> None:
         observation = json.loads((ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8"))
         observation["attachment"]["total_attachment_count"] = 2

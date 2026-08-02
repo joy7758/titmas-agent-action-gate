@@ -185,17 +185,17 @@ def _null_invocation() -> dict[str, Any]:
     }
 
 
-def _permission_code(stdout: str, stderr: str) -> str | None:
+def _permission_code(stdout: str, stderr: str, *, command_failed: bool) -> str | None:
     for candidate in (stdout, stderr):
         try:
             parsed = json.loads(candidate)
         except json.JSONDecodeError:
             parsed = {}
-        code = parsed.get("Code") or parsed.get("code")
+        code = (parsed.get("Code") or parsed.get("code")) if isinstance(parsed, dict) else None
         if isinstance(code, str) and (code in PERMISSION_DENIED_CODES or "permission" in code.lower()):
             return code
-    combined = f"{stdout}\n{stderr}".lower()
-    if any(marker.lower() in combined for marker in PERMISSION_DENIED_CODES):
+    fallback = f"{stdout}\n{stderr}" if command_failed else stderr
+    if any(marker.lower() in fallback.lower() for marker in PERMISSION_DENIED_CODES):
         return "PERMISSION_DENIED_REDACTED"
     return None
 
@@ -210,10 +210,12 @@ def _parse_cli_version(output: str) -> tuple[str | None, tuple[int, int, int] | 
 
 def _resource_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
     for key in ("Resources", "resources"):
-        value = payload.get(key)
-        if isinstance(value, list):
-            return [item for item in value if isinstance(item, dict)]
-    return []
+        if key in payload:
+            value = payload[key]
+            if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+                raise ValueError("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES")
+            return value
+    raise ValueError("RESOURCE_SEARCH_RESPONSE_MISSING_RESOURCES")
 
 
 def _role_ref_from_assumed_role_arn(arn: str) -> str | None:
@@ -367,7 +369,11 @@ class AliyunCliReadOnlyExecutor:
                 ]
             )
             trace.append({"step_id": "VERIFY_LIVE_CALLER_IDENTITY", "effect": "CLOUD_READ", "exit_status": identity_result.returncode})
-            denied = _permission_code(identity_result.stdout, identity_result.stderr)
+            denied = _permission_code(
+                identity_result.stdout,
+                identity_result.stderr,
+                command_failed=identity_result.returncode != 0,
+            )
             if denied is not None:
                 return CliExecution(
                     "NOT_ASSESSED_PERMISSION_DENIED",
@@ -468,7 +474,7 @@ class AliyunCliReadOnlyExecutor:
                     "exit_status": 0,
                 }
             )
-            denied = _permission_code(result.stdout, result.stderr)
+            denied = _permission_code(result.stdout, result.stderr, command_failed=result.returncode != 0)
             if denied is not None:
                 return CliExecution(
                     "NOT_ASSESSED_PERMISSION_DENIED",
@@ -541,7 +547,22 @@ class AliyunCliReadOnlyExecutor:
                     trace,
                     argv_template_sha256,
                 )
-            resources = _resource_list(payload)
+            try:
+                resources = _resource_list(payload)
+            except ValueError:
+                return CliExecution(
+                    "INVOCATION_FAILED",
+                    version_text,
+                    result.returncode,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",),
+                    trace,
+                    argv_template_sha256,
+                )
             resource_types = {item.get("ResourceType") or item.get("resourceType") for item in resources}
             regions = {item.get("RegionId") or item.get("regionId") for item in resources}
             request_id = payload.get("RequestId") or payload.get("requestId")
