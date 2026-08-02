@@ -71,6 +71,10 @@ DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS = 900
 MAX_POLICY_OBSERVATION_CAPTURE_SECONDS = 300
 
 
+def _is_timezone_aware(value: datetime | None) -> bool:
+    return value is not None and value.tzinfo is not None and value.utcoffset() is not None
+
+
 @dataclass(frozen=True)
 class CloudCredentialContext:
     """Non-secret references for one externally configured CLI profile."""
@@ -845,7 +849,7 @@ class CloudContextInspector:
     ) -> dict[str, Any]:
         checked_at = observed_at or utc_now()
         policy_freshness = credential.policy_observation_freshness if credential else "NOT_ASSESSED"
-        if credential and credential.policy_observation_observed_at is not None:
+        if credential and _is_timezone_aware(credential.policy_observation_observed_at):
             invocation_age = (
                 checked_at.astimezone(UTC) - credential.policy_observation_observed_at.astimezone(UTC)
             ).total_seconds()
@@ -1009,6 +1013,27 @@ class CloudContextInspector:
                     {"check_id": "SAME_RUN_POLICY_READBACK", "passed": True},
                 ],
                 uncertainty=["READ_ONLY_POLICY_VERIFICATION_FAILED"],
+                observed_at=checked_at,
+            )
+        if not _is_timezone_aware(credential.policy_observation_observed_at):
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": True},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": False},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": True},
+                ],
+                uncertainty=[
+                    "POLICY_OBSERVATION_TIMESTAMP_MISSING"
+                    if credential.policy_observation_observed_at is None
+                    else "POLICY_OBSERVATION_TIMESTAMP_TIMEZONE_MISSING"
+                ],
                 observed_at=checked_at,
             )
 

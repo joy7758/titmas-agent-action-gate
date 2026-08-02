@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 import warnings
+from datetime import UTC, datetime
 from pathlib import Path
 
 from starlette.testclient import TestClient
@@ -92,6 +93,7 @@ class CloudContextMcpTests(unittest.TestCase):
             read_only_policy_verified=True,
             policy_observation_freshness="FRESH",
             same_run_policy_readback_verified=True,
+            policy_observation_observed_at=datetime.now(UTC),
         )
         with tempfile.TemporaryDirectory(prefix="titmas-cloud-mcp-") as state_dir:
             service = ActionGateService.demo(state_dir)

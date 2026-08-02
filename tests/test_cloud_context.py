@@ -77,7 +77,8 @@ def confirmed_query(**overrides: object) -> dict:
     return value
 
 
-def credential(*, verified: bool = True) -> CloudCredentialContext:
+def credential(*, verified: bool = True, observed_at: datetime | None = None) -> CloudCredentialContext:
+    policy_observed_at = observed_at or datetime.now(UTC)
     return CloudCredentialContext(
         profile_name="secret-profile-name-never-retained",
         permission_identity="acs:ram::example:user/titmas-read-only",
@@ -86,6 +87,7 @@ def credential(*, verified: bool = True) -> CloudCredentialContext:
         read_only_policy_verified=verified,
         policy_observation_freshness="FRESH",
         same_run_policy_readback_verified=True,
+        policy_observation_observed_at=policy_observed_at,
     )
 
 
@@ -476,6 +478,37 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(executor.calls, 0)
         self.assertFalse(is_semantically_usable_cloud_context(result))
 
+    def test_fresh_policy_without_timestamp_fails_closed_before_provider_call(self) -> None:
+        cloud_credential = replace(credential(), policy_observation_observed_at=None)
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-policy-timestamp-missing",
+            confirmed_query(),
+            cloud_credential,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED")
+        self.assertEqual(result["uncertainty"], ["POLICY_OBSERVATION_TIMESTAMP_MISSING"])
+        self.assertFalse(result["skill"]["runtime_invoked"])
+        self.assertFalse(result["invocation"]["invoked"])
+        self.assertEqual(result["invocation"]["result_class"], "NOT_INVOKED")
+        self.assertEqual(result["resourcecenter_write_api_calls"], 0)
+        self.assertEqual(executor.calls, 0)
+
+    def test_fresh_policy_with_naive_timestamp_fails_closed_before_provider_call(self) -> None:
+        cloud_credential = credential(observed_at=datetime(2026, 8, 2, 6, 49, 43))
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-policy-timestamp-naive",
+            confirmed_query(),
+            cloud_credential,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED")
+        self.assertEqual(result["uncertainty"], ["POLICY_OBSERVATION_TIMESTAMP_TIMEZONE_MISSING"])
+        self.assertFalse(result["skill"]["runtime_invoked"])
+        self.assertFalse(result["invocation"]["invoked"])
+        self.assertEqual(result["resourcecenter_write_api_calls"], 0)
+        self.assertEqual(executor.calls, 0)
+
     def test_relabelled_legacy_observation_is_rejected(self) -> None:
         observation = json.loads(
             (ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8")
@@ -634,12 +667,13 @@ class CloudContextBoundaryTests(unittest.TestCase):
         return result, executor.argv
 
     def test_valid_result_is_sanitized_and_has_no_gate_authority(self) -> None:
+        assessed_at = datetime(2026, 8, 2, tzinfo=UTC)
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(
             "aar-cloud-context-test-001",
             confirmed_query(filters={"resource_type": "ACS::ECS::Instance"}),
-            credential(),
-            observed_at=datetime(2026, 8, 2, tzinfo=UTC),
+            credential(observed_at=assessed_at),
+            observed_at=assessed_at,
         )
         self.assertEqual(result["status"], "CLOUD_CONTEXT_AVAILABLE")
         self.assertTrue(is_semantically_usable_cloud_context(result))

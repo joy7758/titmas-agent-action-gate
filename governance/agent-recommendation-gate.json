@@ -1,15 +1,15 @@
 {
-  "gate_version": "1.9.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-010",
-  "evaluated_at": "2026-08-02T19:45:23+08:00",
+  "gate_version": "2.0.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-011",
+  "evaluated_at": "2026-08-02T20:05:40+08:00",
   "evaluator_class": "AI_AGENT",
   "development_context": {
-    "task_scope": "ADDRESS_PR_3_FINAL_READ_ONLY_POLICY_PRE_INVOCATION_REVIEW_FINDING",
+    "task_scope": "ADDRESS_PR_3_POLICY_OBSERVATION_TIMESTAMP_REVIEW_FINDING",
     "branch": "codex/close-m4-runtime-blockers",
-    "base_commit": "c456db67687d3a66d6ad40e76f87775acf2bfcd1",
-    "request_source": "DIRECT_USER_AUTHORIZATION_20260802_PR_3_FINAL_P2_FIX",
-    "request_sha256": "f0f7892e3a443adeb1641d915652f0d2a51b9d5afbf7d712e810c340e2e22b3f",
-    "implementation_boundary": "MINIMAL_CLOUD_CONTEXT_STATUS_SCHEMA_REGRESSION_TEST_COMMIT_PUSH_CI_THREAD_RESOLUTION_AND_FINAL_CODEX_REREVIEW_ONLY",
+    "base_commit": "0203ddc5df105565c9fdd8bba63d22821163db09",
+    "request_source": "DIRECT_USER_AUTHORIZATION_20260802_PR_3_TIMESTAMP_FIX",
+    "request_sha256": "2b108cdfb15eeaa200e79fde3c2755720f190b7ec71ca4b49d3efdffbfb553c0",
+    "implementation_boundary": "MINIMAL_POLICY_OBSERVATION_TIMESTAMP_CODE_TEST_DOC_COMMIT_PUSH_CI_THREAD_RESOLUTION_AND_FINAL_CODEX_REREVIEW_ONLY",
     "external_read_authorized": true,
     "external_write_authorized": true,
     "external_write_executed": false,
@@ -27,8 +27,16 @@
     {
       "agent": "GitHub Codex review",
       "executed": true,
+      "scope": "PR_3_POLICY_OBSERVATION_TIMESTAMP_REQUIRED_BEFORE_FRESH_STATE",
+      "result": "NULL_AND_TIMEZONE_NAIVE_POLICY_OBSERVATION_TIMESTAMPS_FAIL_CLOSED_LOCALLY_WITH_141_TESTS_AND_VALIDATORS_PASS_CI_PENDING",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
       "scope": "PR_3_READ_ONLY_POLICY_PRE_INVOCATION_ENFORCEMENT",
-      "result": "FINAL_P2_FAIL_CLOSED_BOUNDARY_FIXED_LOCALLY_WITH_139_TESTS_AND_VALIDATORS_PASS_CI_PENDING",
+      "result": "ORIGINAL_P2_FIXED_WITH_139_TESTS_AND_BOTH_CI_EVENTS_PASS_THREAD_RESOLVED_FINAL_REVIEW_FOUND_SEPARATE_TIMESTAMP_P2",
       "authorization_effect": "NONE",
       "independent_security_review": false
     },
@@ -243,6 +251,7 @@
     ,"FUTURE_ADAPTER_AND_NATIVE_RUNNERS_CAPTURE_RAM_POLICY_INSIDE_UNPREDICTABLE_RUN_SCOPE"
     ,"EVIDENCE_OUTPUTS_ATOMICALLY_RESERVED_BEFORE_PROVIDER_EFFECTS"
     ,"READ_ONLY_POLICY_VERIFICATION_ENFORCED_BEFORE_PROVIDER_INVOCATION"
+    ,"POLICY_OBSERVATION_NONNULL_TIMEZONE_AWARE_TIMESTAMP_ENFORCED_BEFORE_PROVIDER_INVOCATION"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",
