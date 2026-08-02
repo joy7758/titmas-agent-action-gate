@@ -53,7 +53,7 @@ The target Worker receives no upstream Skill bytes. One native AgentTeams `qwen3
 
 Evidence scope is deliberately narrower than a full runtime attestation. The retained native artifact binds the official Worker image, applied deterministic Worker ZIP, source lock, Matrix event metadata, MCP records, and canonical evidence receipt. It does not bind the Manager or embedded Matrix image identity, and its repository source field is the pre-existing base commit rather than a signed snapshot of the dirty runtime code. The Worker filesystem check is a pre-turn exact whole-file-digest scan; the no-distribution conclusion instead rests on the external-only installation design plus independent tracked-Git, Worker ZIP, wheel, and sdist inspections. None of these observations is a certification or production-runtime claim.
 
-The typed result schema has no Action Gate outcome field. `CLOUD_CONTEXT_AVAILABLE`, `NOT_ASSESSED_NO_VISIBLE_RESOURCE`, `NOT_ASSESSED`, `NOT_ASSESSED_PERMISSION_DENIED`, `BLOCKED_BY_SKILL_BOUNDARY`, `SKILL_LOAD_REJECTED`, and `INVOCATION_FAILED` are evidence statuses only. The Worker and Skill cannot produce `ALLOW`, `BLOCK`, or `REQUIRE_APPROVAL`.
+The typed result schema has no Action Gate outcome field. `CLOUD_CONTEXT_AVAILABLE`, `NOT_ASSESSED_NO_VISIBLE_RESOURCE`, `NOT_ASSESSED`, `NOT_ASSESSED_PERMISSION_DENIED`, `NOT_ASSESSED_POLICY_NOT_VERIFIED`, `BLOCKED_BY_SKILL_BOUNDARY`, `SKILL_LOAD_REJECTED`, and `INVOCATION_FAILED` are evidence statuses only. The Worker and Skill cannot produce `ALLOW`, `BLOCK`, or `REQUIRE_APPROVAL`.
 
 ## Credential boundary
 
@@ -192,6 +192,7 @@ The automated suite requires:
 - missing credentials return `NOT_ASSESSED`;
 - RAM permission denial returns `NOT_ASSESSED_PERMISSION_DENIED` and never means zero resources;
 - stale or future-dated RAM observations return `NOT_ASSESSED_POLICY_OBSERVATION_STALE` before Resource Center invocation;
+- a fresh same-run observation whose read-only policy verification failed returns `NOT_ASSESSED_POLICY_NOT_VERIFIED` before Resource Center invocation;
 - a non-empty `Resources` item without non-empty string `ResourceId` and `ResourceType` returns `INVOCATION_FAILED`, while `Resources=[]` remains a valid `EMPTY_RESULT`;
 - any modified official Skill byte returns `SKILL_LOAD_REJECTED` or `SKILL_DIGEST_MISMATCH`;
 - credential/profile/identity literals are absent from returned data;

@@ -337,6 +337,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
             assessed_at=assessed_at,
             expected_run_id="run-native-alibaba-cloud-20260802-001",
         )
+        cloud_credential = replace(cloud_credential, read_only_policy_verified=False)
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(
             "aar-cloud-context-stale-policy",
@@ -357,6 +358,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
             assessed_at=assessed_at,
             expected_run_id="run-native-alibaba-cloud-20260802-001",
         )
+        cloud_credential = replace(cloud_credential, read_only_policy_verified=False)
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(
             "aar-cloud-context-future-policy",
@@ -436,13 +438,43 @@ class CloudContextBoundaryTests(unittest.TestCase):
                 assessed_at=assessed_at,
                 expected_run_id=observation["capture"]["run_id"],
             )
-        result = CloudContextInspector(ROOT, FakeExecutor(available_execution())).inspect(
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
             "aar-cloud-context-fresh-policy",
             confirmed_query(),
             cloud_credential,
             observed_at=assessed_at,
         )
+        self.assertEqual(result["status"], "CLOUD_CONTEXT_AVAILABLE")
+        self.assertEqual(executor.calls, 1)
         self.assertTrue(is_semantically_usable_cloud_context(result))
+
+    def test_unverified_read_only_policy_fails_closed_before_provider_call(self) -> None:
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-policy-not-verified",
+            confirmed_query(),
+            credential(verified=False),
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED_POLICY_NOT_VERIFIED")
+        self.assertEqual(
+            result["checks"],
+            [
+                {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": False},
+                {"check_id": "POLICY_OBSERVATION_FRESH", "passed": True},
+                {"check_id": "SAME_RUN_POLICY_READBACK", "passed": True},
+            ],
+        )
+        self.assertEqual(result["uncertainty"], ["READ_ONLY_POLICY_VERIFICATION_FAILED"])
+        self.assertEqual(result["credential"]["read_only_policy_verified"], "FAIL")
+        self.assertFalse(result["skill"]["runtime_invoked"])
+        self.assertFalse(result["invocation"]["invoked"])
+        self.assertEqual(result["invocation"]["result_class"], "NOT_INVOKED")
+        self.assertEqual(result["invocation"]["steps"], [])
+        self.assertEqual(result["resourcecenter_write_api_calls"], 0)
+        self.assertEqual(executor.calls, 0)
+        self.assertFalse(is_semantically_usable_cloud_context(result))
 
     def test_relabelled_legacy_observation_is_rejected(self) -> None:
         observation = json.loads(

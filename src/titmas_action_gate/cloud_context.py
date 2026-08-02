@@ -818,7 +818,13 @@ class CloudContextInspector:
                 "permission_identity_ref": credential.permission_identity_ref if credential else None,
                 "permission_role_ref": credential.permission_role_opaque_ref if credential else None,
                 "permission_policy_ref": credential.permission_policy_opaque_ref if credential else None,
-                "read_only_policy_verified": "PASS" if credential and credential.read_only_policy_verified else "NOT_ASSESSED",
+                "read_only_policy_verified": (
+                    "PASS"
+                    if credential and credential.read_only_policy_verified
+                    else "FAIL"
+                    if credential
+                    else "NOT_ASSESSED"
+                ),
             },
             "invocation": invocation,
             "checks": checks,
@@ -986,6 +992,23 @@ class CloudContextInspector:
                     {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
                 ],
                 uncertainty=["POLICY_OBSERVATION_NOT_SAME_RUN"],
+                observed_at=checked_at,
+            )
+        if not credential.read_only_policy_verified:
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED_POLICY_NOT_VERIFIED",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": False},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": True},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": True},
+                ],
+                uncertainty=["READ_ONLY_POLICY_VERIFICATION_FAILED"],
                 observed_at=checked_at,
             )
 
