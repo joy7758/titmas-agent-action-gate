@@ -1,17 +1,72 @@
 {
-  "gate_version": "1.1.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-002",
-  "evaluated_at": "2026-08-02T04:09:59+08:00",
+  "gate_version": "2.1.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-012",
+  "evaluated_at": "2026-08-02T20:22:30+08:00",
   "evaluator_class": "AI_AGENT",
+  "development_context": {
+    "task_scope": "ADDRESS_PR_3_SERVER_OWNED_POLICY_OBSERVATION_FRESHNESS_CEILING_FINDING",
+    "branch": "codex/close-m4-runtime-blockers",
+    "base_commit": "6ac342e1d34ca14f951905a3ff44d1f6e7ef8eee",
+    "request_source": "DIRECT_USER_AUTHORIZATION_20260802_PR_3_FRESHNESS_CEILING_FIX",
+    "request_sha256": "c877a536977cc6995b4062229af1f5d79a7c97db51722b2f602a9f21536959d8",
+    "implementation_boundary": "MINIMAL_CONSTRUCTION_AND_INVOCATION_FRESHNESS_CEILING_CODE_TEST_DOC_COMMIT_PUSH_CI_THREAD_RESOLUTION_AND_FINAL_CODEX_REREVIEW_ONLY",
+    "external_read_authorized": true,
+    "external_write_authorized": true,
+    "external_write_executed": false,
+    "prior_iam_provisioning_external_write_executed": true,
+    "authorized_external_writes": ["GIT_BRANCH_PUSH", "GITHUB_PR_TRUTH_BOUNDARY_UPDATE", "GITHUB_REVIEW_THREAD_RESOLUTION_AFTER_GREEN_CI", "GITHUB_CODEX_REREVIEW_REQUEST"],
+    "prohibited_external_writes": ["PULL_REQUEST_MERGE", "RELEASE", "DEPLOYMENT", "GOAI_SUBMISSION"]
+  },
   "customer_need": "Prevent an agent in a competition dialogue or delegated workflow from crossing an explicit action boundary without an auditable decision and authorization reference.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "The experimental reference implementation has deterministic runtime tests, MCP protocol exchanges, canonical agent-evidence verification, replay and mutation defenses, a bounded real-GitHub sandbox trace, and one official native AgentTeams v1.2.0 local smoke. Product use remains not recommended because the native run was operator-supervised, did not enforce per-Worker tool ACLs or prove repository Skill materialization, used a preview model, retained semantic contamination and role-boundary deviations, and no production key management or independent security and operational review exists."
+    "reason": "Bounded development is recommended for one disposable native AgentTeams cloud-context-inspector turn because the external Skill installation is source-locked, the existing adapter admits only the frozen read-only Resource Center query, credentials remain server-side, EMPTY_RESULT is an acceptable observation, and the Worker has no decision authority. Current product use remains not recommended because this task does not establish a persistent deployment, broader autonomous M4 completion, upstream redistribution permission, production credential lifecycle controls, or independent security review."
   },
   "advisory_agent_reviews": [
     {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_SERVER_OWNED_900_SECOND_POLICY_OBSERVATION_FRESHNESS_CEILING",
+      "result": "CONSTRUCTION_AND_INVOCATION_REJECT_INVALID_OR_OVERSIZED_MAXIMUM_AGE_WITHOUT_CLAMPING_LOCALLY_WITH_144_TESTS_AND_VALIDATORS_PASS_CI_PENDING",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_POLICY_OBSERVATION_TIMESTAMP_REQUIRED_BEFORE_FRESH_STATE",
+      "result": "TIMESTAMP_P2_FIXED_WITH_141_TESTS_AND_BOTH_CI_EVENTS_PASS_THREAD_RESOLVED_FINAL_REVIEW_FOUND_SEPARATE_FRESHNESS_CEILING_P2",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_READ_ONLY_POLICY_PRE_INVOCATION_ENFORCEMENT",
+      "result": "ORIGINAL_P2_FIXED_WITH_139_TESTS_AND_BOTH_CI_EVENTS_PASS_THREAD_RESOLVED_FINAL_REVIEW_FOUND_SEPARATE_TIMESTAMP_P2",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_CREDENTIAL_ROTATION_RAM_FRESHNESS_AND_RESOURCE_ITEM_VALIDATION",
+      "result": "THREE_NEW_P2_FINDINGS_FIXED_LOCALLY_WITH_APPEND_ONLY_CORRECTION_AND_138_TESTS_CI_PENDING",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_INSTALLED_DATA_PROVIDER_PAYLOAD_AND_PERMISSION_CLASSIFICATION",
+      "result": "NOT_RECOMMENDED_UNTIL_THREE_ACTIONABLE_FINDINGS_ARE_FIXED_AND_REGRESSION_TESTED",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
       "agent": "Qwen qwen3.8-max-preview",
+      "executed": true,
       "scope": "NATIVE_AGENTTEAMS_SPECIALIST_EXECUTION_AND_RUNTIME_TRACE",
       "result": "TRACE_RETAINED_WITH_AUTONOMY_ROLE_ACL_AND_CONCURRENCY_FAILURES",
       "authorization_effect": "NONE",
@@ -19,6 +74,7 @@
     },
     {
       "agent": "Gemini 3.6 Flash",
+      "executed": true,
       "scope": "COMPLETE_LOCAL_CHANGESET_READ_ONLY_REVIEW",
       "result": "APPROVE_WITH_LIMITATIONS",
       "residual_risks": [
@@ -31,15 +87,91 @@
     },
     {
       "agent": "Gemini 3.1 Pro Preview",
+      "executed": false,
       "scope": "PLANNED_COMPLETE_LOCAL_CHANGESET_READ_ONLY_REVIEW",
       "result": "NOT_EXECUTED_QUOTA_LIMIT_ZERO",
       "authorization_effect": "NONE"
     },
     {
       "agent": "Jules API",
+      "executed": false,
       "scope": "PLANNED_REMOTE_REPOSITORY_READ_ONLY_REVIEW",
       "result": "NOT_EXECUTED_SESSION_CREATE_FAILED_PRECONDITION",
       "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent runtime-contract review",
+      "executed": true,
+      "scope": "AGENTTEAMS_V1_2_0_MANAGER_LEADER_RUNTIME_CAUSE_AND_MINIMUM_FIX",
+      "result": "CONFIRMED_OPENCLAW_VS_COPAW_PROJECTFLOW_TASKFLOW_CONTRACT_MISMATCH_NOT_CLAIMED_AS_SOLE_CAUSE",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent adversarial-test review",
+      "executed": true,
+      "scope": "M4_A_THROUGH_H_EVIDENCE_AND_NEGATIVE_TEST_DESIGN",
+      "result": "P0_DECISION_REQUEST_CONFUSION_AND_EVIDENCE_REPLACEMENT_GAPS_IDENTIFIED",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent truth-boundary review",
+      "executed": true,
+      "scope": "M4_EXIT_FACTS_NON_CLAIMS_AND_HISTORICAL_EVIDENCE_IMMUTABILITY",
+      "result": "BOUNDED_M4_EXIT_PERMITTED_WITH_PRODUCT_AND_PRODUCTION_NON_CLAIMS_PRESERVED",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Qwen qwen3.7-max",
+      "executed": true,
+      "scope": "SANITIZED_ALIBABA_CLOUD_PREFLIGHT_ADVERSARIAL_REVIEW",
+      "result": "NATIVE_AGENTTEAMS_EXTERNAL_SKILL_LOAD_AND_EMPTY_RESULT_TURN_COMPLETED_WITH_ZERO_DECISION_RECORDS",
+      "authorization_effect": "NONE",
+      "stable_runtime_contract": true
+    },
+    {
+      "agent": "Qwen qwen3.7-max",
+      "executed": true,
+      "scope": "BOUNDED_NON_DRAFT_PULL_REQUEST_FREEZE_READINESS",
+      "result": "RECOMMEND_BOUNDED_PR_WITH_LICENSE_UNSIGNED_SOURCE_FULL_M4_AND_WORKER_ONLY_ATTESTATION_NONCLAIMS",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Gemini 2.5 Pro",
+      "executed": false,
+      "scope": "PLANNED_M4_ARCHITECTURE_REVIEW",
+      "result": "NOT_EXECUTED_PROVIDER_QUOTA_HTTP_429",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent Alibaba Cloud boundary and evidence review",
+      "executed": true,
+      "scope": "OFFICIAL_SKILL_WRITE_SURFACE_TYPED_ADAPTER_SECRET_REDACTION_AND_NEGATIVE_TEST_MATRIX",
+      "result": "NOT_RECOMMENDED_FOR_DIRECT_WORKER_CLI_USE_TYPED_SERVER_SIDE_SINGLE_OPERATION_ADAPTER_REQUIRED",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Codex subagent Alibaba Cloud provenance and truth review",
+      "executed": true,
+      "scope": "SOURCE_REVISION_FILE_HASH_LICENSE_AND_EXIT_CLAIM_REVIEW",
+      "result": "SOURCE_BYTES_VERIFIABLE_LICENSE_NOASSERTION_RUNTIME_AND_QUERY_NOT_YET_ASSESSED",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent Worker package and AgentTeams review",
+      "executed": true,
+      "scope": "OFFICIAL_SKILL_MATERIALIZATION_AND_CONTROL_FILE_ATTESTATION",
+      "result": "DIRECT_UNBOUNDED_PACKAGING_NOT_RECOMMENDED_TYPED_ADAPTER_AND_EXACT_PACKAGE_MEMBER_ATTESTATION_REQUIRED",
+      "authorization_effect": "NONE"
+    },
+    {
+      "agent": "Codex subagent final Alibaba Cloud evidence review",
+      "executed": true,
+      "scope": "LIVE_PROFILE_IDENTITY_ATTACHMENT_SET_PROVENANCE_AND_CHAIN_REPLAY",
+      "result": "P0_PROFILE_OBSERVATION_SPLICE_RISK_FIXED_P1_PROVENANCE_AND_AGENT_EVIDENCE_CHAIN_REPLAY_FIXED",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
     }
   ],
   "non_recommendation_reasons": [
@@ -55,13 +187,23 @@
     },
     {
       "id": "NR-003",
-      "reason": "Native local Manager/Worker smoke evidence exists, but it did not establish autonomous end-to-end orchestration, enforced per-Worker MCP tool ACLs, repository Skill materialization, a stable model contract, persistent deployment, or operational readiness.",
-      "required_fix": "Enforce registry-scoped MCP ACLs, package and attest Skills, qualify a stable model, and retain a clean unassisted correlation-scoped native trace in an isolated reproducible environment."
+      "reason": "Native local Manager/Worker smoke evidence exists, but it did not establish autonomous end-to-end orchestration, code-enforced per-Worker MCP tool ACLs, credential-derived audit identity, repository Skill materialization, a stable non-preview model contract, or correlation-scoped isolation.",
+      "required_fix": "Correct the confirmed Leader runtime/tool contract mismatch, enforce registry-scoped MCP ACLs and authenticated principals, package and attest Skills, isolate run/correlation/task state, qualify a stable non-preview model, and retain a clean unassisted native trace in a disposable environment."
     },
     {
       "id": "NR-004",
       "reason": "DBA admission and architecture mapping are not decided.",
       "required_fix": "Complete G0/G1 review before claiming portfolio membership or cross-project integration."
+    },
+    {
+      "id": "NR-005",
+      "reason": "The Alibaba Cloud upstream repository has no applicable LICENSE file and its README contains conflicting Apache-2.0 and MIT statements; redistribution and license compatibility are NOT_ASSESSED.",
+      "required_fix": "Keep upstream bytes external and obtain an unambiguous upstream license statement before any competition distribution or open-source-release claim."
+    },
+    {
+      "id": "NR-006",
+      "reason": "The real Resource Center query used a dedicated assume-only RAM caller and read-only role, but the caller AccessKey remains in the local 0600 CLI configuration and no rotation, revocation, or recovery exercise is retained.",
+      "required_fix": "Define and test bounded credential rotation, revocation, recovery, and incident response without exposing credential bytes."
     }
   ],
   "completed_corrections": [
@@ -84,17 +226,58 @@
     "QWEN_HIGH_CAPABILITY_SPECIALIST_MCP_TRACE_RETAINED",
     "AUTONOMY_ROLE_ACL_AND_CONCURRENCY_FAILURES_RETAINED_AS_EVIDENCE",
     "DBA_EXISTENCE_REPORT_MERGED_PR_100_G0_PENDING"
+    ,"OFFICIAL_ALIBABA_CLOUD_SKILL_EXACT_REVISION_AND_FILE_HASHES_RETAINED"
+    ,"TYPED_RESOURCECENTER_SEARCH_ONLY_BOUNDARY_IMPLEMENTED"
+    ,"ALIBABA_CLOUD_WRITE_MISSING_CREDENTIAL_PERMISSION_AND_HASH_NEGATIVE_TESTS_ADDED"
+    ,"ALIBABA_CLOUD_QUERY_PARAMETERS_EXPLICITLY_CONFIRMED"
+    ,"DEDICATED_ASSUME_ONLY_RAM_CALLER_AND_READ_ONLY_ROLE_PROVISIONED"
+    ,"OFFICIAL_ALIBABA_CLOUD_SKILL_REAL_QUERY_EXIT_ZERO_RETAINED"
+    ,"AUTHENTICATED_CLOUD_WORKER_MCP_ACL_AND_NEGATIVE_PROBE_RETAINED"
+    ,"ALIBABA_CLOUD_AGENT_EVIDENCE_VALID_RECEIPT_RETAINED"
+    ,"ALIBABA_CLOUD_PROVIDER_READBACK_POLICY_OBSERVATION_RETAINED"
+    ,"ALIBABA_CLOUD_PROFILE_RECORD_AND_SECURITY_CHAINS_MADE_REPLAYABLE"
+    ,"CLOUD_CONTEXT_EVIDENCE_TYPE_SPOOF_BLOCKED"
+    ,"PAGINATION_AND_ZERO_VISIBLE_RESULT_FAIL_CLOSED_FOR_RELEASE"
+    ,"RUNTIME_RESOURCECENTER_PLUGIN_PINNED_AND_AUTO_UPDATE_REMOVED"
+    ,"UPSTREAM_SKILL_BYTES_EXCLUDED_FROM_GIT_AND_PYTHON_DISTRIBUTIONS_PENDING_LICENSE"
+    ,"READ_ONLY_RAM_COMPLETE_ATTACHMENT_SET_VERIFIED"
+    ,"SAME_PROFILE_LIVE_STS_IDENTITY_AND_ROLE_BINDING_ENFORCED"
+    ,"ALIYUN_CLI_EXECUTABLE_DIGEST_PINNED"
+    ,"PUBLIC_EVIDENCE_PROVENANCE_AND_THREE_CHAIN_FAIL_CLOSED_VALIDATOR_ADDED"
+    ,"RAM_POLICY_OBSERVATION_PROVIDER_READBACK_PRODUCER_ADDED_AND_EXECUTED"
+    ,"RESOURCECENTER_PLUGIN_DIGEST_RECHECKED_BEFORE_AND_AFTER_QUERY"
+    ,"UPSTREAM_ALIBABA_CLOUD_SKILL_BYTES_MOVED_OUTSIDE_REPOSITORY_AND_PACKAGES"
+    ,"NATIVE_AGENTTEAMS_QWEN_CLOUD_CONTEXT_WORKER_TURN_RETAINED"
+    ,"EXTERNAL_SKILL_SOURCE_LOCK_DIGEST_VERIFIED_BEFORE_NATIVE_INVOCATION"
+    ,"REAL_EMPTY_RESULT_INTERPRETED_AS_NOT_ASSESSED_NO_VISIBLE_RESOURCE"
+    ,"NATIVE_CLOUD_WORKER_ZERO_DECISION_RECORDS_AND_ZERO_RESOURCECENTER_WRITES_VERIFIED"
+    ,"ALIBABA_CLOUD_SKILL_SUBMILESTONE_COMPLETE_WITH_FOUR_FILE_EVIDENCE_SET"
+    ,"HISTORICAL_NATIVE_CREDENTIAL_ROTATION_CLAIM_CORRECTED_TO_UNKNOWN_APPEND_ONLY"
+    ,"FUTURE_NATIVE_WORKER_CREDENTIAL_ROTATION_BOUND_TO_LIVE_PRE_AND_POST_APPLY_READBACK"
+    ,"FUTURE_RAM_POLICY_OBSERVATION_BOUND_TO_ORDERED_SAME_RUN_CAPTURE_AND_900_SECOND_MAXIMUM_AGE"
+    ,"RESOURCECENTER_NONEMPTY_ITEMS_REQUIRE_NONEMPTY_RESOURCE_ID_AND_RESOURCE_TYPE"
+    ,"FUTURE_ADAPTER_AND_NATIVE_RUNNERS_CAPTURE_RAM_POLICY_INSIDE_UNPREDICTABLE_RUN_SCOPE"
+    ,"EVIDENCE_OUTPUTS_ATOMICALLY_RESERVED_BEFORE_PROVIDER_EFFECTS"
+    ,"READ_ONLY_POLICY_VERIFICATION_ENFORCED_BEFORE_PROVIDER_INVOCATION"
+    ,"POLICY_OBSERVATION_NONNULL_TIMEZONE_AWARE_TIMESTAMP_ENFORCED_BEFORE_PROVIDER_INVOCATION"
+    ,"SERVER_OWNED_900_SECOND_POLICY_OBSERVATION_FRESHNESS_CEILING_ENFORCED_AT_CONSTRUCTION_AND_INVOCATION"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",
     "CLEAN_AUTONOMOUS_NATIVE_AGENTTEAMS_TRACE",
     "ENFORCED_PER_WORKER_MCP_TOOL_ACL",
+    "DISTINCT_CREDENTIAL_DERIVED_WORKER_IDENTITY",
     "REPOSITORY_SKILL_MATERIALIZATION_EVIDENCE",
+    "CORRELATION_SCOPED_STATE_ISOLATION",
+    "DECISION_REQUEST_AND_PARAMETER_DIGEST_BINDING_FIX",
+    "EVIDENCE_ATTACHMENT_AND_SUBJECT_BINDING_FIX",
     "STABLE_MODEL_RUNTIME_CONTRACT",
     "PERSISTENT_AGENTTEAMS_DEPLOYMENT_EVIDENCE",
     "INDEPENDENT_SECURITY_AND_OPERATIONAL_REVIEW",
     "PRODUCTION_KEY_AND_IDENTITY_MANAGEMENT",
     "COMPETITION_MATERIAL_REVIEW_AND_SEPARATELY_AUTHORIZED_SUBMISSION"
+    ,"READ_ONLY_RAM_CREDENTIAL_ROTATION_REVOCATION_AND_RECOVERY_EXERCISE"
+    ,"UPSTREAM_SKILL_LICENSE_CLARIFICATION"
   ],
   "stop_conditions": [
     "ACTION_EXECUTION_REQUESTED_OUTSIDE_EXPLICIT_USER_OR_PROVIDER_AUTHORIZATION",
@@ -102,6 +285,24 @@
     "REQUEST_SCOPE_EXCEEDS_AUTHORIZATION_SCOPE",
     "COMPETITION_SUBMISSION_OR_EXTERNAL_WRITE_REQUESTED_WITHOUT_SEPARATE_AUTHORIZATION"
   ],
+  "m4_stop_conditions": [
+    "AGENTTEAMS_TAG_COMMIT_OR_IMAGE_DRIFT",
+    "LEADER_PROJECTFLOW_OR_TASKFLOW_UNAVAILABLE",
+    "SKILL_MISSING_OR_DIGEST_MISMATCH",
+    "ROOM_ID_OR_MEMBERSHIP_NOT_LIVE_AND_READY",
+    "STABLE_NON_PREVIEW_MODEL_CAPABILITY_PROBE_FAILED",
+    "PER_WORKER_ACL_OR_ASSIGNMENT_ADMISSION_NOT_ENFORCED",
+    "OPERATOR_INTERVENTION_AFTER_INITIAL_TASK",
+    "UNEXPECTED_REQUEST_OR_CROSS_RUN_CONTAMINATION",
+    "EVIDENCE_MISSING_TAMPERED_OR_UNAVAILABLE",
+    "DECISION_EXPIRED_OR_BINDING_MISMATCH",
+    "REAL_PROVIDER_WRITE_PATH_SELECTED"
+    ,"ALIBABA_CLOUD_OPERATION_OTHER_THAN_RESOURCECENTER_SEARCH_RESOURCES"
+    ,"ALIBABA_CLOUD_CREDENTIAL_MATERIAL_VISIBLE_TO_WORKER_PROMPT_LOG_EVIDENCE_OR_GIT"
+    ,"ALIBABA_CLOUD_QUERY_PARAMETER_NOT_EXPLICITLY_CONFIRMED"
+    ,"ALIBABA_CLOUD_RAM_READ_ONLY_IDENTITY_NOT_VERIFIED"
+    ,"OFFICIAL_SKILL_SOURCE_HASH_OR_RUNTIME_LOAD_MISMATCH"
+  ],
   "new_human_decision_required": true,
-  "next_decision": "DBA_G0_ADMIT_AS_ADJACENT_CANDIDATE_OR_KEEP_OUT_OF_PORTFOLIO"
+  "next_decision": "REVIEW_CREDENTIAL_LIFECYCLE_AND_BROADER_AUTONOMOUS_M4_GAPS_SEPARATELY"
 }

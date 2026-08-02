@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1.0",
+  "freeze_id": "TITMAS-AAG-ALIBABACLOUD-EVIDENCE-SET-20260802",
+  "frozen_at": "2026-08-02T09:10:06Z",
+  "submilestone_status": "COMPLETE",
+  "full_m4_complete": false,
+  "files": [
+    {
+      "role": "official_skill_source_lock",
+      "path": "governance/alibabacloud-resourcecenter-search-source-lock.json",
+      "sha256": "26346f8c1b44b49fdf036f71dc49edd25f56de88d2f79eb676d46637c0bae461"
+    },
+    {
+      "role": "read_only_ram_policy_observation",
+      "path": "governance/alibabacloud-ram-policy-observation-20260802.json",
+      "sha256": "0f96840f957667994e562b1792758ac205b54b596be3566668f598f457cb536f"
+    },
+    {
+      "role": "historical_adapter_only_evidence",
+      "path": "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
+      "sha256": "2a7c3a82bd11b7ab58f3de3e24f84ac2bfd6760f0bc7a832c4283a5b7fc45e68"
+    },
+    {
+      "role": "later_native_worker_evidence",
+      "path": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json",
+      "sha256": "9dac679c4045050ae72c6f9d59fa56d5534343e1d1a937bf7cc9e96eb074b1e6"
+    }
+  ],
+  "supplemental_secret_scan": {
+    "path": "demo/evidence/known-secret-git-history-scan-20260802.json",
+    "sha256": "ab0d46f3c9e3c52934250bebdda3386654a10c0bdfd8dc219700f3dd20dbfa2c"
+  },
+  "authority_effect": "NONE",
+  "release_created": false,
+  "deployment_executed": false,
+  "competition_submitted": false
+}

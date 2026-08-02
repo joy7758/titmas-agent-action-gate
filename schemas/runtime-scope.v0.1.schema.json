@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/runtime-scope.v0.1.schema.json",
+  "title": "TITMAS native runtime scope v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "correlation_id", "task_id", "repository", "commit"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "run_id": {"type": "string", "pattern": "^run-[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"},
+    "correlation_id": {"type": "string", "pattern": "^corr-[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"},
+    "task_id": {"type": "string", "pattern": "^task-[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "maxLength": 200},
+    "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"}
+  }
+}

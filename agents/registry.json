@@ -23,7 +23,7 @@
       "identity": "Normalizer that turns ambiguous proposals into explicit requests and uncertainty records.",
       "responsibilities": ["NORMALIZE_REQUEST", "IDENTIFY_TARGET", "SURFACE_UNCERTAINTY", "PROPOSE_EVIDENCE_REQUIREMENTS"],
       "skills": ["analyze-action-request"],
-      "mcp_tools": ["submit_action_request", "get_action_state"],
+      "mcp_tools": ["submit_action_request", "generate_evidence_profile", "get_action_state"],
       "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
     },
     {
@@ -41,10 +41,26 @@
       "identity": "Narrow provider operator that can attempt only an exact, live, unconsumed ALLOW.",
       "responsibilities": ["COMPARE_EXACT_DECISION_BINDING", "REQUEST_DECISION_CONSUMPTION", "ATTEMPT_ONE_PROVIDER_ACTION", "CAPTURE_PROVIDER_RESULT"],
       "skills": ["execute-github-action"],
-      "mcp_tools": ["get_action_state"],
+      "mcp_tools": ["execute_in_memory_github_action", "get_action_state"],
       "future_provider_tools": ["EXACT_GITHUB_TOOL_SELECTED_BY_BOUND_ACTION"],
       "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false},
       "note": "The agent owns no autonomous execution authority. The experimental provider adapter can attempt one exact action only after the service validates and atomically consumes a live ALLOW."
+    },
+    {
+      "id": "cloud-context-inspector",
+      "agentteams_role": "worker",
+      "identity": "Bounded Alibaba Cloud context observer that can request one typed current-account Resource Center search without receiving credential bytes or decision authority.",
+      "responsibilities": [
+        "LOAD_PINNED_OFFICIAL_SKILL",
+        "REQUEST_TYPED_READ_ONLY_RESOURCE_SEARCH",
+        "PRESERVE_SANITIZED_INVOCATION_TRACE",
+        "REPORT_NOT_ASSESSED_WITHOUT_INFERENCE"
+      ],
+      "skills": ["alibabacloud-resourcecenter-search"],
+      "mcp_tools": ["load_external_alibabacloud_skill", "inspect_alibabacloud_resources"],
+      "credential_delivery": "SERVER_SIDE_TYPED_ADAPTER_ONLY_NO_CREDENTIAL_BYTES_IN_WORKER",
+      "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false},
+      "note": "The upstream Skill contains broader read/write instructions. Runtime code permits only resourcecenter.search-resources; the Worker has no Alibaba Cloud shell credential or generic cloud API capability."
     },
     {
       "id": "release-steward",
@@ -52,7 +68,7 @@
       "identity": "Post-execution evidence assembler that requests, but never self-grants, a release decision.",
       "responsibilities": ["ASSEMBLE_EXECUTION_EVIDENCE", "REQUEST_POST_EXECUTION_VERIFICATION", "REQUEST_RELEASE_DECISION", "REPORT_NON_CLAIMS"],
       "skills": ["prepare-release-decision"],
-      "mcp_tools": ["attach_evidence", "verify_evidence", "evaluate_action_gate", "get_action_state"],
+      "mcp_tools": ["submit_action_request", "generate_evidence_profile", "attach_evidence", "verify_evidence", "evaluate_action_gate", "get_action_state"],
       "authority": {"may_decide": false, "may_approve": false, "may_execute": false, "may_release": false}
     }
   ],
@@ -60,6 +76,8 @@
     "NO_AGENT_SELF_AUTHORIZES",
     "NO_AGENT_TREATS_VERIFICATION_AS_POLICY",
     "NO_OPERATOR_CREATES_ITS_OWN_APPROVAL",
+    "NO_CLOUD_CONTEXT_WORKER_PRODUCES_GATE_OUTCOMES",
+    "NO_ALIBABA_CLOUD_WRITE_OPERATION",
     "NO_RELEASE_WITHOUT_A_NEW_GATE_DECISION",
     "NO_MANAGER_OVERRIDE"
   ]

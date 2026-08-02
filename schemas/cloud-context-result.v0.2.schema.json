@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/cloud-context-result.v0.2.schema.json",
+  "title": "Sanitized Alibaba Cloud Resource Center preflight result v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "preflight_id", "request_id", "status", "observed_at", "skill", "query",
+    "credential", "invocation", "checks", "resourcecenter_write_api_calls", "uncertainty"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.2.0"},
+    "preflight_id": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/preflight_id"},
+    "request_id": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/request_id"},
+    "status": {
+      "enum": [
+        "CLOUD_CONTEXT_AVAILABLE", "NOT_ASSESSED_NO_VISIBLE_RESOURCE", "BLOCKED_BY_SKILL_BOUNDARY",
+        "NOT_ASSESSED", "NOT_ASSESSED_PERMISSION_DENIED", "NOT_ASSESSED_POLICY_OBSERVATION_STALE",
+        "NOT_ASSESSED_POLICY_NOT_VERIFIED",
+        "SKILL_LOAD_REJECTED", "INVOCATION_FAILED"
+      ]
+    },
+    "observed_at": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/observed_at"},
+    "skill": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/skill"},
+    "query": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/query"},
+    "credential": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/credential"},
+    "invocation": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/invocation"},
+    "checks": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/checks"},
+    "resourcecenter_write_api_calls": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/resourcecenter_write_api_calls"},
+    "uncertainty": {"$ref": "./cloud-context-result.v0.1.schema.json#/properties/uncertainty"}
+  }
+}

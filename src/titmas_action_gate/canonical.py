@@ -3,11 +3,70 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import rfc8785
+
+
+class ExclusiveOutput:
+    """Reserve one regular output inode before effects and write it exactly once.
+
+    ``O_EXCL`` closes the check-then-write race.  Inode checks ensure a path
+    replacement or symlink cannot redirect the final write to existing data.
+    """
+
+    def __init__(self, path: str | Path, *, mode: int = 0o600):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        self._fd = os.open(self.path, flags, mode)
+        os.fchmod(self._fd, mode)
+        created = os.fstat(self._fd)
+        if not stat.S_ISREG(created.st_mode):
+            os.close(self._fd)
+            self._fd = -1
+            raise RuntimeError("EXCLUSIVE_OUTPUT_NOT_REGULAR")
+        self._identity = (created.st_dev, created.st_ino)
+        self._committed = False
+
+    def __enter__(self) -> ExclusiveOutput:
+        return self
+
+    def _path_is_reserved_inode(self) -> bool:
+        try:
+            observed = os.stat(self.path, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        return stat.S_ISREG(observed.st_mode) and (observed.st_dev, observed.st_ino) == self._identity
+
+    def write_text(self, value: str) -> None:
+        if self._committed or self._fd < 0:
+            raise RuntimeError("EXCLUSIVE_OUTPUT_ALREADY_COMMITTED")
+        if not self._path_is_reserved_inode():
+            raise RuntimeError("EXCLUSIVE_OUTPUT_PATH_REPLACED")
+        with os.fdopen(self._fd, "w", encoding="utf-8") as handle:
+            self._fd = -1
+            handle.write(value)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if not self._path_is_reserved_inode():
+            raise RuntimeError("EXCLUSIVE_OUTPUT_PATH_REPLACED")
+        self._committed = True
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+        if self._fd >= 0:
+            os.close(self._fd)
+            self._fd = -1
+        if not self._committed:
+            if self._path_is_reserved_inode():
+                self.path.unlink()
+            if exc_type is None:
+                raise RuntimeError("EXCLUSIVE_OUTPUT_NOT_COMMITTED")
+        return False
 
 
 def canonical_json_bytes(value: Any) -> bytes:

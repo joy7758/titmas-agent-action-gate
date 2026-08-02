@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
+  "title": "Native AgentTeams external Alibaba Cloud Skill run evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "run_id",
+    "observed_at",
+    "source",
+    "action_request",
+    "native_runtime",
+    "skill_load",
+    "package_boundary",
+    "frozen_query",
+    "cloud_context",
+    "agent_evidence_profile",
+    "agent_evidence_receipt",
+    "trace",
+    "authority",
+    "effects",
+    "secrets",
+    "exit_criteria",
+    "non_claims"
+  ],
+  "properties": {
+    "$schema": {"const": "../../schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json"},
+    "schema_version": {"const": "0.1.0"},
+    "run_id": {"const": "run-native-alibaba-cloud-20260802-001"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_base_commit", "agentteams_release", "agentteams_commit", "agent_evidence_version", "official_skill_source_lock_sha256"],
+      "properties": {
+        "repository_base_commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "agentteams_release": {"const": "v1.2.0"},
+        "agentteams_commit": {"const": "793db242257a569d911b1aa59c1cd554af78511f"},
+        "agent_evidence_version": {"const": "0.6.0"},
+        "official_skill_source_lock_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "action_request": {"type": "object"},
+    "native_runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification", "worker", "worker_container", "prompt_event_id", "response_events", "initial_prompt_count", "operator_followup_prompt_count", "matrix_turn_trace", "mcp_surface", "current_worker_credential_ref", "prior_exposed_disposable_worker_credential_rotated_before_run"],
+      "properties": {
+        "classification": {"const": "OFFICIAL_AGENTTEAMS_NATIVE_LLM_WORKER_TURN"},
+        "worker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "phase", "model", "runtime", "container_state", "matrix_user_id", "room_id"],
+          "properties": {
+            "name": {"const": "cloud-context-inspector"},
+            "phase": {"const": "Running"},
+            "model": {"const": "qwen3.7-max"},
+            "runtime": {"const": "openclaw"},
+            "container_state": {"const": "running"},
+            "matrix_user_id": {"type": "string", "minLength": 1},
+            "room_id": {"type": "string", "minLength": 1}
+          }
+        },
+        "worker_container": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["container_id", "image_ref", "image_id", "started_at"],
+          "properties": {
+            "container_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+            "image_ref": {"const": "higress-registry.cn-hangzhou.cr.aliyuncs.com/agentteams/agentteams-worker:v1.2.0"},
+            "image_id": {"const": "sha256:daf587ad042f9564abb2347db5c4205ecc25d1b322e09fdd0d58a2a16c2d5c85"},
+            "started_at": {"type": "string", "format": "date-time"}
+          }
+        },
+        "prompt_event_id": {"type": "string", "minLength": 1},
+        "response_events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["event_id", "sender", "room_id", "origin_server_ts", "body"],
+            "properties": {
+              "event_id": {"type": "string", "minLength": 1},
+              "sender": {"type": "string", "minLength": 1},
+              "room_id": {"type": "string", "minLength": 1},
+              "origin_server_ts": {"type": "string", "pattern": "^[0-9]+$"},
+              "body": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "initial_prompt_count": {"const": 1},
+        "operator_followup_prompt_count": {"const": 0},
+        "matrix_turn_trace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["room_id", "initial_prompt_event_id", "initial_prompt_sender", "observed_message_events_after_baseline"],
+          "properties": {
+            "room_id": {"type": "string", "minLength": 1},
+            "initial_prompt_event_id": {"type": "string", "minLength": 1},
+            "initial_prompt_sender": {"type": "string", "minLength": 1},
+            "observed_message_events_after_baseline": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["event_id", "sender", "room_id", "origin_server_ts"],
+                "properties": {
+                  "event_id": {"type": "string", "minLength": 1},
+                  "sender": {"type": "string", "minLength": 1},
+                  "room_id": {"type": "string", "minLength": 1},
+                  "origin_server_ts": {"type": "string", "pattern": "^[0-9]+$"}
+                }
+              }
+            }
+          }
+        },
+        "mcp_surface": {"const": "AUTHENTICATED_FASTMCP_STREAMABLE_HTTP"},
+        "current_worker_credential_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "prior_exposed_disposable_worker_credential_rotated_before_run": {"const": true}
+      }
+    },
+    "skill_load": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_name", "external_path_reference", "revision", "digest", "runtime_load_result", "record_sequence", "record_hash", "verified_before_invocation"],
+      "properties": {
+        "skill_name": {"const": "alibabacloud-resourcecenter-search"},
+        "external_path_reference": {"const": "external://titmas/skills/alibabacloud-resourcecenter-search"},
+        "revision": {"const": "92bd723f7cc217b252feab574c1883fa0aa46b3c"},
+        "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "runtime_load_result": {"const": "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY"},
+        "record_sequence": {"type": "integer", "minimum": 1},
+        "record_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "verified_before_invocation": {"const": true}
+      }
+    },
+    "package_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package_sha256", "package_member_count", "package_members", "external_skill_reference_only", "distribution_scope", "local_external_installation_exists", "upstream_skill_bytes_distributed", "agentteams_package_apply", "runtime_worker_filesystem_scan"],
+      "properties": {
+        "package_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "package_member_count": {"type": "integer", "minimum": 1},
+        "package_members": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "external_skill_reference_only": {"const": true},
+        "distribution_scope": {"const": "TRACKED_GIT_WORKER_ZIP_WHEEL_AND_SDIST"},
+        "local_external_installation_exists": {"const": true},
+        "upstream_skill_bytes_distributed": {"const": false},
+        "agentteams_package_apply": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["apply_result", "apply_exit_status", "applied_at", "worker_container_started_at", "worker_container_recreated"],
+          "properties": {
+            "apply_result": {"const": "AGENTTEAMS_WORKER_PACKAGE_APPLIED"},
+            "apply_exit_status": {"const": 0},
+            "applied_at": {"type": "string", "format": "date-time"},
+            "worker_container_started_at": {"type": "string", "format": "date-time"},
+            "worker_container_recreated": {"const": true}
+          }
+        },
+        "runtime_worker_filesystem_scan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workspace_reference", "scan_exit_status", "upstream_file_digest_match_count"],
+          "properties": {
+            "workspace_reference": {"const": "agentteams://workers/cloud-context-inspector/workspace"},
+            "scan_exit_status": {"const": 0},
+            "upstream_file_digest_match_count": {"const": 0}
+          }
+        }
+      }
+    },
+    "frozen_query": {"type": "object"},
+    "cloud_context": {"$ref": "./cloud-context-result.v0.1.schema.json"},
+    "agent_evidence_profile": {"type": "object"},
+    "agent_evidence_receipt": {"type": "object"},
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_chain_issues", "records", "security_chain_issues", "security_events", "agent_evidence_chain_issues", "agent_evidence_events"],
+      "properties": {
+        "record_chain_issues": {"type": "array", "maxItems": 0},
+        "records": {"type": "array", "minItems": 4, "items": {"type": "object"}},
+        "security_chain_issues": {"type": "array", "maxItems": 0},
+        "security_events": {"type": "array", "minItems": 3, "items": {"type": "object"}},
+        "agent_evidence_chain_issues": {"type": "array", "maxItems": 0},
+        "agent_evidence_events": {"type": "array", "minItems": 3, "items": {"type": "object"}}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worker_decision_record_count", "worker_produced_gate_outcome", "deterministic_action_gate_sole_authority"],
+      "properties": {
+        "worker_decision_record_count": {"const": 0},
+        "worker_produced_gate_outcome": {"const": false},
+        "deterministic_action_gate_sole_authority": {"const": true}
+      }
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect_scope", "resourcecenter_read_api_calls", "sts_identity_read_api_calls", "resourcecenter_write_api_calls", "cloud_resource_write_executed", "cloud_resource_created_for_nonempty_result", "prior_setup_iam_control_plane_write_executed"],
+      "properties": {
+        "effect_scope": {"const": "NATIVE_WORKER_TURN_RESOURCECENTER_AND_CLOUD_WORKLOAD_ONLY"},
+        "resourcecenter_read_api_calls": {"const": 1},
+        "sts_identity_read_api_calls": {"const": 1},
+        "resourcecenter_write_api_calls": {"const": 0},
+        "cloud_resource_write_executed": {"const": false},
+        "cloud_resource_created_for_nonempty_result": {"const": false},
+        "prior_setup_iam_control_plane_write_executed": {"const": true}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "credential_bytes_in_prompt": {"const": false},
+        "credential_bytes_in_worker_response": {"const": false},
+        "credential_bytes_in_private_mcp_log": {"const": false},
+        "credential_bytes_in_evidence": {"const": false},
+        "credential_bytes_in_git": {"const": false},
+        "profile_name_in_evidence": {"const": false},
+        "raw_provider_output_retained": {"const": false}
+      },
+      "required": ["credential_bytes_in_prompt", "credential_bytes_in_worker_response", "credential_bytes_in_private_mcp_log", "credential_bytes_in_evidence", "credential_bytes_in_git", "profile_name_in_evidence", "raw_provider_output_retained"]
+    },
+    "exit_criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "AGENTTEAMS_NATIVE_WORKER_TURN_RETAINED": {"const": true},
+        "RUNTIME_LOADING_PROVEN": {"const": true},
+        "SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION": {"const": true},
+        "OFFICIAL_SKILL_ACTUALLY_INVOKED": {"const": true},
+        "REAL_RESOURCECENTER_QUERY_REUSED": {"const": true},
+        "EMPTY_RESULT_INTERPRETED_CORRECTLY": {"const": true},
+        "WORKER_DECISION_RECORD_COUNT": {"const": 0},
+        "CLOUD_RESOURCE_WRITE_EXECUTED": {"const": false},
+        "UPSTREAM_SKILL_BYTES_DISTRIBUTED": {"const": false},
+        "AGENT_EVIDENCE_RECEIPT_VALID": {"const": true},
+        "SECRETS_COMMITTED": {"const": false}
+      },
+      "required": ["AGENTTEAMS_NATIVE_WORKER_TURN_RETAINED", "RUNTIME_LOADING_PROVEN", "SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION", "OFFICIAL_SKILL_ACTUALLY_INVOKED", "REAL_RESOURCECENTER_QUERY_REUSED", "EMPTY_RESULT_INTERPRETED_CORRECTLY", "WORKER_DECISION_RECORD_COUNT", "CLOUD_RESOURCE_WRITE_EXECUTED", "UPSTREAM_SKILL_BYTES_DISTRIBUTED", "AGENT_EVIDENCE_RECEIPT_VALID", "SECRETS_COMMITTED"]
+    },
+    "non_claims": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

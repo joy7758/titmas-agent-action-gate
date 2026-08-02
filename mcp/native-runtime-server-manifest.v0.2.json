@@ -1,0 +1,95 @@
+{
+  "$schema": "../schemas/native-runtime-mcp-manifest.v0.2.schema.json",
+  "manifest_schema_version": "0.2.0",
+  "server": {"name": "titmas-action-gate-native-runtime", "version": "0.2.0-alpha"},
+  "status": "EXPERIMENTAL_DISPOSABLE_RUNTIME",
+  "transport": "streamable-http",
+  "identity": "BEARER_CREDENTIAL_DERIVED_PER_PRINCIPAL_SERVER_SIDE_ACL",
+  "credential_handling": {
+    "worker_receives_cloud_credential_bytes": false,
+    "cloud_profile_from_mcp_argument": false,
+    "cloud_secret_retained_in_evidence": false
+  },
+  "tools": [
+    {
+      "name": "submit_action_request",
+      "principals": ["workflow-lead", "request-analyst", "release-steward"],
+      "input_contract": "schemas/action-request.v0.1.schema.json + schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "generate_evidence_profile",
+      "principals": ["request-analyst", "release-steward"],
+      "input_contract": "request-bound typed arguments",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "EVIDENCE_RESULT_ONLY"
+    },
+    {
+      "name": "load_external_alibabacloud_skill",
+      "principals": ["cloud-context-inspector"],
+      "input_contract": "schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "EVIDENCE_RESULT_ONLY"
+    },
+    {
+      "name": "inspect_alibabacloud_resources",
+      "principals": ["cloud-context-inspector"],
+      "input_contract": "schemas/cloud-context-query.v0.1.schema.json + schemas/runtime-scope.v0.1.schema.json",
+      "external_read": true,
+      "external_write": false,
+      "authority_effect": "EVIDENCE_RESULT_ONLY"
+    },
+    {
+      "name": "attach_evidence",
+      "principals": ["evidence-verifier", "release-steward"],
+      "input_contract": "request-bound immutable evidence reference",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "EVIDENCE_RESULT_ONLY"
+    },
+    {
+      "name": "verify_evidence",
+      "principals": ["evidence-verifier", "release-steward"],
+      "input_contract": "schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "EVIDENCE_RESULT_ONLY"
+    },
+    {
+      "name": "evaluate_action_gate",
+      "principals": ["workflow-lead", "release-steward"],
+      "input_contract": "schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "DETERMINISTIC_GATE_ONLY"
+    },
+    {
+      "name": "record_human_approval",
+      "principals": ["titmas-action-gate-reviewer"],
+      "input_contract": "schemas/runtime-scope.v0.1.schema.json + schemas/human-approval.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "APPROVAL_INPUT_ONLY"
+    },
+    {
+      "name": "execute_in_memory_github_action",
+      "principals": ["github-operator"],
+      "input_contract": "exact live ALLOW and schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "NONE"
+    },
+    {
+      "name": "get_action_state",
+      "principals": ["workflow-lead", "request-analyst", "evidence-verifier", "github-operator", "release-steward"],
+      "input_contract": "schemas/runtime-scope.v0.1.schema.json",
+      "external_read": false,
+      "external_write": false,
+      "authority_effect": "NONE"
+    }
+  ]
+}

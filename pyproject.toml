@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 titmas-action-gate = "titmas_action_gate.cli:main"
 titmas-action-gate-mcp = "titmas_action_gate.mcp_server:main"
+titmas-action-gate-native-mcp = "titmas_action_gate.runtime_mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -43,8 +44,8 @@ where = ["src"]
 "share/titmas-action-gate/evaluations/cases/tampered-evidence" = ["evaluations/cases/tampered-evidence/case.json"]
 "share/titmas-action-gate/evaluations/cases/high-risk-approval" = ["evaluations/cases/high-risk-approval/case.json"]
 "share/titmas-action-gate/agents" = ["agents/registry.json"]
-"share/titmas-action-gate/mcp" = ["mcp/server-manifest.v0.1.json"]
-"share/titmas-action-gate/governance" = ["governance/upstream-sources.json", "governance/dba-source-lock.json", "governance/project-declaration.json"]
+"share/titmas-action-gate/mcp" = ["mcp/server-manifest.v0.1.json", "mcp/native-runtime-server-manifest.v0.2.json"]
+"share/titmas-action-gate/governance" = ["governance/upstream-sources.json", "governance/dba-source-lock.json", "governance/project-declaration.json", "governance/alibabacloud-resourcecenter-search-source-lock.json"]
 "share/titmas-action-gate/demo/evidence" = ["demo/evidence/*.json"]
 "share/titmas-action-gate/skills/analyze-action-request" = ["skills/analyze-action-request/SKILL.md", "skills/analyze-action-request/manifest.json"]
 "share/titmas-action-gate/skills/analyze-action-request/examples" = ["skills/analyze-action-request/examples/*.json"]
@@ -61,6 +62,7 @@ where = ["src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 160
+extend-exclude = ["skills/alibabacloud-resourcecenter-search"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

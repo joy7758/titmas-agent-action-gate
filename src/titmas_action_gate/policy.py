@@ -13,7 +13,7 @@ from .canonical import format_datetime, request_binding, sha256_json, utc_now
 from .contracts import validate_action_request, validate_contract
 from .errors import ContractValidationError
 
-POLICY_FILENAME = "github-demo-policy.v0.1.json"
+POLICY_FILENAME = "github-demo-policy.v0.2.json"
 
 
 def default_policy_path() -> Path:

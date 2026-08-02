@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 
 from .canonical import request_binding, sha256_json
 from .errors import ContractValidationError
@@ -19,6 +20,12 @@ SCHEMA_FILES = {
     "evidence_result": "evidence-verification-result.v0.1.schema.json",
     "human_approval": "human-approval.v0.1.schema.json",
     "decision": "action-gate-decision.v0.1.schema.json",
+    "runtime_scope": "runtime-scope.v0.1.schema.json",
+    "cloud_context_query": "cloud-context-query.v0.1.schema.json",
+    "cloud_context_result": "cloud-context-result.v0.2.schema.json",
+    "cloud_context_result_v01": "cloud-context-result.v0.1.schema.json",
+    "alibabacloud_ram_policy_observation": "alibabacloud-ram-policy-observation.v0.2.schema.json",
+    "alibabacloud_ram_policy_observation_v01": "alibabacloud-ram-policy-observation.v0.1.schema.json",
 }
 
 
@@ -43,8 +50,15 @@ def _validator(contract: str) -> Draft202012Validator:
         filename = SCHEMA_FILES[contract]
     except KeyError as exc:
         raise ContractValidationError("SCHEMA_UNKNOWN", f"Unknown contract: {contract}") from exc
-    schema = json.loads((schema_directory() / filename).read_text(encoding="utf-8"))
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    directory = schema_directory()
+    schema = json.loads((directory / filename).read_text(encoding="utf-8"))
+    resources = []
+    for path in directory.glob("*.schema.json"):
+        candidate = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(candidate.get("$id"), str):
+            resources.append((candidate["$id"], Resource.from_contents(candidate)))
+    registry = Registry().with_resources(resources)
+    return Draft202012Validator(schema, registry=registry, format_checker=FormatChecker())
 
 
 def validate_contract(contract: str, payload: dict[str, Any]) -> None:
@@ -70,6 +84,10 @@ def validate_action_request(request: dict[str, Any]) -> None:
             "parameters_sha256 does not match RFC 8785 canonical parameters.",
             details={"expected": expected, "actual": request["parameters_sha256"]},
         )
+
+
+def validate_runtime_scope(scope: dict[str, Any]) -> None:
+    validate_contract("runtime_scope", scope)
 
 
 def validate_bound_input(request: dict[str, Any], payload: dict[str, Any], contract: str) -> None:

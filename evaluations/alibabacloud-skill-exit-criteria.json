@@ -1,0 +1,115 @@
+{
+  "schema_version": "0.1.0",
+  "evaluation_id": "TITMAS-AAG-ALIBABACLOUD-RESOURCECENTER-20260802",
+  "observed_at": "2026-08-02T16:26:13+08:00",
+  "status": "ALIBABA_CLOUD_SKILL_SUBMILESTONE_COMPLETE_BOUNDED_NATIVE_WORKER_EVIDENCE",
+  "full_m4_complete": false,
+  "reason": "NATIVE_AGENTTEAMS_WORKER_VERIFIED_EXTERNAL_SKILL_LOCK_INVOKED_FROZEN_READ_ONLY_QUERY_AND_CORRECTLY_REPORTED_EMPTY_RESULT_WITHOUT_DECISION_AUTHORITY",
+  "source": {
+    "repository": "https://github.com/aliyun/alibabacloud-aiops-skills",
+    "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+    "source_lock": "governance/alibabacloud-resourcecenter-search-source-lock.json",
+    "runtime_evidence": "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
+    "native_worker_evidence": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json",
+    "known_secret_history_scan": "demo/evidence/known-secret-git-history-scan-20260802.json",
+    "frozen_evidence_set": "demo/evidence/alibabacloud-evidence-set-freeze-20260802.json"
+  },
+  "query_plan": {
+    "operation": "resourcecenter.search-resources",
+    "account_scope": "CURRENT_ACCOUNT_ONLY",
+    "filters": {},
+    "max_results": 1,
+    "include_deleted_resources": false,
+    "parameters_confirmed_by_user": true,
+    "confirmation_ref": "confirmation:e3f602a4fd564910313383ab1f553d8317d06e4b440c1b49b600178a013d288c"
+  },
+  "observed_result": {
+    "status": "NOT_ASSESSED_NO_VISIBLE_RESOURCE",
+    "invocation_result": "EMPTY_RESULT",
+    "cli_version": "3.4.11",
+    "cli_exit_status": 0,
+    "returned_resource_count": 0,
+    "next_token_present": false,
+    "agent_evidence_status": "VALID",
+    "same_profile_live_sts_identity_binding": true,
+    "role_attachment_counts": {
+      "total": 1,
+      "system": 1,
+      "custom": 0,
+      "matching": 1,
+      "unexpected": 0
+    },
+    "public_evidence_fail_closed_validation": "VALID",
+    "semantic_cloud_context_usable_for_release": false,
+    "record_chain_issues": [],
+    "uncertainty": [
+      "ZERO_RESULTS_ONLY_MEAN_NO_RESOURCES_VISIBLE_TO_THIS_BOUNDED_IDENTITY"
+    ]
+  },
+  "write_accounting": {
+    "credential_provisioning_iam_write_executed": true,
+    "credential_provisioning_scope": "DEDICATED_ASSUME_ONLY_RAM_USER_PLUS_RESOURCECENTER_READ_ONLY_ROLE",
+    "skill_resourcecenter_write_executed": false,
+    "runtime_local_cli_configuration_writes": 3,
+    "runtime_plugin_install_or_update_executed": false,
+    "setup_plugin_update_previously_executed": true,
+    "github_write_executed": false,
+    "release_or_deployment_executed": false
+  },
+  "exit_criteria": {
+    "OFFICIAL_ALIBABA_CLOUD_SKILL_INSTALLED": true,
+    "OFFICIAL_SKILL_ACTUALLY_INVOKED": true,
+    "READ_ONLY_RAM_IDENTITY_USED": true,
+    "SKILL_SOURCE_AND_HASH_RETAINED": true,
+    "RUNTIME_LOADING_PROVEN": true,
+    "INVOCATION_TRACE_RETAINED": true,
+    "AGENT_EVIDENCE_RECEIPT_VALID": true,
+    "CLOUD_RESOURCE_WRITE_EXECUTED": false,
+    "DETERMINISTIC_GATE_AUTHORITY_PRESERVED": true,
+    "SECRETS_COMMITTED": false,
+    "AGENTTEAMS_NATIVE_WORKER_TURN_RETAINED": true,
+    "SKILL_DIGEST_VERIFIED_BEFORE_INVOCATION": true,
+    "REAL_RESOURCECENTER_QUERY_REUSED": true,
+    "EMPTY_RESULT_INTERPRETED_CORRECTLY": true,
+    "WORKER_DECISION_RECORD_COUNT": 0,
+    "UPSTREAM_SKILL_BYTES_DISTRIBUTED": false
+  },
+  "exit_criteria_scope": {
+    "OFFICIAL_ALIBABA_CLOUD_SKILL_INSTALLED": "EXTERNAL_INSTALLATION_EXACT_BYTES_SOURCE_LOCKED",
+    "OFFICIAL_SKILL_ACTUALLY_INVOKED": "ONE_NATIVE_AGENTTEAMS_QWEN_WORKER_TURN_USED_HASH_VERIFIED_OFFICIAL_SKILL_BOUNDARY_INTERPRETATION_THEN_TYPED_INSPECT",
+    "RUNTIME_LOADING_PROVEN": "EXTERNAL_PATH_RESOLVED_AND_SOURCE_LOCK_DIGEST_VERIFIED_BEFORE_INVOCATION",
+    "INVOCATION_TRACE_RETAINED": "SANITIZED_CLI_STEP_TRACE_PLUS_REPLAYABLE_RECORD_SECURITY_AND_AGENT_EVIDENCE_EVENT_CHAINS",
+    "AGENT_EVIDENCE_RECEIPT_VALID": "INDEPENDENTLY_REPLAYED_FROM_RETAINED_PROFILE",
+    "CLOUD_RESOURCE_WRITE_EXECUTED": "RESOURCECENTER_WORKLOAD_API_SCOPE_ONLY_IAM_PROVISIONING_WRITES_RECORDED_SEPARATELY",
+    "SECRETS_COMMITTED": "NO_MATCH_FOR_10_KNOWN_CURRENT_SECRET_VALUES_ACROSS_6_REACHABLE_COMMITS_AND_150_CANDIDATE_FILES_NO_COMMIT_PERFORMED_UNKNOWN_HISTORICAL_SECRETS_NOT_ASSESSED",
+    "UPSTREAM_SKILL_BYTES_DISTRIBUTED": "FALSE_FOR_TRACKED_GIT_WORKER_ZIP_WHEEL_AND_SDIST_EXTERNAL_LOCAL_INSTALLATION_RETAINED"
+  },
+  "substitute_facts": {
+    "OFFICIAL_SKILL_SOURCE_VERIFIED": true,
+    "SKILL_BOUND_ADAPTER_ACTUALLY_INVOKED": true,
+    "AUTHENTICATED_FASTMCP_WORKER_BOUNDARY_PROVEN": true,
+    "RAM_POLICY_OBSERVATION_PRODUCER_AVAILABLE": true,
+    "NATIVE_AGENTTEAMS_LLM_WORKER_TURN": true,
+    "NONEMPTY_CLOUD_CONTEXT_OBSERVED": false,
+    "GLOBAL_ALIBABA_CONTROL_PLANE_WRITE_EXECUTED_DURING_SETUP": true
+  },
+  "runtime_boundary": {
+    "proven_surface": "AUTHENTICATED_FASTMCP_STREAMABLE_HTTP",
+    "authenticated_worker": "cloud-context-inspector",
+    "tool": "inspect_alibabacloud_resources",
+    "unauthorized_worker_probe": "MCP_TOOL_NOT_ALLOWED",
+    "native_agentteams_llm_worker_turn": true,
+    "initial_prompt_count": 1,
+    "operator_followup_prompt_count": 0,
+    "worker_decision_record_count": 0,
+    "upstream_skill_bytes_distributed": false
+  },
+  "non_claims": [
+    "NO_COMPLETE_CLOUD_INVENTORY_CLAIM",
+    "NO_ZERO_RESOURCE_ACCOUNT_CLAIM",
+    "NO_BROADER_AUTONOMOUS_M4_COMPLETION_CLAIM",
+    "NO_RELEASE_DEPLOYMENT_OR_COMPETITION_SUBMISSION",
+    "NO_PRODUCTION_READINESS_CERTIFICATION_OR_COMPLIANCE_CLAIM",
+    "NO_LICENSE_OR_REDISTRIBUTION_CLEARANCE"
+  ]
+}

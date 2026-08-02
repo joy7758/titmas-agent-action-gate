@@ -11,7 +11,7 @@
   },
   "inputs": ["execution-attempt receipt", "repository state", "schemas/action-request.v0.1.schema.json"],
   "outputs": ["schemas/evidence-verification-result.v0.1.schema.json", "schemas/action-gate-decision.v0.1.schema.json"],
-  "mcp_tools": ["attach_evidence", "verify_evidence", "evaluate_action_gate", "get_action_state"],
+  "mcp_tools": ["submit_action_request", "generate_evidence_profile", "attach_evidence", "verify_evidence", "evaluate_action_gate", "get_action_state"],
   "authority": {"may_propose": true, "may_decide": false, "may_approve": false, "may_execute": false},
   "examples": ["examples/example.json"],
   "tests": ["../../tests/test_contracts.py", "../../tests/test_boundaries.py"]

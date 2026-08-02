@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/native-runtime-mcp-manifest.v0.2.schema.json",
+  "title": "TITMAS native runtime MCP manifest v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_schema_version", "server", "status", "transport", "identity", "credential_handling", "tools"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "manifest_schema_version": {"const": "0.2.0"},
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "titmas-action-gate-native-runtime"},
+        "version": {"const": "0.2.0-alpha"}
+      }
+    },
+    "status": {"const": "EXPERIMENTAL_DISPOSABLE_RUNTIME"},
+    "transport": {"const": "streamable-http"},
+    "identity": {"const": "BEARER_CREDENTIAL_DERIVED_PER_PRINCIPAL_SERVER_SIDE_ACL"},
+    "credential_handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worker_receives_cloud_credential_bytes", "cloud_profile_from_mcp_argument", "cloud_secret_retained_in_evidence"],
+      "properties": {
+        "worker_receives_cloud_credential_bytes": {"const": false},
+        "cloud_profile_from_mcp_argument": {"const": false},
+        "cloud_secret_retained_in_evidence": {"const": false}
+      }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "principals", "input_contract", "external_read", "external_write", "authority_effect"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$"},
+          "principals": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "input_contract": {"type": "string", "minLength": 1},
+          "external_read": {"type": "boolean"},
+          "external_write": {"const": false},
+          "authority_effect": {"enum": ["NONE", "EVIDENCE_RESULT_ONLY", "DETERMINISTIC_GATE_ONLY", "APPROVAL_INPUT_ONLY"]}
+        }
+      }
+    }
+  }
+}

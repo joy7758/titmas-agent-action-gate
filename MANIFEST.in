@@ -16,5 +16,6 @@ recursive-include policies *.json
 recursive-include schemas *.json
 recursive-include scripts *.py
 recursive-include skills *.json *.md
+prune skills/alibabacloud-resourcecenter-search
 recursive-include specs *.md
 recursive-include tests *.py

@@ -24,6 +24,10 @@ class AuthenticationError(ActionGateError):
     pass
 
 
+class AuthorizationError(ActionGateError):
+    pass
+
+
 class ConflictError(ActionGateError):
     pass
 

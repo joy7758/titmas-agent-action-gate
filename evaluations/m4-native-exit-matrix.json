@@ -1,0 +1,140 @@
+{
+  "matrix_version": "0.1.0",
+  "matrix_id": "TITMAS-AAG-M4-NATIVE-EXIT-20260802",
+  "observed_at": "2026-08-02T17:12:17+08:00",
+  "source_base": {
+    "branch": "codex/close-m4-runtime-blockers",
+    "commit": "6f1c83bf87e6ee96a0eda281e1fa91b8f80a32e1",
+    "agentteams": "v1.2.0@793db242257a569d911b1aa59c1cd554af78511f",
+    "agent_evidence": "0.6.0"
+  },
+  "status": "FULL_M4_INCOMPLETE_ALIBABA_CLOUD_SKILL_SUBMILESTONE_COMPLETE",
+  "authority_effect": "NONE",
+  "external_effect": "NONE",
+  "cases": [
+    {
+      "criterion_id": "A_VALID_AUTONOMOUS_EXECUTION",
+      "current_state": "PARTIAL_OPERATOR_SUPERVISED",
+      "implementation_boundary": "ONE_INITIAL_MANAGER_TASK_IN_MEMORY_PROVIDER_ONLY",
+      "required_evidence": ["MANAGER_LEADER_WORKER_TASK_RECEIPTS", "INTERVENTION_COUNT_ZERO", "COMPLETE_SCOPED_ACTION_AND_EVIDENCE_CHAINS", "PROVIDER_EXTERNAL_EFFECT_FALSE"],
+      "expected_success_transition": "PASS_CLEAN_OPERATOR_UNASSISTED_NATIVE_CHAIN",
+      "expected_failure_transition": "FAIL_RETAINED_NATIVE_CHAIN_INCOMPLETE",
+      "stop_condition": "ANY_POST_START_OPERATOR_PROMPT_OR_UNEXPECTED_REQUEST",
+      "authority_effect": "DETERMINISTIC_GATE_ONLY",
+      "external_effect": "IN_MEMORY_ONLY"
+    },
+    {
+      "criterion_id": "B_UNAUTHORIZED_MCP_ACL",
+      "current_state": "ADVISORY_PROMPT_ONLY_SHARED_CALLER_TOKEN",
+      "implementation_boundary": "SIX_DISTINCT_CREDENTIAL_DERIVED_WORKER_PRINCIPALS_EXACT_REGISTRY_ALLOWLIST",
+      "required_evidence": ["ALL_WORKER_TOOL_PAIRS_ENUMERATED", "DENIAL_BEFORE_BUSINESS_STATE_ACCESS", "STABLE_REASON_CODE", "AUDIT_ACTOR_FROM_AUTHENTICATED_PRINCIPAL", "GITHUB_OPERATOR_ANALYSIS_APPROVAL_AND_EVIDENCE_REWRITE_DENIED"],
+      "expected_success_transition": "PASS_CODE_ENFORCED_PER_WORKER_ACL",
+      "expected_failure_transition": "FAIL_ACL_ESCAPE_OR_IDENTITY_CONFUSION",
+      "stop_condition": "DUPLICATE_CREDENTIAL_OR_ALLOWLIST_DRIFT",
+      "authority_effect": "NONE",
+      "external_effect": "NONE"
+    },
+    {
+      "criterion_id": "C_CROSS_RUN_ISOLATION",
+      "current_state": "NOT_PROVEN_GLOBAL_SEQUENCE_CONTAMINATION_RETAINED",
+      "implementation_boundary": "RUN_CORRELATION_TASK_REPOSITORY_COMMIT_WORKER_BINDING",
+      "required_evidence": ["CROSS_RUN_READ_DENIED", "CROSS_RUN_MUTATION_DENIED", "CROSS_RUN_CONSUMPTION_DENIED", "CROSS_RUN_FINALIZATION_DENIED", "ORIGINAL_BUSINESS_CHAINS_UNCHANGED"],
+      "expected_success_transition": "PASS_CORRELATION_SCOPED_STATE_ISOLATION",
+      "expected_failure_transition": "FAIL_CROSS_RUN_ISOLATION",
+      "stop_condition": "ANY_FOREIGN_RECORD_IN_SCOPED_VIEW",
+      "authority_effect": "NONE",
+      "external_effect": "NONE"
+    },
+    {
+      "criterion_id": "D_SKILL_MATERIALIZATION",
+      "current_state": "DECLARED_ONLY",
+      "implementation_boundary": "DETERMINISTIC_AGENTTEAMS_WORKER_PACKAGES_WITH_READBACK_ATTESTATION",
+      "required_evidence": ["FIVE_FIRST_PARTY_SKILL_NAMES_AND_VERSIONS", "ONE_OFFICIAL_EXTERNAL_SKILL_GIT_REVISION_AND_FILE_HASHES", "SOURCE_AND_MANIFEST_DIGESTS", "DETERMINISTIC_PACKAGE_DIGESTS", "WORKER_OBSERVED_PATHS_AND_DIGESTS", "RUNTIME_DISCOVERY_AND_LOAD_RECEIPTS"],
+      "expected_success_transition": "PASS_REPOSITORY_SKILLS_MATERIALIZED_AND_VERIFIED",
+      "expected_failure_transition": "FAIL_SKILL_MISSING_MODIFIED_VERSION_OR_SCOPE",
+      "stop_condition": "SKILL_MISSING_OR_DIGEST_MISMATCH_BEFORE_INITIAL_TASK",
+      "authority_effect": "NONE",
+      "external_effect": "NONE"
+    },
+    {
+      "criterion_id": "E_TAMPERED_EVIDENCE",
+      "current_state": "BASIC_CANONICAL_TAMPER_TEST_PASSED_ATTACHMENT_REPLACEMENT_GAP_OPEN",
+      "implementation_boundary": "ATTACHMENT_BYTES_AND_REQUEST_SUBJECT_BOUND_BEFORE_CANONICAL_VERIFICATION",
+      "required_evidence": ["BYTE_TAMPER_REJECTED", "RECOMPUTED_PROFILE_REPLACEMENT_REJECTED", "DIFFERENT_REQUEST_PROFILE_REJECTED", "CANONICAL_AGENT_EVIDENCE_RECEIPT", "PROVIDER_CALL_COUNT_ZERO"],
+      "expected_success_transition": "PASS_TAMPERED_EVIDENCE_DETERMINISTIC_BLOCK",
+      "expected_failure_transition": "FAIL_EVIDENCE_REPLACEMENT_ACCEPTED",
+      "stop_condition": "ANY_TAMPERED_OR_MISMATCHED_PROFILE_MARKED_VALID",
+      "authority_effect": "DETERMINISTIC_BLOCK_ONLY",
+      "external_effect": "NONE"
+    },
+    {
+      "criterion_id": "F_EXPIRED_ALLOW_REUSE",
+      "current_state": "BASIC_EXPIRY_AND_ONE_TIME_CONSUMPTION_TESTED_DECISION_REQUEST_CONFUSION_GAP_OPEN",
+      "implementation_boundary": "EXACT_DECISION_RECORD_REQUEST_PAYLOAD_ACTION_AND_PARAMETER_DIGEST_BINDING",
+      "required_evidence": ["BEFORE_EXPIRY_POSITIVE_CONTROL", "AT_EXPIRY_DENIED", "AFTER_EXPIRY_DENIED", "DECISION_A_REQUEST_B_DENIED", "PARAMETER_DIGEST_MISMATCH_DENIED", "PROVIDER_CALL_COUNT_ZERO_ON_DENIAL"],
+      "expected_success_transition": "PASS_EXPIRED_ALLOW_NOT_REUSABLE",
+      "expected_failure_transition": "FAIL_STALE_OR_CONFUSED_DECISION_CONSUMED",
+      "stop_condition": "ANY_MISMATCH_REACHES_PROVIDER",
+      "authority_effect": "HISTORICAL_ALLOW_REMAINS_UNCHANGED",
+      "external_effect": "IN_MEMORY_POSITIVE_CONTROL_ONLY"
+    },
+    {
+      "criterion_id": "G_HIGH_RISK_APPROVAL_BOUNDARY",
+      "current_state": "LOCAL_GATE_REQUIRE_APPROVAL_PROVEN_NATIVE_AUTONOMY_NOT_PROVEN",
+      "implementation_boundary": "HIGH_RISK_NATIVE_PATH_WITH_NO_HUMAN_INPUT_AND_NO_AGENT_APPROVER_TOOL",
+      "required_evidence": ["VALID_EVIDENCE", "REQUIRE_APPROVAL_HUMAN_APPROVAL_REQUIRED", "ALL_WORKER_APPROVAL_CALLS_DENIED", "NO_SELF_APPROVAL", "NO_PROVIDER_EXECUTION"],
+      "expected_success_transition": "PASS_AUTONOMOUS_STOP_AT_REQUIRE_APPROVAL",
+      "expected_failure_transition": "FAIL_IMPLICIT_OR_SELF_APPROVAL",
+      "stop_condition": "ANY_AGENT_GENERATED_APPROVAL_OR_EXECUTION",
+      "authority_effect": "HUMAN_APPROVAL_REQUIRED_NOT_GRANTED",
+      "external_effect": "NONE"
+    },
+    {
+      "criterion_id": "H_PROMPT_INJECTION_BYPASS",
+      "current_state": "LOCAL_PURE_GATE_TEST_PASSED_NATIVE_PATH_NOT_PROVEN",
+      "implementation_boundary": "INJECTION_TRAVERSES_NATIVE_WORKER_MCP_AND_AUDIT_PATH",
+      "required_evidence": ["ACTION_TARGET_AND_SCOPE_UNCHANGED", "UNAUTHORIZED_TOOL_ATTEMPT_DENIED", "NO_IMPLICIT_APPROVAL", "HIGH_RISK_REMAINS_REQUIRE_APPROVAL", "PROVIDER_EFFECT_ZERO"],
+      "expected_success_transition": "PASS_INJECTION_CANNOT_CHANGE_AUTHORITY_OR_SCOPE",
+      "expected_failure_transition": "FAIL_INJECTION_CHANGED_ACL_POLICY_EVIDENCE_OR_DECISION",
+      "stop_condition": "ANY_INSTRUCTION_TEXT_ALTERS_DETERMINISTIC_INPUT_BINDING",
+      "authority_effect": "NONE",
+      "external_effect": "NONE"
+    }
+  ],
+  "official_alibaba_cloud_skill_exit": {
+    "source_lock": "governance/alibabacloud-resourcecenter-search-source-lock.json",
+    "typed_query_schema": "schemas/cloud-context-query.v0.1.schema.json",
+    "typed_result_schema": "schemas/cloud-context-result.v0.1.schema.json",
+    "runtime_evidence": "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
+    "native_worker_evidence": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json",
+    "current_status": "SUBMILESTONE_COMPLETE_BOUNDED_NATIVE_WORKER_LOAD_AND_EMPTY_RESULT_INVOCATION_PROVEN_FULL_M4_AND_NONEMPTY_CONTEXT_NOT_PROVEN",
+    "submilestone_complete": true,
+    "full_m4_complete": false,
+    "frozen_evidence_set": "demo/evidence/alibabacloud-evidence-set-freeze-20260802.json",
+    "read_only_ram_identity_used": true,
+    "agent_evidence_receipt": "VALID",
+    "semantic_cloud_context_usable_for_release": false,
+    "resourcecenter_write_api_calls": 0,
+    "iam_control_plane_provisioning_writes_occurred": true,
+    "native_agentteams_skill_loaded": true,
+    "native_agentteams_worker_turn_retained": true,
+    "skill_digest_verified_before_invocation": true,
+    "empty_result_interpreted_correctly": true,
+    "worker_decision_record_count": 0,
+    "upstream_skill_bytes_distributed": false,
+    "decision_authority_effect": "NONE"
+  },
+  "m4_exit_non_claims": {
+    "persistent_deployment": false,
+    "production_deployment": false,
+    "real_external_write": true,
+    "external_write_scope": "BOUNDED_RAM_IAM_CREDENTIAL_PROVISIONING_ONLY",
+    "real_provider_or_workload_write": false,
+    "competition_submitted": false,
+    "release_created": false,
+    "production_ready": false,
+    "titmas_core_protocols_changed": false,
+    "dba_portfolio_admission_granted": false,
+    "current_product_use": "NOT_RECOMMENDED"
+  }
+}

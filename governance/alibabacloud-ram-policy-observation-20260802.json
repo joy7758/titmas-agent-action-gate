@@ -1,0 +1,61 @@
+{
+  "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.1.schema.json",
+  "schema_version": "0.1.0",
+  "observed_at": "2026-08-02T06:49:42.052182Z",
+  "identity": {
+    "type": "AssumedRoleUser",
+    "identity_ref": "sha256:d5dfdaf092de944ea6a34dbc7edc16903b6aac180f69c0fb48d8b1a903c4dda1",
+    "role_ref": "sha256:c172f1e2c0106e474ae5e0327854abf05c051f7e9a59fea9b1d97ae0b4b18a3f"
+  },
+  "attachment": {
+    "role_ref": "sha256:c172f1e2c0106e474ae5e0327854abf05c051f7e9a59fea9b1d97ae0b4b18a3f",
+    "policy_type": "System",
+    "policy_name": "AliyunResourceCenterReadOnlyAccess",
+    "total_attachment_count": 1,
+    "system_policy_count": 1,
+    "custom_policy_count": 0,
+    "matching_attachment_count": 1,
+    "unexpected_attachment_count": 0
+  },
+  "policy": {
+    "version_id": "v2",
+    "document_sha256": "e0e16cc23d7ec88b76f6e691ffd5edf7ad47c1bf518b25055ad9f10950c94663",
+    "allow_actions": [
+      "resourcecenter:ExecuteMultiAccountSQLQuery",
+      "resourcecenter:ExecuteSQLQuery",
+      "resourcecenter:Get*",
+      "resourcecenter:List*",
+      "resourcecenter:Search*",
+      "tag:ListTag*"
+    ],
+    "deny_statement_count": 0,
+    "write_operation_marker_count": 0
+  },
+  "read_trace": [
+    {
+      "operation": "ram.GetPolicy",
+      "exit_status": 0,
+      "request_id_ref": "sha256:52e7e79d2730c641ef9ecdc7b8932257ff23ebf6be7a38acb60276d18a03100d"
+    },
+    {
+      "operation": "ram.GetPolicyVersion",
+      "exit_status": 0,
+      "request_id_ref": "sha256:657d67591b948ad07f742652ecbe8f583eaede708f91df109cd19d5b73f03fa3"
+    },
+    {
+      "operation": "ram.ListPoliciesForRole",
+      "exit_status": 0,
+      "request_id_ref": "sha256:9844743e9238e6289316098b3608400b86e6496004c70db25cf5fd5829fe8bd1"
+    },
+    {
+      "operation": "sts.GetCallerIdentity",
+      "exit_status": 0,
+      "request_id_ref": "sha256:e50b9cc9d7ae1bc80f1e9805277c6c778ecb2de5132d81180b905692451c620c"
+    }
+  ],
+  "effects": {
+    "cloud_read_calls": 4,
+    "cloud_write_calls": 0,
+    "local_cli_config_writes": 3
+  }
+}

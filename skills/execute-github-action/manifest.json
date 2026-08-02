@@ -11,7 +11,7 @@
   },
   "inputs": ["schemas/action-gate-decision.v0.1.schema.json", "exact server-side provider invocation"],
   "outputs": ["signed append-only execution-attempt receipt"],
-  "mcp_tools": ["get_action_state"],
+  "mcp_tools": ["execute_in_memory_github_action", "get_action_state"],
   "authority": {"may_propose": false, "may_decide": false, "may_approve": false, "may_execute": false},
   "examples": ["examples/example.json"],
   "tests": ["../../tests/test_store_runtime.py", "../../tests/test_provider_boundaries.py", "../../tests/test_workflow_runtime.py"]

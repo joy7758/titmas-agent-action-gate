@@ -16,7 +16,14 @@ from .service import ActionGateService
 
 AGENTTEAMS_RELEASE = "v1.2.0"
 AGENTTEAMS_COMMIT = "793db242257a569d911b1aa59c1cd554af78511f"
-EXPECTED_WORKERS = {"workflow-lead", "request-analyst", "evidence-verifier", "github-operator", "release-steward"}
+EXPECTED_WORKERS = {
+    "workflow-lead",
+    "request-analyst",
+    "evidence-verifier",
+    "github-operator",
+    "cloud-context-inspector",
+    "release-steward",
+}
 
 
 def validate_agentteams_template(path: str | Path) -> dict[str, Any]:
@@ -67,8 +74,8 @@ class AgentTeamsWorkflow:
         self.handoffs.add("workflow-lead", "request-analyst", request["request_id"], "NORMALIZE_REQUEST", request)
         self.service.submit_action_request(request, caller_token=self.caller_token)
 
-        profile = self.service.evidence.build_profile(
-            request,
+        profile = self.service.generate_evidence_profile(
+            request["request_id"],
             actor=self.analyst.agent_id,
             phase="pre-execution",
             operation_status="succeeded",
@@ -112,8 +119,8 @@ class AgentTeamsWorkflow:
         )
         self.handoffs.add("github-operator", "release-steward", release_request["request_id"], "ASSEMBLE_POST_EXECUTION_EVIDENCE", execution_receipt)
         self.service.submit_action_request(release_request, caller_token=self.caller_token)
-        post_profile = self.service.evidence.build_profile(
-            release_request,
+        post_profile = self.service.generate_evidence_profile(
+            release_request["request_id"],
             actor=self.steward.agent_id,
             phase="post-execution",
             operation_status="succeeded",
