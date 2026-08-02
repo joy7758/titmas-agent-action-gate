@@ -38,6 +38,7 @@ def _source_inventory(
     worker: dict[str, Any],
     *,
     verify_external_skill_source: bool = True,
+    schema_names: set[str] | None = None,
 ) -> tuple[str, list[dict[str, str]], dict[str, bytes]]:
     if len(worker["skills"]) != 1:
         raise ActionGateError("SKILL_SCOPE_INVALID", "M4 Worker packages require exactly one repository Skill.")
@@ -82,6 +83,8 @@ def _source_inventory(
                 }
             )
     for schema_path in sorted((root / "schemas").glob("*.json")):
+        if schema_names is not None and schema_path.name not in schema_names:
+            continue
         package_path = f"schemas/{schema_path.name}"
         data = schema_path.read_bytes()
         contents[package_path] = data
@@ -231,6 +234,7 @@ def build_worker_packages(
     model: str,
     distribution_scope: str = LOCAL_RUNTIME_ONLY,
     verify_external_skill_source: bool = True,
+    schema_names: set[str] | None = None,
 ) -> dict[str, Any]:
     repository_root = Path(root).resolve()
     destination = Path(output_dir).resolve()
@@ -252,6 +256,7 @@ def build_worker_packages(
             repository_root,
             worker,
             verify_external_skill_source=verify_external_skill_source,
+            schema_names=schema_names,
         )
         runtime = LEADER_RUNTIME if worker["id"] == "workflow-lead" else SPECIALIST_RUNTIME
         package_manifest = _package_manifest(worker, source_commit=source_commit, model=model, runtime=runtime)
@@ -278,6 +283,7 @@ def build_worker_packages(
             expected_source_commit=source_commit,
             expected_model=model,
             verify_external_skill_source=verify_external_skill_source,
+            schema_names=schema_names,
         )
         receipts.append(receipt)
     index = {
@@ -301,6 +307,7 @@ def verify_worker_package(
     expected_source_commit: str | None = None,
     expected_model: str | None = None,
     verify_external_skill_source: bool = True,
+    schema_names: set[str] | None = None,
 ) -> dict[str, Any]:
     archive_path = Path(package_path).resolve()
     repository_root = Path(root).resolve()
@@ -312,6 +319,7 @@ def verify_worker_package(
         repository_root,
         workers[expected_worker],
         verify_external_skill_source=verify_external_skill_source,
+        schema_names=schema_names,
     )
     expected_hashes = {item["package_path"]: item["sha256"] for item in expected_files}
     with zipfile.ZipFile(archive_path) as archive:

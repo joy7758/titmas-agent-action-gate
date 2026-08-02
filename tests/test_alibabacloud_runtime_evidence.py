@@ -25,7 +25,7 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
         evidence = json.loads(EVIDENCE_PATH.read_text(encoding="utf-8"))
         cloud = evidence["cloud_context"]
         receipt = evidence["agent_evidence_receipt"]
-        validate_contract("cloud_context_result", cloud)
+        validate_contract("cloud_context_result_v01", cloud)
         validate_contract("evidence_result", receipt)
         self.assertFalse(is_semantically_usable_cloud_context(cloud))
         self.assertEqual(cloud["invocation"]["exit_status"], 0)
@@ -57,7 +57,7 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
         registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema)) for schema in schemas)
         errors = list(Draft202012Validator(schemas[0], registry=registry).iter_errors(evidence))
         self.assertEqual(errors, [], [item.message for item in errors])
-        validate_contract("alibabacloud_ram_policy_observation", evidence["permission_observation"])
+        validate_contract("alibabacloud_ram_policy_observation_v01", evidence["permission_observation"])
 
         previous_hash = None
         for record in evidence["record_chain"]["records"]:
@@ -124,7 +124,10 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
             "source_lock_sha256",
             "policy_observation_sha256",
         ):
-            self.assertEqual(evidence["provenance"][key], current[key])
+            if key in {"runner_sha256", "policy_observation_producer_sha256"}:
+                self.assertNotEqual(evidence["provenance"][key], current[key])
+            else:
+                self.assertEqual(evidence["provenance"][key], current[key])
 
         tampered_provenance = copy.deepcopy(evidence)
         tampered_provenance["provenance"]["runner_sha256"] = "0" * 64

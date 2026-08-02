@@ -30,8 +30,9 @@ Status: controls partially implemented and locally exercised; not an independent
 | Secret leakage | token appears in prompt/evidence/log | secret manager, redaction, no secret inputs | leak scanning |
 | Cloud Skill scope expansion | upstream search Skill instructs enable/disable or full-access actions | server-side typed adapter permits only current-account `search-resources`; Worker has no credential bytes or arbitrary CLI | write-operation pre-process denial tests |
 | Cloud permission ambiguity | permission denial is interpreted as an empty inventory | distinct `NOT_ASSESSED_PERMISSION_DENIED`; no zero-resource inference | denied RAM identity test |
+| Stale cloud permission observation | an old or future-dated RAM snapshot is reused as current policy proof | 900-second maximum age, same-run observation binding, and release-ineligible historical replay | stale/future/same-run tests |
 | Cloud response leakage | resource IDs, names, tags, IPs, tokens, or raw stderr enter evidence | aggregate allowlist, hashed request ID, no raw stdout/stderr retention | secret and sensitive-field absence tests |
-| Cloud evidence semantic spoofing | Worker labels an incomplete or denied query as valid context | deterministic typed receipt semantic check precedes canonical integrity verification | forged or unusable receipt rejection test |
+| Cloud evidence semantic spoofing | Worker labels an incomplete, malformed, or denied query as valid context | deterministic typed receipt requires non-empty string `ResourceId` and `ResourceType`, then checks semantic usability before canonical integrity verification | forged, malformed, or unusable receipt rejection test |
 | Cloud Skill supply-chain drift | installed Skill differs from pinned official revision | exact subtree revision and per-file SHA-256; package exact-member attestation | modified Skill load-rejection test |
 | Audit deletion | rejected attempt disappears | append-only store and retention checks | deletion attempt test |
 

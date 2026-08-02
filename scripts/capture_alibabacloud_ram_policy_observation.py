@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from titmas_action_gate.canonical import sha256_file, sha256_json
+from titmas_action_gate.canonical import ExclusiveOutput, sha256_file, sha256_json
 from titmas_action_gate.cloud_context import (
     EXPECTED_READ_ONLY_POLICY_ACTIONS,
     OFFICIAL_ALIYUN_CLI_SHA256,
@@ -48,12 +48,16 @@ def _as_json_object(value: Any) -> dict[str, Any]:
 
 def build_sanitized_observation(
     *,
+    run_id: str,
+    capture_id: str,
+    started_at: datetime,
+    completed_at: datetime,
+    trace_observed_at: tuple[datetime, datetime, datetime, datetime],
     role_name: str,
     policy_payload: dict[str, Any],
     policy_version_payload: dict[str, Any],
     attachments_payload: dict[str, Any],
     identity_payload: dict[str, Any],
-    observed_at: datetime,
 ) -> dict[str, Any]:
     """Build and validate the public-safe observation from in-memory responses."""
 
@@ -112,9 +116,16 @@ def build_sanitized_observation(
         for action in sorted_actions
     )
     observation = {
-        "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.1.schema.json",
-        "schema_version": "0.1.0",
-        "observed_at": observed_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.2.schema.json",
+        "schema_version": "0.2.0",
+        "observed_at": completed_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+        "capture": {
+            "capture_id": capture_id,
+            "run_id": run_id,
+            "started_at": started_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "completed_at": completed_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "mode": "SAME_RUN_STS_AND_RAM_READBACK",
+        },
         "identity": {
             "type": identity_type,
             "identity_ref": _opaque_ref("identity", arn),
@@ -139,15 +150,22 @@ def build_sanitized_observation(
         },
         "read_trace": [
             {
+                "sequence": sequence,
+                "capture_id": capture_id,
+                "profile_scope": profile_scope,
                 "operation": operation,
+                "observed_at": trace_time.astimezone(UTC).isoformat().replace("+00:00", "Z"),
                 "exit_status": 0,
                 "request_id_ref": _opaque_ref("request", payload["RequestId"]),
             }
-            for operation, payload in (
-                ("ram.GetPolicy", policy_payload),
-                ("ram.GetPolicyVersion", policy_version_payload),
-                ("ram.ListPoliciesForRole", attachments_payload),
-                ("sts.GetCallerIdentity", identity_payload),
+            for sequence, (profile_scope, operation, payload, trace_time) in enumerate(
+                (
+                    ("CONTROL_RAM_READBACK", "ram.GetPolicy", policy_payload, trace_observed_at[0]),
+                    ("CONTROL_RAM_READBACK", "ram.GetPolicyVersion", policy_version_payload, trace_observed_at[1]),
+                    ("CONTROL_RAM_READBACK", "ram.ListPoliciesForRole", attachments_payload, trace_observed_at[2]),
+                    ("QUERY_STS_IDENTITY", "sts.GetCallerIdentity", identity_payload, trace_observed_at[3]),
+                ),
+                start=1,
             )
         ],
         "effects": {"cloud_read_calls": 4, "cloud_write_calls": 0, "local_cli_config_writes": 3},
@@ -176,7 +194,7 @@ def _run_json(binary: str, argv: list[str]) -> dict[str, Any]:
     return payload
 
 
-def capture(control_profile: str, query_profile: str, role_name: str) -> dict[str, Any]:
+def capture(control_profile: str, query_profile: str, role_name: str, run_id: str) -> dict[str, Any]:
     binary = shutil.which("aliyun")
     if binary is None:
         raise RuntimeError("ALIYUN_CLI_NOT_INSTALLED")
@@ -186,6 +204,9 @@ def capture(control_profile: str, query_profile: str, role_name: str) -> dict[st
     binary = str(binary_path)
     enabled = False
     try:
+        started_at = datetime.now(UTC)
+        capture_id = _opaque_ref("policy-capture", f"{run_id}:{started_at.isoformat()}")
+        trace_times: list[datetime] = []
         subprocess.run([binary, "configure", "ai-mode", "enable"], check=True, capture_output=True, text=True, timeout=30)
         enabled = True
         subprocess.run(
@@ -200,6 +221,7 @@ def capture(control_profile: str, query_profile: str, role_name: str) -> dict[st
             raise RuntimeError("ALIYUN_CLI_VERSION_MISMATCH")
         common_control = ["--profile", control_profile, "--user-agent", OFFICIAL_USER_AGENT]
         policy = _run_json(binary, ["ram", "GetPolicy", "--PolicyType", "System", "--PolicyName", POLICY_NAME, *common_control])
+        trace_times.append(datetime.now(UTC))
         version_id = policy.get("Policy", {}).get("DefaultVersion")
         if not isinstance(version_id, str):
             raise RuntimeError("POLICY_DEFAULT_VERSION_MISSING")
@@ -217,18 +239,26 @@ def capture(control_profile: str, query_profile: str, role_name: str) -> dict[st
                 *common_control,
             ],
         )
+        trace_times.append(datetime.now(UTC))
         attachments = _run_json(binary, ["ram", "ListPoliciesForRole", "--RoleName", role_name, *common_control])
+        trace_times.append(datetime.now(UTC))
         identity = _run_json(
             binary,
             ["sts", "GetCallerIdentity", "--profile", query_profile, "--user-agent", OFFICIAL_USER_AGENT],
         )
+        trace_times.append(datetime.now(UTC))
+        completed_at = datetime.now(UTC)
         return build_sanitized_observation(
+            run_id=run_id,
+            capture_id=capture_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            trace_observed_at=(trace_times[0], trace_times[1], trace_times[2], trace_times[3]),
             role_name=role_name,
             policy_payload=policy,
             policy_version_payload=policy_version,
             attachments_payload=attachments,
             identity_payload=identity,
-            observed_at=datetime.now(UTC),
         )
     finally:
         if enabled:
@@ -244,18 +274,22 @@ def main() -> None:
     parser.add_argument("--control-profile", default=os.environ.get("TITMAS_ALIBABA_CLOUD_CONTROL_PROFILE"))
     parser.add_argument("--query-profile", default=os.environ.get("TITMAS_ALIBABA_CLOUD_PROFILE"))
     parser.add_argument("--role-name", default=os.environ.get("TITMAS_ALIBABA_CLOUD_ROLE_NAME"))
+    parser.add_argument("--run-id", required=True)
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json",
+        required=True,
     )
     args = parser.parse_args()
     if not args.control_profile or not args.query_profile or not args.role_name:
         raise SystemExit("control profile, query profile, and role name are required; credential bytes are not accepted")
-    observation = capture(args.control_profile, args.query_profile, args.role_name)
-    output = args.output.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(observation, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    output = Path(os.path.abspath(args.output))
+    try:
+        with ExclusiveOutput(output) as reserved_output:
+            observation = capture(args.control_profile, args.query_profile, args.role_name, args.run_id)
+            reserved_output.write_text(json.dumps(observation, indent=2, ensure_ascii=False) + "\n")
+    except FileExistsError as exc:
+        raise SystemExit("POLICY_OBSERVATION_OUTPUT_ALREADY_EXISTS") from exc
     print(json.dumps({"status": "VALID", "output": str(output), "sha256": sha256_file(output)}, sort_keys=True))
 
 

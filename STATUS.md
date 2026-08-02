@@ -2,12 +2,16 @@
 
 ```text
 PROJECT_ID=TITMAS-AGENT-ACTION-GATE
-OBSERVED_AT=2026-08-02T17:12:17+08:00
+OBSERVED_AT=2026-08-02T19:26:00+08:00
 REPOSITORY=https://github.com/joy7758/titmas-agent-action-gate
 REPOSITORY_VISIBILITY=PUBLIC
 BRANCH=codex/close-m4-runtime-blockers
 SOURCE_BASE_COMMIT=6f1c83bf87e6ee96a0eda281e1fa91b8f80a32e1
 CURRENT_MILESTONE=M4_RUNTIME_BLOCKER_CLOSURE_IN_PROGRESS
+PR_3_REVIEW_FIX_BASE_COMMIT=5ea0204646737ce5cae816d620202482f26fa15d
+PR_3_REVIEW_FIX_LOCAL_TESTS=138
+PR_3_REVIEW_FIX_LOCAL_VALIDATORS=PASS
+PR_3_REVIEW_FIX_CI_STATUS=PENDING
 FULL_M4_COMPLETE=false
 ALIBABA_CLOUD_OFFICIAL_SKILL_SUBMILESTONE=COMPLETE_BOUNDED_NATIVE_WORKER_EVIDENCE
 AGENTTEAMS_PIN=v1.2.0@793db242257a569d911b1aa59c1cd554af78511f
@@ -42,6 +46,16 @@ ALIBABA_CLOUD_RUNTIME_EVIDENCE=demo/evidence/alibabacloud-resourcecenter-preflig
 ALIBABA_CLOUD_NATIVE_RUNTIME_EVIDENCE=demo/evidence/agentteams-native-alibabacloud-skill-20260802.json
 ALIBABA_CLOUD_FROZEN_EVIDENCE_SET=demo/evidence/alibabacloud-evidence-set-freeze-20260802.json
 ALIBABA_CLOUD_FROZEN_EVIDENCE_SET_VALID=true
+ALIBABA_CLOUD_APPEND_ONLY_CORRECTION=demo/evidence/agentteams-native-alibabacloud-skill-correction-20260802.json
+ALIBABA_CLOUD_PRIOR_WORKER_CREDENTIAL_ROTATION_STATUS=UNKNOWN
+ALIBABA_CLOUD_POLICY_OBSERVATION_AT_NATIVE_RUN=STALE
+ALIBABA_CLOUD_HISTORICAL_REPLAY_STRUCTURALLY_VALID=true
+ALIBABA_CLOUD_HISTORICAL_REPLAY_RELEASE_ELIGIBLE=false
+ALIBABA_CLOUD_FUTURE_POLICY_OBSERVATION_MAX_AGE_SECONDS=900
+ALIBABA_CLOUD_FUTURE_RELEASE_CONTEXT_REQUIRES_SAME_RUN_STS_AND_RAM_READBACK=true
+ALIBABA_CLOUD_FUTURE_RUNNER_ACCEPTS_EXTERNAL_POLICY_OBSERVATION=false
+ALIBABA_CLOUD_EVIDENCE_OUTPUT_ATOMIC_CREATE_ONLY=true
+ALIBABA_CLOUD_RESOURCE_ID_AND_TYPE_VALIDATION_TESTED=true
 ALIBABA_CLOUD_IAM_PROVISIONING_WRITE_EXECUTED=true
 ALIBABA_CLOUD_RESOURCECENTER_WRITE_API_CALLS=0
 ALIBABA_CLOUD_SEMANTIC_CONTEXT_USABLE_FOR_RELEASE=false
@@ -85,4 +99,4 @@ TITMAS_CORE_PROTOCOLS_CHANGED=false
 TITMAS_DRIFT_CHECK=PASS
 ```
 
-This is an experimental reference implementation with local runtime tests, one bounded public GitHub sandbox trace, one temporary historical five-Worker native AgentTeams smoke trace, and one disposable native `cloud-context-inspector` turn on official AgentTeams `v1.2.0`. The Worker resolved the externally installed official Skill, verified its source-lock digest before invoking the typed adapter, and received a real Resource Center `EMPTY_RESULT`, interpreted as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. Provider readbacks verify the complete one-policy role attachment set, and a same-profile live STS call binds the runtime identity and normalized role before each search. The result entered the evidence path but cannot satisfy a release request's semantic `CLOUD_CONTEXT` requirement. The Worker produced zero decision records and Resource Center write calls; separately recorded IAM credential provisioning and local CLI configuration writes remain disclosed. No upstream Skill bytes entered the repository or Worker package. This bounded specialist turn does not prove the broader autonomous M4 chain, persistent or production deployment, release, certification, compliance assessment, or competition submission.
+This is an experimental reference implementation with local runtime tests, one bounded public GitHub sandbox trace, one temporary historical five-Worker native AgentTeams smoke trace, and one disposable native `cloud-context-inspector` turn on official AgentTeams `v1.2.0`. The Worker resolved the externally installed official Skill, verified its source-lock digest before invoking the typed adapter, and received a real Resource Center `EMPTY_RESULT`, interpreted as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. The retained provider readback structurally records a complete one-policy role attachment set, but it was already older than the new 900-second freshness limit at the native turn; it therefore does not prove that policy remained current at invocation time. The same-profile live STS call binds the runtime identity and normalized role, not the contemporaneous policy set. An append-only correction also marks the earlier credential-rotation assertion `UNKNOWN` because no prior digest was retained. The historical result remains reviewable but cannot satisfy a release request's semantic `CLOUD_CONTEXT` requirement. The Worker produced zero decision records and Resource Center write calls; separately recorded IAM credential provisioning and local CLI configuration writes remain disclosed. No upstream Skill bytes entered the repository or Worker package. This bounded specialist turn does not prove the broader autonomous M4 chain, persistent or production deployment, release, certification, compliance assessment, or competition submission.

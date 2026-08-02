@@ -15,7 +15,7 @@ import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -67,6 +67,8 @@ EXPECTED_READ_ONLY_POLICY_ACTIONS = {
     "resourcecenter:Search*",
     "tag:ListTag*",
 }
+DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS = 900
+MAX_POLICY_OBSERVATION_CAPTURE_SECONDS = 300
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,10 @@ class CloudCredentialContext:
     permission_role_ref: str
     permission_policy_ref: str
     read_only_policy_verified: bool
+    policy_observation_freshness: str = "NOT_ASSESSED"
+    same_run_policy_readback_verified: bool = False
+    policy_observation_observed_at: datetime | None = None
+    policy_observation_max_age_seconds: int = DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS
 
     @property
     def credential_ref(self) -> str:
@@ -102,12 +108,30 @@ class CloudCredentialContext:
         return _opaque_ref(f"role:{self.permission_role_ref.lower()}")
 
 
-def credential_from_policy_observation(profile_name: str, observation_path: str | Path) -> tuple[CloudCredentialContext, dict[str, Any]]:
-    """Build a credential reference only from a schema-valid provider readback."""
+def credential_from_policy_observation(
+    profile_name: str,
+    observation_path: str | Path,
+    *,
+    assessed_at: datetime | None = None,
+    max_age_seconds: int = DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS,
+    expected_run_id: str | None = None,
+) -> tuple[CloudCredentialContext, dict[str, Any]]:
+    """Build a credential reference from a bounded provider readback.
+
+    Structural validity is retained separately from freshness.  A historical
+    observation remains reviewable, but cannot become release-usable unless it
+    is current and its four provider reads belong to the same runtime turn.
+    """
 
     path = Path(observation_path).resolve()
     observation = json.loads(path.read_text(encoding="utf-8"))
-    validate_contract("alibabacloud_ram_policy_observation", observation)
+    observation_version = observation.get("schema_version")
+    validate_contract(
+        "alibabacloud_ram_policy_observation_v01"
+        if observation_version == "0.1.0"
+        else "alibabacloud_ram_policy_observation",
+        observation,
+    )
     policy = observation["policy"]
     attachment = observation["attachment"]
     identity = observation["identity"]
@@ -133,12 +157,54 @@ def credential_from_policy_observation(profile_name: str, observation_path: str 
         or any(item["exit_status"] != 0 for item in observation["read_trace"])
     ):
         raise ValueError("READ_ONLY_POLICY_OBSERVATION_INVALID")
+    if max_age_seconds <= 0:
+        raise ValueError("POLICY_OBSERVATION_MAX_AGE_INVALID")
+    try:
+        policy_observed_at = datetime.fromisoformat(observation["observed_at"].replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("POLICY_OBSERVATION_TIMESTAMP_INVALID") from exc
+    if policy_observed_at.tzinfo is None:
+        raise ValueError("POLICY_OBSERVATION_TIMESTAMP_INVALID")
+    same_run_binding_verified = False
+    if observation_version == "0.2.0":
+        capture = observation["capture"]
+        try:
+            started_at = datetime.fromisoformat(capture["started_at"].replace("Z", "+00:00"))
+            completed_at = datetime.fromisoformat(capture["completed_at"].replace("Z", "+00:00"))
+            trace_times = [datetime.fromisoformat(item["observed_at"].replace("Z", "+00:00")) for item in observation["read_trace"]]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID") from exc
+        capture_ids = {item["capture_id"] for item in observation["read_trace"]}
+        if (
+            any(item.tzinfo is None for item in (started_at, completed_at, *trace_times))
+            or capture_ids != {capture["capture_id"]}
+            or not started_at <= trace_times[0] <= trace_times[1] <= trace_times[2] <= trace_times[3] <= completed_at
+            or (completed_at - started_at).total_seconds() > MAX_POLICY_OBSERVATION_CAPTURE_SECONDS
+            or policy_observed_at != completed_at
+        ):
+            raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID")
+        policy_observed_at = completed_at
+        same_run_binding_verified = isinstance(expected_run_id, str) and capture["run_id"] == expected_run_id
+    evaluated_at = assessed_at or utc_now()
+    if evaluated_at.tzinfo is None:
+        raise ValueError("POLICY_OBSERVATION_ASSESSMENT_TIMESTAMP_INVALID")
+    age_seconds = (evaluated_at.astimezone(UTC) - policy_observed_at.astimezone(UTC)).total_seconds()
+    freshness = "FUTURE" if age_seconds < 0 else "STALE" if age_seconds > max_age_seconds else "FRESH"
     credential = CloudCredentialContext(
         profile_name=profile_name,
         permission_identity=identity["identity_ref"],
         permission_role_ref=identity["role_ref"],
-        permission_policy_ref="sha256:" + sha256_file(path),
+        permission_policy_ref="sha256:" + (
+            sha256_json(observation) if observation_version == "0.2.0" else sha256_file(path)
+        ),
         read_only_policy_verified=True,
+        policy_observation_freshness=freshness,
+        same_run_policy_readback_verified=(
+            freshness == "FRESH"
+            and same_run_binding_verified
+        ),
+        policy_observation_observed_at=policy_observed_at,
+        policy_observation_max_age_seconds=max_age_seconds,
     )
     return credential, observation
 
@@ -208,12 +274,22 @@ def _parse_cli_version(output: str) -> tuple[str | None, tuple[int, int, int] | 
     return ".".join(str(value) for value in parts), parts
 
 
+def _resource_identity(item: dict[str, Any], canonical: str, alias: str) -> str:
+    value = item[canonical] if canonical in item else item.get(alias)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES")
+    return value
+
+
 def _resource_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
     for key in ("Resources", "resources"):
         if key in payload:
             value = payload[key]
             if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
                 raise ValueError("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES")
+            for item in value:
+                _resource_identity(item, "ResourceId", "resourceId")
+                _resource_identity(item, "ResourceType", "resourceType")
             return value
     raise ValueError("RESOURCE_SEARCH_RESPONSE_MISSING_RESOURCES")
 
@@ -563,7 +639,7 @@ class AliyunCliReadOnlyExecutor:
                     trace,
                     argv_template_sha256,
                 )
-            resource_types = {item.get("ResourceType") or item.get("resourceType") for item in resources}
+            resource_types = {_resource_identity(item, "ResourceType", "resourceType") for item in resources}
             regions = {item.get("RegionId") or item.get("regionId") for item in resources}
             request_id = payload.get("RequestId") or payload.get("requestId")
             next_token = payload.get("NextToken") or payload.get("nextToken")
@@ -730,7 +806,7 @@ class CloudContextInspector:
     ) -> dict[str, Any]:
         material = {"request_id": request_id, "query": query, "observed_at": format_datetime(observed_at)}
         result = {
-            "schema_version": "0.1.0",
+            "schema_version": "0.2.0",
             "preflight_id": f"cloud-preflight-{sha256_json(material)[:32]}",
             "request_id": request_id,
             "status": status,
@@ -762,6 +838,18 @@ class CloudContextInspector:
         native_agentteams_loaded: bool = False,
     ) -> dict[str, Any]:
         checked_at = observed_at or utc_now()
+        policy_freshness = credential.policy_observation_freshness if credential else "NOT_ASSESSED"
+        if credential and credential.policy_observation_observed_at is not None:
+            invocation_age = (
+                checked_at.astimezone(UTC) - credential.policy_observation_observed_at.astimezone(UTC)
+            ).total_seconds()
+            policy_freshness = (
+                "FUTURE"
+                if invocation_age < 0
+                else "STALE"
+                if invocation_age > credential.policy_observation_max_age_seconds
+                else "FRESH"
+            )
         try:
             skill = {**self.verify_skill_source(), "runtime_invoked": False}
         except (OSError, ValueError, KeyError, json.JSONDecodeError):
@@ -845,6 +933,62 @@ class CloudContextInspector:
                 observed_at=checked_at,
             )
 
+        if policy_freshness in {"STALE", "FUTURE"}:
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED_POLICY_OBSERVATION_STALE",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": credential.read_only_policy_verified},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": False},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
+                ],
+                uncertainty=[
+                    "POLICY_OBSERVATION_FUTURE_DATED"
+                    if policy_freshness == "FUTURE"
+                    else "POLICY_OBSERVATION_MAXIMUM_AGE_EXCEEDED"
+                ],
+                observed_at=checked_at,
+            )
+        if policy_freshness != "FRESH":
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": credential.read_only_policy_verified},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": False},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
+                ],
+                uncertainty=["POLICY_OBSERVATION_NOT_ASSESSED"],
+                observed_at=checked_at,
+            )
+        if policy_freshness == "FRESH" and not credential.same_run_policy_readback_verified:
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": credential.read_only_policy_verified},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": True},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
+                ],
+                uncertainty=["POLICY_OBSERVATION_NOT_SAME_RUN"],
+                observed_at=checked_at,
+            )
+
         skill["native_agentteams_loaded"] = native_agentteams_loaded
         skill["runtime_load_result"] = "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY" if native_agentteams_loaded else "SOURCE_VERIFIED_NOT_NATIVE_LOADED"
         execution = self.executor.execute(query, credential)
@@ -891,6 +1035,11 @@ class CloudContextInspector:
             {"check_id": "USER_PARAMETER_CONFIRMATION", "passed": True},
             {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
             {"check_id": "READ_ONLY_POLICY_REFERENCE", "passed": credential.read_only_policy_verified},
+            {"check_id": "POLICY_OBSERVATION_FRESH", "passed": policy_freshness == "FRESH"},
+            {
+                "check_id": "SAME_RUN_POLICY_READBACK",
+                "passed": policy_freshness == "FRESH" and credential.same_run_policy_readback_verified,
+            },
             {
                 "check_id": "LIVE_READ_ONLY_IDENTITY_BINDING",
                 "passed": any(item["step_id"] == "VERIFY_LIVE_CALLER_IDENTITY" and item["exit_status"] == 0 for item in execution.step_trace)
@@ -920,13 +1069,15 @@ class CloudContextInspector:
 def is_semantically_usable_cloud_context(result: dict[str, Any]) -> bool:
     """Only this condition allows the receipt to satisfy CLOUD_CONTEXT evidence."""
 
-    validate_contract("cloud_context_result", result)
+    validate_contract("cloud_context_result_v01" if result.get("schema_version") == "0.1.0" else "cloud_context_result", result)
     required = {
         "SKILL_SOURCE_HASH",
         "READ_ONLY_OPERATION_ALLOWLIST",
         "USER_PARAMETER_CONFIRMATION",
         "CREDENTIAL_REFERENCE_PRESENT",
         "READ_ONLY_POLICY_REFERENCE",
+        "POLICY_OBSERVATION_FRESH",
+        "SAME_RUN_POLICY_READBACK",
         "LIVE_READ_ONLY_IDENTITY_BINDING",
         "CLI_EXIT_STATUS_ZERO",
         "PAGINATION_COMPLETE",

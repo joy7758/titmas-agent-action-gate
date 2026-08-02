@@ -27,10 +27,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from titmas_action_gate.canonical import sha256_file, sha256_json
+from titmas_action_gate.canonical import ExclusiveOutput, sha256_file, sha256_json
 from titmas_action_gate.cloud_context import CloudContextInspector
 from titmas_action_gate.runtime import HUMAN_PRINCIPAL_ID, RuntimeAdmission, RuntimePrincipalRegistry
 from titmas_action_gate.service import ActionGateService
+
+try:
+    from scripts.capture_alibabacloud_ram_policy_observation import capture as capture_ram_policy_observation
+except ModuleNotFoundError:  # Direct script execution resolves sibling modules without the repository package prefix.
+    from capture_alibabacloud_ram_policy_observation import capture as capture_ram_policy_observation
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTTEAMS_COMMIT = "793db242257a569d911b1aa59c1cd554af78511f"
@@ -339,6 +344,38 @@ def _contains_gate_outcome(value: Any) -> bool:
     return isinstance(value, str) and value in {"ALLOW", "BLOCK", "REQUIRE_APPROVAL"}
 
 
+def credential_rotation_status(
+    prior_credential_ref: str | None,
+    current_credential_ref: str | None,
+    *,
+    current_ref_independently_read_back: bool,
+    rotation_applicable: bool = True,
+) -> str:
+    """Classify rotation from opaque digests only; never accept credential bytes."""
+
+    if not rotation_applicable:
+        return "NOT_APPLICABLE"
+    digest_pattern = re.compile(r"^sha256:[a-f0-9]{64}$")
+    if (
+        not current_ref_independently_read_back
+        or not isinstance(prior_credential_ref, str)
+        or not isinstance(current_credential_ref, str)
+        or digest_pattern.fullmatch(prior_credential_ref) is None
+        or digest_pattern.fullmatch(current_credential_ref) is None
+    ):
+        return "UNKNOWN"
+    return "VERIFIED_UNCHANGED" if prior_credential_ref == current_credential_ref else "VERIFIED_ROTATED"
+
+
+def require_new_evidence_output(path: Path) -> ExclusiveOutput:
+    """Atomically reserve evidence output before any external effect."""
+
+    try:
+        return ExclusiveOutput(path)
+    except FileExistsError as exc:
+        raise RuntimeError("EVIDENCE_OUTPUT_ALREADY_EXISTS") from exc
+
+
 def _has_complete_worker_report(responses: list[dict[str, str]]) -> bool:
     if not responses:
         return False
@@ -350,13 +387,27 @@ def _has_complete_worker_report(responses: list[dict[str, str]]) -> bool:
     )
 
 
-def run(args: argparse.Namespace) -> dict[str, Any]:
+def _run_reserved(args: argparse.Namespace, reserved_output: ExclusiveOutput) -> dict[str, Any]:
+    run_suffix = secrets.token_hex(12)
+    run_id = f"run-native-alibaba-cloud-{run_suffix}"
     runtime_dir = args.runtime_dir.resolve()
-    state_dir = runtime_dir / "action-gate-state"
+    state_dir = runtime_dir / f"action-gate-state-{run_suffix}"
     state_dir.mkdir(parents=True, exist_ok=True)
     os.chmod(state_dir, 0o700)
     external_skill = CloudContextInspector(ROOT, external_skill_path=args.external_skill_path)
     external_skill.verify_skill_source()
+    prior_worker_token: str | None = None
+    with contextlib.suppress(
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+        KeyError,
+        RuntimeError,
+    ):
+        prior_worker_token = _worker_consumer_token()
+    prior_worker_credential_ref = (
+        "sha256:" + hashlib.sha256(prior_worker_token.encode()).hexdigest() if prior_worker_token else None
+    )
+    prior_worker_credential_ref_source = "LIVE_PRE_APPLY_READBACK" if prior_worker_token else "NOT_AVAILABLE"
     package_apply = _apply_worker_package(args.worker_package)
     worker = _worker_readback()
     if worker != {
@@ -376,22 +427,41 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if runtime_byte_scan["upstream_file_digest_match_count"] != 0:
         raise RuntimeError("UPSTREAM_SKILL_BYTES_PRESENT_IN_WORKER_RUNTIME")
     worker_token = _worker_consumer_token()
+    current_worker_credential_ref = "sha256:" + hashlib.sha256(worker_token.encode()).hexdigest()
+    rotation_status = credential_rotation_status(
+        prior_worker_credential_ref,
+        current_worker_credential_ref,
+        current_ref_independently_read_back=True,
+    )
+    if rotation_status != "VERIFIED_ROTATED":
+        raise RuntimeError("WORKER_CREDENTIAL_ROTATION_NOT_VERIFIED")
     registry = json.loads((ROOT / "agents/registry.json").read_text(encoding="utf-8"))
     principals = {item["id"] for item in registry["agents"]} | {HUMAN_PRINCIPAL_ID}
     credentials = {principal: secrets.token_urlsafe(36) for principal in principals}
     credentials[WORKER] = worker_token
-    credentials_path = runtime_dir / "native-runtime-credentials.private.json"
-    credentials_path.write_text(json.dumps({"credentials": credentials}), encoding="utf-8")
-    os.chmod(credentials_path, 0o600)
+    credentials_path = runtime_dir / f"{run_id}-native-runtime-credentials.private.json"
+    with ExclusiveOutput(credentials_path) as private_credentials_output:
+        private_credentials_output.write_text(json.dumps({"credentials": credentials}))
 
     scope = {
         "schema_version": "0.1.0",
-        "run_id": "run-native-alibaba-cloud-20260802-001",
-        "correlation_id": "corr-native-alibaba-cloud-20260802-001",
-        "task_id": "task-native-alibaba-cloud-20260802-001",
+        "run_id": run_id,
+        "correlation_id": f"corr-native-alibaba-cloud-{run_suffix}",
+        "task_id": f"task-native-alibaba-cloud-{run_suffix}",
         "repository": "joy7758/titmas-agent-action-gate",
         "commit": args.source_commit,
     }
+    policy_observation_path = runtime_dir / f"{scope['run_id']}-ram-policy-observation.private.json"
+    with ExclusiveOutput(policy_observation_path) as private_observation_output:
+        policy_observation = capture_ram_policy_observation(
+            args.control_profile,
+            args.profile,
+            args.role_name,
+            scope["run_id"],
+        )
+        private_observation_output.write_text(
+            json.dumps(policy_observation, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        )
     request = _prepare_request(state_dir, credentials, scope)
     query = {
         "schema_version": "0.1.0",
@@ -403,7 +473,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "confirmation_ref": FROZEN_CONFIRMATION_REF,
     }
 
-    server_log = runtime_dir / "native-mcp-server.private.log"
+    server_log = runtime_dir / f"{run_id}-native-mcp-server.private.log"
     server_env = os.environ.copy()
     server_env.update(
         {
@@ -417,10 +487,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "TITMAS_AGENTTEAMS_NATIVE_WORKER": "true",
             "TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH": str(args.external_skill_path),
             "TITMAS_ALIBABA_CLOUD_PROFILE": args.profile,
-            "TITMAS_ALIBABA_RAM_POLICY_OBSERVATION": str(args.policy_observation),
+            "TITMAS_ALIBABA_RAM_POLICY_OBSERVATION": str(policy_observation_path),
+            "TITMAS_ALIBABA_POLICY_OBSERVATION_RUN_ID": scope["run_id"],
         }
     )
-    log_handle = server_log.open("w", encoding="utf-8")
+    log_handle = server_log.open("x", encoding="utf-8")
     os.chmod(server_log, 0o600)
     process = subprocess.Popen(
         [str(ROOT / ".venv/bin/python"), "-m", "titmas_action_gate.runtime_mcp_server"],
@@ -493,6 +564,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     manager_env = _read_env(args.agentteams_env)
     secret_values = [
         worker_token,
+        *([prior_worker_token] if prior_worker_token else []),
         *credentials.values(),
         *(value for key, value in manager_env.items() if value and any(marker in key for marker in ("KEY", "TOKEN", "PASSWORD"))),
     ]
@@ -525,8 +597,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
     observed_at = _utc_now()
     evidence = {
-        "$schema": "../../schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
-        "schema_version": "0.1.0",
+        "$schema": "../../schemas/native-agentteams-cloud-skill-run-evidence.v0.2.schema.json",
+        "schema_version": "0.2.0",
         "run_id": scope["run_id"],
         "observed_at": observed_at,
         "source": {
@@ -552,8 +624,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "observed_message_events_after_baseline": room_events,
             },
             "mcp_surface": "AUTHENTICATED_FASTMCP_STREAMABLE_HTTP",
-            "current_worker_credential_ref": "sha256:" + hashlib.sha256(worker_token.encode()).hexdigest(),
-            "prior_exposed_disposable_worker_credential_rotated_before_run": True,
+            "current_worker_credential_ref": current_worker_credential_ref,
+            "prior_worker_credential_ref": prior_worker_credential_ref,
+            "prior_worker_credential_ref_source": prior_worker_credential_ref_source,
+            "current_worker_credential_ref_source": "LIVE_POST_APPLY_READBACK",
+            "prior_worker_credential_rotation_status": rotation_status,
         },
         "skill_load": {
             **load_record["payload"],
@@ -574,6 +649,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "frozen_query": query,
         "cloud_context": cloud,
+        "permission_observation": policy_observation,
+        "permission_observation_sha256": sha256_json(policy_observation),
         "agent_evidence_profile": profile_record,
         "agent_evidence_receipt": receipt,
         "trace": {
@@ -590,9 +667,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "deterministic_action_gate_sole_authority": True,
         },
         "effects": {
-            "effect_scope": "NATIVE_WORKER_TURN_RESOURCECENTER_AND_CLOUD_WORKLOAD_ONLY",
+            "effect_scope": "NATIVE_WORKER_TURN_AND_SAME_RUN_PERMISSION_OBSERVATION",
             "resourcecenter_read_api_calls": 1,
-            "sts_identity_read_api_calls": 1,
+            "runtime_sts_identity_read_api_calls": 1,
+            "permission_observation_cloud_read_calls": policy_observation["effects"]["cloud_read_calls"],
+            "permission_observation_local_cli_config_writes": policy_observation["effects"][
+                "local_cli_config_writes"
+            ],
             "resourcecenter_write_api_calls": 0,
             "cloud_resource_write_executed": False,
             "cloud_resource_created_for_nonempty_result": False,
@@ -632,9 +713,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     serialized = json.dumps(evidence, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     if any(secret in serialized for secret in secret_values):
         raise RuntimeError("SECRET_FOUND_IN_PUBLIC_NATIVE_EVIDENCE")
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(serialized, encoding="utf-8")
+    reserved_output.write_text(serialized)
     return evidence
+
+
+def run(args: argparse.Namespace) -> dict[str, Any]:
+    with require_new_evidence_output(args.output) as reserved_output:
+        return _run_reserved(args, reserved_output)
 
 
 def main() -> None:
@@ -643,8 +728,9 @@ def main() -> None:
     parser.add_argument("--runtime-dir", type=Path, required=True)
     parser.add_argument("--external-skill-path", type=Path, required=True)
     parser.add_argument("--worker-package", type=Path, required=True)
-    parser.add_argument("--policy-observation", type=Path, required=True)
+    parser.add_argument("--control-profile", required=True)
     parser.add_argument("--profile", required=True)
+    parser.add_argument("--role-name", required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=240)

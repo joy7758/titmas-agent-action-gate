@@ -22,6 +22,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from .canonical import sha256_file, sha256_json
+from .cloud_context import credential_from_policy_observation
 from .contracts import validate_action_request, validate_contract
 from .evidence import AgentEvidenceAdapter
 
@@ -32,6 +33,8 @@ SOURCE_LOCK_RELATIVE_PATH = "governance/alibabacloud-resourcecenter-search-sourc
 RUNNER_RELATIVE_PATH = "scripts/run_alibabacloud_skill_evaluation.py"
 VALIDATOR_RELATIVE_PATH = "src/titmas_action_gate/public_evidence.py"
 HISTORICAL_ADAPTER_SHA256 = "b93d95d26216642885f0bbe03ff8ecf5ebb37227dbf10f9bc72556e3a0e73d54"
+HISTORICAL_RUNNER_SHA256 = "c6890bb7865bbf0fab7baac42cc79806a0eabf92e51bcf41f8279cfb88347aaa"
+HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256 = "a68ec44f560ea50dd0366bcc7c0ab0de378480ca2dfd744a4e5434e218d3a498"
 
 
 def workspace_content_provenance(root: Path) -> dict[str, Any]:
@@ -95,16 +98,76 @@ def workspace_provenance(root: Path) -> dict[str, Any]:
     }
 
 
+def workspace_provenance_v02(root: Path) -> dict[str, Any]:
+    """Capture current provenance for future v0.2 same-run evidence."""
+
+    provenance = workspace_provenance(root)
+    provenance.update(
+        {
+            "result_schema_sha256": sha256_file(root / "schemas/cloud-context-result.v0.2.schema.json"),
+            "policy_observation_schema_sha256": sha256_file(
+                root / "schemas/alibabacloud-ram-policy-observation.v0.2.schema.json"
+            ),
+            "public_evidence_schema_sha256": sha256_file(
+                root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json"
+            ),
+        }
+    )
+    return provenance
+
+
 def _schema_issues(root: Path, evidence: dict[str, Any]) -> list[str]:
-    paths = [
-        root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json",
-        root / "schemas/cloud-context-result.v0.1.schema.json",
-        root / "schemas/alibabacloud-ram-policy-observation.v0.1.schema.json",
-    ]
+    version = "v0.1" if evidence.get("schema_version") == "0.1.0" else "v0.2"
+    paths = list((root / "schemas").glob("*.schema.json"))
     schemas = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema)) for schema in schemas)
-    errors = Draft202012Validator(schemas[0], registry=registry).iter_errors(evidence)
+    root_schema = next(schema for schema in schemas if schema["$id"].endswith(f"alibabacloud-resourcecenter-runtime-evidence.{version}.schema.json"))
+    errors = Draft202012Validator(root_schema, registry=registry).iter_errors(evidence)
     return [f"SCHEMA:{'.'.join(str(part) for part in error.path) or 'root'}:{error.message}" for error in errors]
+
+
+def _v02_policy_binding_issues(evidence: dict[str, Any]) -> list[str]:
+    """Recompute same-run, freshness, digest, and cloud-result bindings for v0.2."""
+
+    issues: list[str] = []
+    observation = evidence["permission_observation"]
+    if sha256_json(observation) != evidence["provenance"]["policy_observation_sha256"]:
+        issues.append("POLICY_OBSERVATION_INLINE_DIGEST_MISMATCH")
+    run_ids = {item["run_id"] for item in evidence["security_chain"]["events"]}
+    if len(run_ids) != 1:
+        issues.append("SECURITY_CHAIN_RUN_SCOPE_INVALID")
+        return issues
+    expected_run_id = next(iter(run_ids))
+    try:
+        assessed_at = datetime.fromisoformat(evidence["observed_at"].replace("Z", "+00:00"))
+        with tempfile.TemporaryDirectory(prefix="titmas-public-policy-binding-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation, sort_keys=True), encoding="utf-8")
+            credential, _ = credential_from_policy_observation(
+                "validator-profile",
+                path,
+                assessed_at=assessed_at,
+                expected_run_id=expected_run_id,
+            )
+        if credential.policy_observation_freshness != "FRESH":
+            issues.append("PERMISSION_OBSERVATION_NOT_FRESH")
+        if not credential.same_run_policy_readback_verified:
+            issues.append("PERMISSION_OBSERVATION_NOT_SAME_RUN")
+        cloud_credential = evidence["cloud_context"]["credential"]
+        if cloud_credential["permission_identity_ref"] != credential.permission_identity_ref:
+            issues.append("PERMISSION_IDENTITY_BINDING_MISMATCH")
+        if cloud_credential["permission_role_ref"] != credential.permission_role_opaque_ref:
+            issues.append("PERMISSION_ROLE_BINDING_MISMATCH")
+        if cloud_credential["permission_policy_ref"] != credential.permission_policy_opaque_ref:
+            issues.append("PERMISSION_POLICY_BINDING_MISMATCH")
+        checks = {item["check_id"]: item["passed"] for item in evidence["cloud_context"]["checks"]}
+        if checks.get("POLICY_OBSERVATION_FRESH") is not True:
+            issues.append("CLOUD_CONTEXT_FRESHNESS_CHECK_MISSING")
+        if checks.get("SAME_RUN_POLICY_READBACK") is not True:
+            issues.append("CLOUD_CONTEXT_SAME_RUN_CHECK_MISSING")
+    except Exception as exc:
+        issues.append(f"PERMISSION_OBSERVATION_BINDING:{type(exc).__name__}")
+    return issues
 
 
 def _record_chain_issues(records: list[dict[str, Any]]) -> list[str]:
@@ -165,44 +228,67 @@ def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
 
     try:
         validate_action_request(evidence["action_request"])
-        validate_contract("cloud_context_result", evidence["cloud_context"])
+        historical = evidence.get("schema_version") == "0.1.0"
+        validate_contract("cloud_context_result_v01" if historical else "cloud_context_result", evidence["cloud_context"])
         validate_contract("evidence_result", evidence["agent_evidence_receipt"])
-        validate_contract("alibabacloud_ram_policy_observation", evidence["permission_observation"])
+        validate_contract(
+            "alibabacloud_ram_policy_observation_v01" if historical else "alibabacloud_ram_policy_observation",
+            evidence["permission_observation"],
+        )
     except Exception as exc:
         issues.append(f"CONTRACT:{type(exc).__name__}")
 
     expected_provenance = workspace_content_provenance(root)
+    if evidence.get("schema_version") == "0.2.0":
+        expected_provenance.update(
+            {
+                "result_schema_sha256": sha256_file(root / "schemas/cloud-context-result.v0.2.schema.json"),
+                "policy_observation_schema_sha256": sha256_file(root / "schemas/alibabacloud-ram-policy-observation.v0.2.schema.json"),
+                "public_evidence_schema_sha256": sha256_file(root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json"),
+            }
+        )
     for key, expected in expected_provenance.items():
-        if key in {"workspace_manifest_sha256", "public_evidence_validator_sha256"}:
+        if key in {"workspace_manifest_sha256", "public_evidence_validator_sha256"} or (
+            evidence.get("schema_version") == "0.2.0" and key == "policy_observation_sha256"
+        ):
             # These are historical capture metadata. The exact public artifact
             # is frozen by the four-file evidence-set manifest, while live
             # verification uses the stable per-file source digests below.
             continue
         observed = evidence["provenance"].get(key)
-        if key == "adapter_sha256" and observed == HISTORICAL_ADAPTER_SHA256:
+        historical_digests = {
+            "adapter_sha256": HISTORICAL_ADAPTER_SHA256,
+            "runner_sha256": HISTORICAL_RUNNER_SHA256,
+            "policy_observation_producer_sha256": HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256,
+        }
+        if observed == historical_digests.get(key):
             continue
         if observed != expected:
             issues.append(f"PROVENANCE_MISMATCH:{key}")
 
-    try:
-        native = json.loads((root / NATIVE_EVIDENCE_RELATIVE_PATH).read_text(encoding="utf-8"))
-        capture_base = evidence["provenance"]["base_commit"]
-        if capture_base != native["source"]["repository_base_commit"]:
-            issues.append("PROVENANCE_CAPTURE_BASE_MISMATCH")
-        ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", capture_base, "HEAD"],
-            cwd=root,
-            check=False,
-            capture_output=True,
-        )
-        if ancestor.returncode != 0:
-            issues.append("PROVENANCE_CAPTURE_BASE_NOT_ANCESTOR")
-    except (OSError, KeyError, json.JSONDecodeError):
-        issues.append("PROVENANCE_CAPTURE_BASE_UNVERIFIABLE")
+    if evidence.get("schema_version") == "0.1.0":
+        try:
+            native = json.loads((root / NATIVE_EVIDENCE_RELATIVE_PATH).read_text(encoding="utf-8"))
+            capture_base = evidence["provenance"]["base_commit"]
+            if capture_base != native["source"]["repository_base_commit"]:
+                issues.append("PROVENANCE_CAPTURE_BASE_MISMATCH")
+            ancestor = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", capture_base, "HEAD"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+            )
+            if ancestor.returncode != 0:
+                issues.append("PROVENANCE_CAPTURE_BASE_NOT_ANCESTOR")
+        except (OSError, KeyError, json.JSONDecodeError):
+            issues.append("PROVENANCE_CAPTURE_BASE_UNVERIFIABLE")
 
-    observed_policy = json.loads((root / POLICY_OBSERVATION_RELATIVE_PATH).read_text(encoding="utf-8"))
-    if evidence["permission_observation"] != observed_policy:
-        issues.append("POLICY_OBSERVATION_INLINE_MISMATCH")
+    if evidence.get("schema_version") == "0.1.0":
+        observed_policy = json.loads((root / POLICY_OBSERVATION_RELATIVE_PATH).read_text(encoding="utf-8"))
+        if evidence["permission_observation"] != observed_policy:
+            issues.append("POLICY_OBSERVATION_INLINE_MISMATCH")
+    else:
+        issues.extend(_v02_policy_binding_issues(evidence))
     if evidence["cloud_context"]["skill"]["source_lock_sha256"] != expected_provenance["source_lock_sha256"]:
         issues.append("SOURCE_LOCK_CLOUD_CONTEXT_MISMATCH")
 

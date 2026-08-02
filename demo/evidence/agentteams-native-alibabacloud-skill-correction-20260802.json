@@ -1,0 +1,29 @@
+{
+  "$schema": "../../schemas/native-agentteams-cloud-skill-correction.v0.1.schema.json",
+  "schema_version": "0.1.0",
+  "correction_id": "TITMAS-AAG-NATIVE-ALIBABACLOUD-CORRECTION-20260802-001",
+  "recorded_at": "2026-08-02T10:37:38Z",
+  "original_evidence": {
+    "path": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json",
+    "sha256": "9dac679c4045050ae72c6f9d59fa56d5534343e1d1a937bf7cc9e96eb074b1e6"
+  },
+  "credential_rotation": {
+    "original_json_pointer": "/native_runtime/prior_exposed_disposable_worker_credential_rotated_before_run",
+    "original_assertion": true,
+    "corrected_status": "UNKNOWN",
+    "reason": "PRIOR_CREDENTIAL_DIGEST_NOT_RETAINED_COMPARISON_UNAVAILABLE"
+  },
+  "policy_observation_freshness": {
+    "observation_path": "governance/alibabacloud-ram-policy-observation-20260802.json",
+    "observation_sha256": "0f96840f957667994e562b1792758ac205b54b596be3566668f598f457cb536f",
+    "observed_at": "2026-08-02T06:49:42.052182Z",
+    "evidence_observed_at": "2026-08-02T08:26:13.914875Z",
+    "age_seconds": 5791.862693,
+    "maximum_age_seconds": 900,
+    "status": "STALE",
+    "same_run_readback": "NOT_PROVEN",
+    "historical_replay": "STRUCTURALLY_VALID_RELEASE_INELIGIBLE"
+  },
+  "credential_bytes_retained": false,
+  "authority_effect": "NONE"
+}

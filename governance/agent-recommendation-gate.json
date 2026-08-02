@@ -1,20 +1,20 @@
 {
-  "gate_version": "1.7.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-008",
-  "evaluated_at": "2026-08-02T17:46:10+08:00",
+  "gate_version": "1.8.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260802-009",
+  "evaluated_at": "2026-08-02T19:26:00+08:00",
   "evaluator_class": "AI_AGENT",
   "development_context": {
-    "task_scope": "ADDRESS_PR_3_INSTALLED_DATA_RESOURCES_AND_PERMISSION_CLASSIFICATION_REVIEW_FINDINGS",
+    "task_scope": "ADDRESS_PR_3_CREDENTIAL_ROTATION_RAM_FRESHNESS_AND_RESOURCE_ITEM_REVIEW_FINDINGS",
     "branch": "codex/close-m4-runtime-blockers",
-    "base_commit": "2944c7f1159e23816ae62137d737480a65af3d22",
-    "request_source": "DIRECT_USER_AUTHORIZATION_20260802_PR_3_REVIEW_FIX",
-    "request_sha256": "UNKNOWN_NOT_FILE_BACKED",
-    "implementation_boundary": "MINIMAL_CODE_AND_REGRESSION_TEST_FIX_COMMIT_PUSH_AND_CODEX_REREVIEW_REQUEST_ONLY",
+    "base_commit": "5ea0204646737ce5cae816d620202482f26fa15d",
+    "request_source": "ATTACHED_DIRECT_USER_AUTHORIZATION_20260802_PR_3_SECOND_REVIEW_FIX",
+    "request_sha256": "8e9d9a4078742e5bf4cfbb2cdef97a010490e1cd44c404b89637a2b00dc517c2",
+    "implementation_boundary": "MINIMAL_CODE_SCHEMA_APPEND_ONLY_CORRECTION_REGRESSION_TEST_COMMIT_PUSH_THREAD_RESOLUTION_AND_CODEX_REREVIEW_ONLY",
     "external_read_authorized": true,
     "external_write_authorized": true,
     "external_write_executed": false,
     "prior_iam_provisioning_external_write_executed": true,
-    "authorized_external_writes": ["GIT_BRANCH_PUSH", "GITHUB_CODEX_REREVIEW_REQUEST"],
+    "authorized_external_writes": ["GIT_BRANCH_PUSH", "GITHUB_PR_TRUTH_BOUNDARY_UPDATE", "GITHUB_REVIEW_THREAD_RESOLUTION_AFTER_GREEN_CI", "GITHUB_CODEX_REREVIEW_REQUEST"],
     "prohibited_external_writes": ["PULL_REQUEST_MERGE", "RELEASE", "DEPLOYMENT", "GOAI_SUBMISSION"]
   },
   "customer_need": "Prevent an agent in a competition dialogue or delegated workflow from crossing an explicit action boundary without an auditable decision and authorization reference.",
@@ -24,6 +24,14 @@
     "reason": "Bounded development is recommended for one disposable native AgentTeams cloud-context-inspector turn because the external Skill installation is source-locked, the existing adapter admits only the frozen read-only Resource Center query, credentials remain server-side, EMPTY_RESULT is an acceptable observation, and the Worker has no decision authority. Current product use remains not recommended because this task does not establish a persistent deployment, broader autonomous M4 completion, upstream redistribution permission, production credential lifecycle controls, or independent security review."
   },
   "advisory_agent_reviews": [
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_3_CREDENTIAL_ROTATION_RAM_FRESHNESS_AND_RESOURCE_ITEM_VALIDATION",
+      "result": "THREE_NEW_P2_FINDINGS_FIXED_LOCALLY_WITH_APPEND_ONLY_CORRECTION_AND_138_TESTS_CI_PENDING",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
     {
       "agent": "GitHub Codex review",
       "executed": true,
@@ -220,6 +228,12 @@
     ,"REAL_EMPTY_RESULT_INTERPRETED_AS_NOT_ASSESSED_NO_VISIBLE_RESOURCE"
     ,"NATIVE_CLOUD_WORKER_ZERO_DECISION_RECORDS_AND_ZERO_RESOURCECENTER_WRITES_VERIFIED"
     ,"ALIBABA_CLOUD_SKILL_SUBMILESTONE_COMPLETE_WITH_FOUR_FILE_EVIDENCE_SET"
+    ,"HISTORICAL_NATIVE_CREDENTIAL_ROTATION_CLAIM_CORRECTED_TO_UNKNOWN_APPEND_ONLY"
+    ,"FUTURE_NATIVE_WORKER_CREDENTIAL_ROTATION_BOUND_TO_LIVE_PRE_AND_POST_APPLY_READBACK"
+    ,"FUTURE_RAM_POLICY_OBSERVATION_BOUND_TO_ORDERED_SAME_RUN_CAPTURE_AND_900_SECOND_MAXIMUM_AGE"
+    ,"RESOURCECENTER_NONEMPTY_ITEMS_REQUIRE_NONEMPTY_RESOURCE_ID_AND_RESOURCE_TYPE"
+    ,"FUTURE_ADAPTER_AND_NATIVE_RUNNERS_CAPTURE_RAM_POLICY_INSIDE_UNPREDICTABLE_RUN_SCOPE"
+    ,"EVIDENCE_OUTPUTS_ATOMICALLY_RESERVED_BEFORE_PROVIDER_EFFECTS"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",

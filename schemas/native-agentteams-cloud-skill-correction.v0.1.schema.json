@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/native-agentteams-cloud-skill-correction.v0.1.schema.json",
+  "title": "Append-only correction for native Alibaba Cloud Skill evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "correction_id", "recorded_at", "original_evidence", "credential_rotation",
+    "policy_observation_freshness", "credential_bytes_retained", "authority_effect"
+  ],
+  "properties": {
+    "$schema": {"const": "../../schemas/native-agentteams-cloud-skill-correction.v0.1.schema.json"},
+    "schema_version": {"const": "0.1.0"},
+    "correction_id": {"const": "TITMAS-AAG-NATIVE-ALIBABACLOUD-CORRECTION-20260802-001"},
+    "recorded_at": {"type": "string", "format": "date-time"},
+    "original_evidence": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "credential_rotation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["original_json_pointer", "original_assertion", "corrected_status", "reason"],
+      "properties": {
+        "original_json_pointer": {"const": "/native_runtime/prior_exposed_disposable_worker_credential_rotated_before_run"},
+        "original_assertion": {"const": true},
+        "corrected_status": {"const": "UNKNOWN"},
+        "reason": {"const": "PRIOR_CREDENTIAL_DIGEST_NOT_RETAINED_COMPARISON_UNAVAILABLE"}
+      }
+    },
+    "policy_observation_freshness": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "observation_path", "observation_sha256", "observed_at", "evidence_observed_at", "age_seconds",
+        "maximum_age_seconds", "status", "same_run_readback", "historical_replay"
+      ],
+      "properties": {
+        "observation_path": {"const": "governance/alibabacloud-ram-policy-observation-20260802.json"},
+        "observation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "evidence_observed_at": {"type": "string", "format": "date-time"},
+        "age_seconds": {"type": "number", "exclusiveMinimum": 900},
+        "maximum_age_seconds": {"const": 900},
+        "status": {"const": "STALE"},
+        "same_run_readback": {"const": "NOT_PROVEN"},
+        "historical_replay": {"const": "STRUCTURALLY_VALID_RELEASE_INELIGIBLE"}
+      }
+    },
+    "credential_bytes_retained": {"const": false},
+    "authority_effect": {"const": "NONE"}
+  }
+}

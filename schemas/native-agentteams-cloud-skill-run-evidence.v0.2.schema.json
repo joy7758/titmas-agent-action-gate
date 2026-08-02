@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/native-agentteams-cloud-skill-run-evidence.v0.2.schema.json",
+  "title": "Native AgentTeams external Alibaba Cloud Skill run evidence v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "run_id", "observed_at", "source", "action_request", "native_runtime",
+    "skill_load", "package_boundary", "frozen_query", "cloud_context", "agent_evidence_profile",
+    "permission_observation", "permission_observation_sha256", "agent_evidence_receipt", "trace", "authority",
+    "effects", "secrets", "exit_criteria", "non_claims"
+  ],
+  "properties": {
+    "$schema": {"const": "../../schemas/native-agentteams-cloud-skill-run-evidence.v0.2.schema.json"},
+    "schema_version": {"const": "0.2.0"},
+    "run_id": {"type": "string", "pattern": "^run-[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"},
+    "observed_at": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/observed_at"},
+    "source": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/source"},
+    "action_request": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/action_request"},
+    "native_runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification", "worker", "worker_container", "prompt_event_id", "response_events", "initial_prompt_count",
+        "operator_followup_prompt_count", "matrix_turn_trace", "mcp_surface", "current_worker_credential_ref",
+        "prior_worker_credential_ref", "prior_worker_credential_ref_source", "current_worker_credential_ref_source",
+        "prior_worker_credential_rotation_status"
+      ],
+      "properties": {
+        "classification": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/classification"},
+        "worker": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/worker"},
+        "worker_container": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/worker_container"},
+        "prompt_event_id": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/prompt_event_id"},
+        "response_events": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/response_events"},
+        "initial_prompt_count": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/initial_prompt_count"},
+        "operator_followup_prompt_count": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/operator_followup_prompt_count"},
+        "matrix_turn_trace": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/matrix_turn_trace"},
+        "mcp_surface": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/mcp_surface"},
+        "current_worker_credential_ref": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/native_runtime/properties/current_worker_credential_ref"},
+        "prior_worker_credential_ref": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+        "prior_worker_credential_ref_source": {"enum": ["LIVE_PRE_APPLY_READBACK", "NOT_AVAILABLE"]},
+        "current_worker_credential_ref_source": {"const": "LIVE_POST_APPLY_READBACK"},
+        "prior_worker_credential_rotation_status": {
+          "enum": ["VERIFIED_ROTATED", "VERIFIED_UNCHANGED", "UNKNOWN", "NOT_APPLICABLE"]
+        }
+      }
+    },
+    "skill_load": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/skill_load"},
+    "package_boundary": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/package_boundary"},
+    "frozen_query": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/frozen_query"},
+    "cloud_context": {"$ref": "./cloud-context-result.v0.2.schema.json"},
+    "permission_observation": {"$ref": "./alibabacloud-ram-policy-observation.v0.2.schema.json"},
+    "permission_observation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "agent_evidence_profile": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/agent_evidence_profile"},
+    "agent_evidence_receipt": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/agent_evidence_receipt"},
+    "trace": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/trace"},
+    "authority": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/authority"},
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effect_scope", "resourcecenter_read_api_calls", "runtime_sts_identity_read_api_calls",
+        "permission_observation_cloud_read_calls", "permission_observation_local_cli_config_writes",
+        "resourcecenter_write_api_calls", "cloud_resource_write_executed",
+        "cloud_resource_created_for_nonempty_result", "prior_setup_iam_control_plane_write_executed"
+      ],
+      "properties": {
+        "effect_scope": {"const": "NATIVE_WORKER_TURN_AND_SAME_RUN_PERMISSION_OBSERVATION"},
+        "resourcecenter_read_api_calls": {"const": 1},
+        "runtime_sts_identity_read_api_calls": {"const": 1},
+        "permission_observation_cloud_read_calls": {"const": 4},
+        "permission_observation_local_cli_config_writes": {"const": 3},
+        "resourcecenter_write_api_calls": {"const": 0},
+        "cloud_resource_write_executed": {"const": false},
+        "cloud_resource_created_for_nonempty_result": {"const": false},
+        "prior_setup_iam_control_plane_write_executed": {"const": true}
+      }
+    },
+    "secrets": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/secrets"},
+    "exit_criteria": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/exit_criteria"},
+    "non_claims": {"$ref": "./native-agentteams-cloud-skill-run-evidence.v0.1.schema.json#/properties/non_claims"}
+  }
+}

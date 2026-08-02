@@ -175,7 +175,12 @@ def main() -> int:
         "runtime-scope.v0.1.schema.json",
         "cloud-context-query.v0.1.schema.json",
         "cloud-context-result.v0.1.schema.json",
+        "cloud-context-result.v0.2.schema.json",
+        "alibabacloud-ram-policy-observation.v0.2.schema.json",
         "native-agentteams-cloud-skill-run-evidence.v0.1.schema.json",
+        "native-agentteams-cloud-skill-run-evidence.v0.2.schema.json",
+        "native-agentteams-cloud-skill-correction.v0.1.schema.json",
+        "alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json",
         "native-runtime-mcp-manifest.v0.2.schema.json",
     ]
     validators: dict[str, Draft202012Validator] = {}

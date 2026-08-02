@@ -12,6 +12,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import patch
 
+from scripts.capture_alibabacloud_ram_policy_observation import build_sanitized_observation
 from titmas_action_gate.canonical import sha256_file, sha256_json
 from titmas_action_gate.cloud_context import (
     OFFICIAL_ALIYUN_CLI_SHA256,
@@ -25,6 +26,7 @@ from titmas_action_gate.cloud_context import (
     credential_from_policy_observation,
     is_semantically_usable_cloud_context,
 )
+from titmas_action_gate.contracts import validate_contract
 from titmas_action_gate.errors import ContractValidationError
 from titmas_action_gate.service import ActionGateService
 
@@ -82,6 +84,8 @@ def credential(*, verified: bool = True) -> CloudCredentialContext:
         permission_role_ref="sha256:" + "c" * 64,
         permission_policy_ref="AliyunResourceCenterReadOnlyAccess",
         read_only_policy_verified=verified,
+        policy_observation_freshness="FRESH",
+        same_run_policy_readback_verified=True,
     )
 
 
@@ -100,6 +104,48 @@ def available_execution() -> CliExecution:
 
 
 class CloudContextBoundaryTests(unittest.TestCase):
+    @staticmethod
+    def _fresh_v02_policy_observation(run_id: str, observed_at: datetime) -> dict:
+        actions = sorted(
+            {
+                "resourcecenter:ExecuteMultiAccountSQLQuery",
+                "resourcecenter:ExecuteSQLQuery",
+                "resourcecenter:Get*",
+                "resourcecenter:List*",
+                "resourcecenter:Search*",
+                "tag:ListTag*",
+            }
+        )
+        return build_sanitized_observation(
+            run_id=run_id,
+            capture_id="sha256:" + "e" * 64,
+            started_at=observed_at,
+            completed_at=observed_at,
+            trace_observed_at=(observed_at, observed_at, observed_at, observed_at),
+            role_name="test-role",
+            policy_payload={"Policy": {"DefaultVersion": "v2"}, "RequestId": "policy-request"},
+            policy_version_payload={
+                "PolicyVersion": {
+                    "PolicyDocument": {
+                        "Version": "1",
+                        "Statement": [{"Effect": "Allow", "Action": actions, "Resource": "*"}],
+                    }
+                },
+                "RequestId": "version-request",
+            },
+            attachments_payload={
+                "Policies": {
+                    "Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]
+                },
+                "RequestId": "attachments-request",
+            },
+            identity_payload={
+                "IdentityType": "AssumedRoleUser",
+                "Arn": "acs:sts::opaque:assumed-role/test-role/session",
+                "RequestId": "identity-request",
+            },
+        )
+
     def test_cli_command_pins_official_endpoint_and_runtime_profile(self) -> None:
         argv = AliyunCliReadOnlyExecutor._search_argv("/usr/local/bin/aliyun", confirmed_query(), credential())
         self.assertEqual(argv[:3], ["/usr/local/bin/aliyun", "resourcecenter", "search-resources"])
@@ -164,6 +210,11 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(result.status, "INVOCATION_FAILED")
         self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
 
+    def test_empty_resource_object_is_rejected(self) -> None:
+        result = self._resource_search_execution({"Resources": [{}]})
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
     def test_empty_resources_remain_a_valid_empty_result(self) -> None:
         result = self._resource_search_execution({"Resources": [], "RequestId": "opaque"})
         self.assertEqual(result.status, "NOT_ASSESSED_NO_VISIBLE_RESOURCE")
@@ -180,6 +231,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
             {
                 "Resources": [
                     {
+                        "ResourceId": "i-visible-001",
                         "ResourceName": "Forbidden is ordinary resource data",
                         "ResourceType": "ACS::ECS::Instance",
                         "RegionId": "cn-test",
@@ -191,6 +243,56 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
         self.assertEqual(result.returned_resource_count, 1)
 
+    def test_resource_id_must_be_a_nonempty_string(self) -> None:
+        missing = object()
+        for value in (missing, None, "", "   ", 7):
+            with self.subTest(value=value):
+                resource = {"ResourceType": "ACS::ECS::Instance"}
+                if value is not missing:
+                    resource["ResourceId"] = value
+                result = self._resource_search_execution({"Resources": [resource]})
+                self.assertEqual(result.status, "INVOCATION_FAILED")
+                self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
+    def test_resource_type_must_be_a_nonempty_string(self) -> None:
+        missing = object()
+        for value in (missing, None, "", "   ", 7):
+            with self.subTest(value=value):
+                resource = {"ResourceId": "i-visible-001"}
+                if value is not missing:
+                    resource["ResourceType"] = value
+                result = self._resource_search_execution({"Resources": [resource]})
+                self.assertEqual(result.status, "INVOCATION_FAILED")
+                self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
+    def test_valid_resource_identity_and_type_is_accepted(self) -> None:
+        result = self._resource_search_execution(
+            {"Resources": [{"ResourceId": "i-visible-001", "ResourceType": "ACS::ECS::Instance"}]}
+        )
+        self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
+        self.assertEqual(result.returned_resource_count, 1)
+
+    def test_lower_camel_resource_identity_and_type_are_accepted(self) -> None:
+        result = self._resource_search_execution(
+            {"Resources": [{"resourceId": "i-visible-001", "resourceType": "ACS::ECS::Instance"}]}
+        )
+        self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
+
+    def test_invalid_canonical_resource_identity_is_not_masked_by_alias(self) -> None:
+        result = self._resource_search_execution(
+            {
+                "Resources": [
+                    {
+                        "ResourceId": " ",
+                        "resourceId": "i-visible-001",
+                        "ResourceType": "ACS::ECS::Instance",
+                    }
+                ]
+            }
+        )
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
+
     def test_structured_access_denied_provider_error_remains_permission_denied(self) -> None:
         result = self._resource_search_execution(
             {"Code": "AccessDenied", "Message": "redacted"},
@@ -198,6 +300,14 @@ class CloudContextBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(result.status, "NOT_ASSESSED_PERMISSION_DENIED")
         self.assertEqual(result.uncertainty, ("RAM_PERMISSION_DENIED",))
+
+    def test_non_permission_provider_failure_remains_generic_invocation_failure(self) -> None:
+        result = self._resource_search_execution(
+            {"Code": "Throttling", "Message": "ordinary provider failure"},
+            returncode=1,
+        )
+        self.assertEqual(result.status, "INVOCATION_FAILED")
+        self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_FAILED_REDACTED",))
 
     def test_policy_observation_rejects_extra_attachment(self) -> None:
         observation = json.loads((ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8"))
@@ -217,6 +327,176 @@ class CloudContextBoundaryTests(unittest.TestCase):
             path.write_text(json.dumps(observation), encoding="utf-8")
             with self.assertRaises(ValueError):
                 credential_from_policy_observation("runtime-profile", path)
+
+    def test_stale_policy_observation_fails_closed_before_provider_call(self) -> None:
+        path = ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json"
+        assessed_at = datetime(2026, 8, 2, 7, 4, 43, tzinfo=UTC)
+        cloud_credential, _ = credential_from_policy_observation(
+            "runtime-profile",
+            path,
+            assessed_at=assessed_at,
+            expected_run_id="run-native-alibaba-cloud-20260802-001",
+        )
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-stale-policy",
+            confirmed_query(),
+            cloud_credential,
+            observed_at=assessed_at,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED_POLICY_OBSERVATION_STALE")
+        self.assertIn("POLICY_OBSERVATION_MAXIMUM_AGE_EXCEEDED", result["uncertainty"])
+        self.assertEqual(executor.calls, 0)
+
+    def test_future_dated_policy_observation_fails_closed_before_provider_call(self) -> None:
+        path = ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json"
+        assessed_at = datetime(2026, 8, 2, 6, 49, 41, tzinfo=UTC)
+        cloud_credential, _ = credential_from_policy_observation(
+            "runtime-profile",
+            path,
+            assessed_at=assessed_at,
+            expected_run_id="run-native-alibaba-cloud-20260802-001",
+        )
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-future-policy",
+            confirmed_query(),
+            cloud_credential,
+            observed_at=assessed_at,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED_POLICY_OBSERVATION_STALE")
+        self.assertIn("POLICY_OBSERVATION_FUTURE_DATED", result["uncertainty"])
+        self.assertEqual(executor.calls, 0)
+
+    def test_fresh_different_run_policy_observation_fails_closed_before_provider_call(self) -> None:
+        assessed_at = datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-policy-source-001", assessed_at)
+        with tempfile.TemporaryDirectory(prefix="titmas-different-run-policy-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            cloud_credential, _ = credential_from_policy_observation(
+                "runtime-profile",
+                path,
+                assessed_at=assessed_at,
+                expected_run_id="run-different-preflight-001",
+            )
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-different-run-policy",
+            confirmed_query(),
+            cloud_credential,
+            observed_at=assessed_at,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED")
+        self.assertIn("POLICY_OBSERVATION_NOT_SAME_RUN", result["uncertainty"])
+        self.assertEqual(executor.calls, 0)
+
+    def test_policy_observation_freshness_is_rechecked_at_invocation(self) -> None:
+        policy_time = datetime(2026, 8, 2, 6, 49, 42, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-policy-aging-test-001", policy_time)
+        with tempfile.TemporaryDirectory(prefix="titmas-aging-policy-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            cloud_credential, _ = credential_from_policy_observation(
+                "runtime-profile",
+                path,
+                assessed_at=datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC),
+                expected_run_id=observation["capture"]["run_id"],
+            )
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-aged-before-use",
+            confirmed_query(),
+            cloud_credential,
+            observed_at=datetime(2026, 8, 2, 7, 4, 43, tzinfo=UTC),
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED_POLICY_OBSERVATION_STALE")
+        self.assertEqual(executor.calls, 0)
+
+    def test_historical_policy_observation_is_reviewable_but_release_ineligible(self) -> None:
+        observation = json.loads(
+            (ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8")
+        )
+        validate_contract("alibabacloud_ram_policy_observation_v01", observation)
+        historical = json.loads(
+            (ROOT / "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json").read_text(encoding="utf-8")
+        )["cloud_context"]
+        validate_contract("cloud_context_result_v01", historical)
+        self.assertFalse(is_semantically_usable_cloud_context(historical))
+
+    def test_fresh_same_run_policy_readback_can_satisfy_freshness_checks(self) -> None:
+        assessed_at = datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-fresh-policy-readback-001", assessed_at)
+        with tempfile.TemporaryDirectory(prefix="titmas-fresh-policy-observation-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            cloud_credential, _ = credential_from_policy_observation(
+                "runtime-profile",
+                path,
+                assessed_at=assessed_at,
+                expected_run_id=observation["capture"]["run_id"],
+            )
+        result = CloudContextInspector(ROOT, FakeExecutor(available_execution())).inspect(
+            "aar-cloud-context-fresh-policy",
+            confirmed_query(),
+            cloud_credential,
+            observed_at=assessed_at,
+        )
+        self.assertTrue(is_semantically_usable_cloud_context(result))
+
+    def test_relabelled_legacy_observation_is_rejected(self) -> None:
+        observation = json.loads(
+            (ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8")
+        )
+        observation.update(
+            {
+                "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.2.schema.json",
+                "schema_version": "0.2.0",
+            }
+        )
+        with tempfile.TemporaryDirectory(prefix="titmas-relabeled-policy-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            with self.assertRaises(ContractValidationError):
+                credential_from_policy_observation(
+                    "runtime-profile",
+                    path,
+                    assessed_at=datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC),
+                    expected_run_id="run-relabeled-policy-001",
+                )
+
+    def test_recombined_capture_trace_is_rejected(self) -> None:
+        assessed_at = datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-recombined-policy-001", assessed_at)
+        observation["read_trace"][2]["capture_id"] = "sha256:" + "f" * 64
+        with tempfile.TemporaryDirectory(prefix="titmas-recombined-policy-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "POLICY_OBSERVATION_CAPTURE_INVALID"):
+                credential_from_policy_observation(
+                    "runtime-profile",
+                    path,
+                    assessed_at=assessed_at,
+                    expected_run_id=observation["capture"]["run_id"],
+                )
+
+    def test_unassessed_policy_context_never_invokes_provider(self) -> None:
+        cloud_credential = CloudCredentialContext(
+            profile_name="runtime-profile",
+            permission_identity="sha256:" + "a" * 64,
+            permission_role_ref="sha256:" + "b" * 64,
+            permission_policy_ref="sha256:" + "c" * 64,
+            read_only_policy_verified=True,
+        )
+        executor = FakeExecutor(available_execution())
+        result = CloudContextInspector(ROOT, executor).inspect(
+            "aar-cloud-context-policy-unassessed",
+            confirmed_query(),
+            cloud_credential,
+        )
+        self.assertEqual(result["status"], "NOT_ASSESSED")
+        self.assertIn("POLICY_OBSERVATION_NOT_ASSESSED", result["uncertainty"])
+        self.assertEqual(executor.calls, 0)
 
     def test_live_profile_identity_mismatch_blocks_before_resource_search(self) -> None:
         class ScriptedExecutor(AliyunCliReadOnlyExecutor):

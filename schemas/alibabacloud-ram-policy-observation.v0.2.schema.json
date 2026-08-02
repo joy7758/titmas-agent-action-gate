@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/alibabacloud-ram-policy-observation.v0.2.schema.json",
+  "title": "Sanitized same-run Alibaba Cloud RAM read-only policy observation v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "observed_at", "capture", "identity", "attachment", "policy", "read_trace", "effects"
+  ],
+  "properties": {
+    "$schema": {"const": "../schemas/alibabacloud-ram-policy-observation.v0.2.schema.json"},
+    "schema_version": {"const": "0.2.0"},
+    "observed_at": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json#/properties/observed_at"},
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capture_id", "run_id", "started_at", "completed_at", "mode"],
+      "properties": {
+        "capture_id": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "run_id": {"type": "string", "pattern": "^run-[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "completed_at": {"type": "string", "format": "date-time"},
+        "mode": {"const": "SAME_RUN_STS_AND_RAM_READBACK"}
+      }
+    },
+    "identity": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json#/properties/identity"},
+    "attachment": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json#/properties/attachment"},
+    "policy": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json#/properties/policy"},
+    "read_trace": {
+      "type": "array",
+      "prefixItems": [
+        {"$ref": "#/$defs/getPolicy"},
+        {"$ref": "#/$defs/getPolicyVersion"},
+        {"$ref": "#/$defs/listPoliciesForRole"},
+        {"$ref": "#/$defs/getCallerIdentity"}
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "effects": {"$ref": "./alibabacloud-ram-policy-observation.v0.1.schema.json#/properties/effects"}
+  },
+  "$defs": {
+    "traceBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "capture_id", "profile_scope", "operation", "observed_at", "exit_status", "request_id_ref"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1, "maximum": 4},
+        "capture_id": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "profile_scope": {"enum": ["CONTROL_RAM_READBACK", "QUERY_STS_IDENTITY"]},
+        "operation": {"enum": ["ram.GetPolicy", "ram.GetPolicyVersion", "ram.ListPoliciesForRole", "sts.GetCallerIdentity"]},
+        "observed_at": {"type": "string", "format": "date-time"},
+        "exit_status": {"const": 0},
+        "request_id_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      }
+    },
+    "getPolicy": {
+      "allOf": [
+        {"$ref": "#/$defs/traceBase"},
+        {"properties": {"sequence": {"const": 1}, "profile_scope": {"const": "CONTROL_RAM_READBACK"}, "operation": {"const": "ram.GetPolicy"}}}
+      ]
+    },
+    "getPolicyVersion": {
+      "allOf": [
+        {"$ref": "#/$defs/traceBase"},
+        {"properties": {"sequence": {"const": 2}, "profile_scope": {"const": "CONTROL_RAM_READBACK"}, "operation": {"const": "ram.GetPolicyVersion"}}}
+      ]
+    },
+    "listPoliciesForRole": {
+      "allOf": [
+        {"$ref": "#/$defs/traceBase"},
+        {"properties": {"sequence": {"const": 3}, "profile_scope": {"const": "CONTROL_RAM_READBACK"}, "operation": {"const": "ram.ListPoliciesForRole"}}}
+      ]
+    },
+    "getCallerIdentity": {
+      "allOf": [
+        {"$ref": "#/$defs/traceBase"},
+        {"properties": {"sequence": {"const": 4}, "profile_scope": {"const": "QUERY_STS_IDENTITY"}, "operation": {"const": "sts.GetCallerIdentity"}}}
+      ]
+    }
+  }
+}

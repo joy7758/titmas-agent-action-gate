@@ -17,16 +17,17 @@ from agent_evidence.crypto.chain import verify_chain as verify_agent_evidence_ch
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
-from titmas_action_gate.canonical import sha256_file
+from titmas_action_gate.canonical import sha256_file, sha256_json
+from titmas_action_gate.cloud_context import credential_from_policy_observation
 from titmas_action_gate.contracts import validate_action_request, validate_contract
 from titmas_action_gate.evidence import AgentEvidenceAdapter
 from titmas_action_gate.public_evidence import _record_chain_issues, _security_chain_issues
 from titmas_action_gate.skill_materialization import build_worker_packages, verify_worker_package
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = ROOT / "schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json"
-DEPENDENCY_SCHEMA = ROOT / "schemas/cloud-context-result.v0.1.schema.json"
 SOURCE_LOCK = ROOT / "governance/alibabacloud-resourcecenter-search-source-lock.json"
+CORRECTION = ROOT / "demo/evidence/agentteams-native-alibabacloud-skill-correction-20260802.json"
+CORRECTION_SCHEMA = ROOT / "schemas/native-agentteams-cloud-skill-correction.v0.1.schema.json"
 FROZEN_CONFIRMATION_REF = "confirmation:e3f602a4fd564910313383ab1f553d8317d06e4b440c1b49b600178a013d288c"
 
 
@@ -44,11 +45,108 @@ def _final_worker_summary(body: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def validate_correction(root: Path, correction: dict[str, Any]) -> list[str]:
+    """Validate the append-only correction without altering historical bytes."""
+
+    issues: list[str] = []
+    schema = json.loads((root / CORRECTION_SCHEMA.relative_to(ROOT)).read_text(encoding="utf-8"))
+    errors = Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(correction)
+    issues.extend(f"SCHEMA:{'.'.join(str(part) for part in error.path) or 'root'}:{error.message}" for error in errors)
+    if issues:
+        return issues
+    original_path = root / correction["original_evidence"]["path"]
+    observation_path = root / correction["policy_observation_freshness"]["observation_path"]
+    if not original_path.is_file() or sha256_file(original_path) != correction["original_evidence"]["sha256"]:
+        issues.append("ORIGINAL_EVIDENCE_DIGEST_MISMATCH")
+    if not observation_path.is_file() or sha256_file(observation_path) != correction["policy_observation_freshness"]["observation_sha256"]:
+        issues.append("POLICY_OBSERVATION_DIGEST_MISMATCH")
+    try:
+        original = json.loads(original_path.read_text(encoding="utf-8"))
+        observation = json.loads(observation_path.read_text(encoding="utf-8"))
+        if original["native_runtime"]["prior_exposed_disposable_worker_credential_rotated_before_run"] is not True:
+            issues.append("ORIGINAL_ROTATION_ASSERTION_MISMATCH")
+        if correction["policy_observation_freshness"]["observed_at"] != observation["observed_at"]:
+            issues.append("POLICY_OBSERVATION_TIMESTAMP_BINDING_MISMATCH")
+        if correction["policy_observation_freshness"]["evidence_observed_at"] != original["observed_at"]:
+            issues.append("ORIGINAL_EVIDENCE_TIMESTAMP_BINDING_MISMATCH")
+        observed_at = datetime.fromisoformat(correction["policy_observation_freshness"]["observed_at"].replace("Z", "+00:00"))
+        evidence_at = datetime.fromisoformat(correction["policy_observation_freshness"]["evidence_observed_at"].replace("Z", "+00:00"))
+        recorded_at = datetime.fromisoformat(correction["recorded_at"].replace("Z", "+00:00"))
+        if recorded_at < max(observed_at, evidence_at):
+            issues.append("CORRECTION_RECORDED_AT_PRECEDES_SOURCE_EVIDENCE")
+        if abs((evidence_at - observed_at).total_seconds() - correction["policy_observation_freshness"]["age_seconds"]) > 0.000001:
+            issues.append("POLICY_OBSERVATION_AGE_MISMATCH")
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        issues.append("CORRECTION_BINDING_UNVERIFIABLE")
+    return issues
+
+
+def validate_v02_runtime_bindings(evidence: dict[str, Any]) -> list[str]:
+    """Recompute v0.2 credential-rotation and same-run RAM observation claims."""
+
+    issues: list[str] = []
+    runtime = evidence["native_runtime"]
+    prior_ref = runtime["prior_worker_credential_ref"]
+    prior_source = runtime["prior_worker_credential_ref_source"]
+    current_ref = runtime["current_worker_credential_ref"]
+    if (prior_source == "LIVE_PRE_APPLY_READBACK") != isinstance(prior_ref, str):
+        issues.append("PRIOR_WORKER_CREDENTIAL_SOURCE_INCONSISTENT")
+    expected_rotation = "UNKNOWN"
+    if isinstance(prior_ref, str):
+        expected_rotation = "VERIFIED_UNCHANGED" if prior_ref == current_ref else "VERIFIED_ROTATED"
+    if runtime["prior_worker_credential_rotation_status"] != expected_rotation:
+        issues.append("WORKER_CREDENTIAL_ROTATION_STATUS_MISMATCH")
+    if runtime["prior_worker_credential_rotation_status"] != "VERIFIED_ROTATED":
+        issues.append("WORKER_CREDENTIAL_ROTATION_NOT_VERIFIED")
+
+    observation = evidence["permission_observation"]
+    observation_digest = sha256_json(observation)
+    if observation_digest != evidence["permission_observation_sha256"]:
+        issues.append("PERMISSION_OBSERVATION_DIGEST_MISMATCH")
+    try:
+        validate_contract("alibabacloud_ram_policy_observation", observation)
+        assessed_at = datetime.fromisoformat(evidence["observed_at"].replace("Z", "+00:00"))
+        with tempfile.TemporaryDirectory(prefix="titmas-native-policy-binding-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation, sort_keys=True), encoding="utf-8")
+            credential, _ = credential_from_policy_observation(
+                "validator-profile",
+                path,
+                assessed_at=assessed_at,
+                expected_run_id=evidence["run_id"],
+            )
+        if credential.policy_observation_freshness != "FRESH":
+            issues.append("PERMISSION_OBSERVATION_NOT_FRESH")
+        if not credential.same_run_policy_readback_verified:
+            issues.append("PERMISSION_OBSERVATION_NOT_SAME_RUN")
+        cloud_credential = evidence["cloud_context"]["credential"]
+        if cloud_credential["permission_identity_ref"] != credential.permission_identity_ref:
+            issues.append("PERMISSION_IDENTITY_BINDING_MISMATCH")
+        if cloud_credential["permission_role_ref"] != credential.permission_role_opaque_ref:
+            issues.append("PERMISSION_ROLE_BINDING_MISMATCH")
+        if cloud_credential["permission_policy_ref"] != credential.permission_policy_opaque_ref:
+            issues.append("PERMISSION_POLICY_BINDING_MISMATCH")
+        checks = {item["check_id"]: item["passed"] for item in evidence["cloud_context"]["checks"]}
+        if checks.get("POLICY_OBSERVATION_FRESH") is not True:
+            issues.append("CLOUD_CONTEXT_FRESHNESS_CHECK_MISSING")
+        if checks.get("SAME_RUN_POLICY_READBACK") is not True:
+            issues.append("CLOUD_CONTEXT_SAME_RUN_CHECK_MISSING")
+    except Exception as exc:
+        issues.append(f"PERMISSION_OBSERVATION_BINDING:{type(exc).__name__}")
+    return issues
+
+
 def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> list[str]:
     issues: list[str] = []
-    schemas = [json.loads(path.read_text(encoding="utf-8")) for path in (SCHEMA, DEPENDENCY_SCHEMA)]
+    schema_name = (
+        "native-agentteams-cloud-skill-run-evidence.v0.1.schema.json"
+        if evidence.get("schema_version") == "0.1.0"
+        else "native-agentteams-cloud-skill-run-evidence.v0.2.schema.json"
+    )
+    schemas = [json.loads(path.read_text(encoding="utf-8")) for path in (ROOT / "schemas").glob("*.schema.json")]
     registry = Registry().with_resources((schema["$id"], Resource.from_contents(schema)) for schema in schemas)
-    errors = Draft202012Validator(schemas[0], registry=registry, format_checker=FormatChecker()).iter_errors(evidence)
+    root_schema = next(schema for schema in schemas if schema["$id"].endswith(schema_name))
+    errors = Draft202012Validator(root_schema, registry=registry, format_checker=FormatChecker()).iter_errors(evidence)
     issues.extend(f"SCHEMA:{'.'.join(str(part) for part in error.path) or 'root'}:{error.message}" for error in errors)
     if issues:
         return issues
@@ -56,10 +154,16 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
     try:
         validate_action_request(evidence["action_request"])
         validate_contract("cloud_context_query", evidence["frozen_query"])
-        validate_contract("cloud_context_result", evidence["cloud_context"])
+        validate_contract(
+            "cloud_context_result_v01" if evidence.get("schema_version") == "0.1.0" else "cloud_context_result",
+            evidence["cloud_context"],
+        )
         validate_contract("evidence_result", evidence["agent_evidence_receipt"])
     except Exception as exc:
         issues.append(f"CONTRACT:{type(exc).__name__}")
+
+    if evidence.get("schema_version") == "0.2.0":
+        issues.extend(validate_v02_runtime_bindings(evidence))
 
     cloud = evidence["cloud_context"]
     if evidence["source"]["official_skill_source_lock_sha256"] != sha256_file(SOURCE_LOCK):
@@ -130,6 +234,9 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
     except ValueError:
         issues.append("PACKAGE_APPLY_TIMESTAMP_INVALID")
     package_tempdir: tempfile.TemporaryDirectory[str] | None = None
+    historical_schema_names = {
+        Path(item).name for item in package_members if item.startswith("schemas/")
+    }
     try:
         if worker_package is None:
             package_tempdir = tempfile.TemporaryDirectory(prefix="titmas-native-cloud-package-rebuild-")
@@ -139,6 +246,7 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
                 source_commit=evidence["source"]["repository_base_commit"],
                 model=evidence["native_runtime"]["worker"]["model"],
                 verify_external_skill_source=False,
+                schema_names=historical_schema_names,
             )
             worker_package = Path(package_tempdir.name) / "cloud-context-inspector.zip"
         if sha256_file(worker_package) != evidence["package_boundary"]["package_sha256"]:
@@ -154,6 +262,7 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
             expected_source_commit=evidence["source"]["repository_base_commit"],
             expected_model=evidence["native_runtime"]["worker"]["model"],
             verify_external_skill_source=False,
+            schema_names=historical_schema_names,
         )
     except Exception as exc:
         issues.append(f"PACKAGE_VERIFICATION:{type(exc).__name__}")
@@ -240,6 +349,12 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
         item["tool_name"] not in {"submit_action_request", "load_external_alibabacloud_skill", "inspect_alibabacloud_resources"} for item in security_events
     ):
         issues.append("UNEXPECTED_NATIVE_TOOL_CALL")
+    if evidence.get("schema_version") == "0.1.0":
+        try:
+            correction = json.loads(CORRECTION.read_text(encoding="utf-8"))
+            issues.extend(f"CORRECTION:{item}" for item in validate_correction(ROOT, correction))
+        except (OSError, json.JSONDecodeError):
+            issues.append("CORRECTION:APPEND_ONLY_CORRECTION_UNAVAILABLE")
     return issues
 
 

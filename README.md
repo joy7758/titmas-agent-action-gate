@@ -96,12 +96,14 @@ python3 -m titmas_action_gate.cli demo --state-dir artifacts/runtime/local-demo
 python3 -m titmas_action_gate.cli validate-install
 ```
 
-Run the real Alibaba Cloud preflight only after configuring an external read-only RAM profile and independently verifying its policy. The runner does not accept credential bytes:
+Run a future real Alibaba Cloud preflight only through the runner's internal same-run RAM readback. It generates an unpredictable run ID and atomically reserves the evidence path before any provider call. It does not accept an external observation or credential bytes:
 
 ```bash
-TITMAS_ALIBABA_CLOUD_PROFILE='<read-only-profile-label>' \
-TITMAS_ALIBABA_RAM_POLICY_OBSERVATION='governance/alibabacloud-ram-policy-observation-20260802.json' \
 python3 scripts/run_alibabacloud_skill_evaluation.py \
+  --control-profile '<RAM-readback-profile-label>' \
+  --profile '<read-only-profile-label>' \
+  --role-name '<read-only-role-label>' \
+  --output '<new-evidence-path>' \
   --confirmation-ref '<explicit-user-confirmation-reference>'
 ```
 

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json",
+  "title": "Alibaba Cloud Resource Center runtime evidence v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "evaluation_id", "observed_at", "request_id", "provenance", "action_request",
+    "runtime", "cloud_context", "permission_observation", "agent_evidence_profile", "agent_evidence_receipt",
+    "record_chain", "security_chain", "agent_evidence_event_chain", "authority", "external_effects", "secrets", "non_claims"
+  ],
+  "properties": {
+    "$schema": {"const": "../../schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json"},
+    "schema_version": {"const": "0.2.0"},
+    "evaluation_id": {"type": "string", "pattern": "^TITMAS-AAG-ALIBABACLOUD-RESOURCECENTER-[A-Za-z0-9._-]{8,128}$"},
+    "observed_at": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/observed_at"},
+    "request_id": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/request_id"},
+    "provenance": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/provenance"},
+    "action_request": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/action_request"},
+    "runtime": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/runtime"},
+    "cloud_context": {"$ref": "./cloud-context-result.v0.2.schema.json"},
+    "permission_observation": {"$ref": "./alibabacloud-ram-policy-observation.v0.2.schema.json"},
+    "agent_evidence_profile": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/agent_evidence_profile"},
+    "agent_evidence_receipt": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/agent_evidence_receipt"},
+    "record_chain": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/record_chain"},
+    "security_chain": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/security_chain"},
+    "agent_evidence_event_chain": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/agent_evidence_event_chain"},
+    "authority": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/authority"},
+    "external_effects": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/external_effects"},
+    "secrets": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/secrets"},
+    "non_claims": {"$ref": "./alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json#/properties/non_claims"}
+  }
+}

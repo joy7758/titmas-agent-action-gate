@@ -2,8 +2,8 @@
 """Run and retain one authenticated, decision-free Alibaba Cloud Skill preflight.
 
 Credential bytes remain in the Alibaba Cloud CLI configuration.  This runner
-accepts only a profile label and a sanitized provider-readback policy
-observation, and emits aggregate-only public evidence.
+creates its own unpredictable run ID, performs the four bounded provider
+readbacks inside that run, and emits aggregate-only public evidence.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 
 from starlette.testclient import TestClient
 
-from titmas_action_gate.canonical import sha256_file, sha256_json
+from titmas_action_gate.canonical import ExclusiveOutput, sha256_json
 from titmas_action_gate.cloud_context import (
     OFFICIAL_ALIYUN_CLI_SHA256,
     OFFICIAL_RESOURCE_CENTER_PLUGIN_SHA256,
@@ -30,10 +30,15 @@ from titmas_action_gate.cloud_context import (
     CloudContextInspector,
     credential_from_policy_observation,
 )
-from titmas_action_gate.public_evidence import validate_public_evidence, workspace_provenance
+from titmas_action_gate.public_evidence import validate_public_evidence, workspace_provenance_v02
 from titmas_action_gate.runtime import HUMAN_PRINCIPAL_ID, RuntimePrincipalRegistry
 from titmas_action_gate.runtime_mcp_server import NativeRuntimeMcp
 from titmas_action_gate.service import ActionGateService
+
+try:
+    from scripts.capture_alibabacloud_ram_policy_observation import capture as capture_ram_policy_observation
+except ModuleNotFoundError:  # Direct script execution resolves sibling modules without the repository package prefix.
+    from capture_alibabacloud_ram_policy_observation import capture as capture_ram_policy_observation
 
 ROOT = Path(__file__).resolve().parents[1]
 CALLER_TOKEN = "titmas-demo-caller-token"
@@ -80,13 +85,30 @@ def _call(client: TestClient, token: str, sequence: int, tool: str, arguments: d
     return json.loads(data_line.removeprefix("data: "))["result"]["structuredContent"]
 
 
-def run(profile: str, policy_observation_path: Path, confirmation_ref: str, output_path: Path) -> dict[str, Any]:
-    cloud_credential, policy_observation = credential_from_policy_observation(profile, policy_observation_path)
+def _run_reserved(
+    control_profile: str,
+    profile: str,
+    role_name: str,
+    confirmation_ref: str,
+    reserved_output: ExclusiveOutput,
+) -> dict[str, Any]:
+    run_id = "run-alibaba-cloud-preflight-" + secrets.token_hex(12)
+    policy_observation = capture_ram_policy_observation(control_profile, profile, role_name, run_id)
+    assessed_at = datetime.now(UTC)
+    with tempfile.TemporaryDirectory(prefix="titmas-policy-observation-binding-") as policy_tempdir:
+        policy_observation_path = Path(policy_tempdir) / "observation.json"
+        policy_observation_path.write_text(json.dumps(policy_observation, sort_keys=True), encoding="utf-8")
+        cloud_credential, _ = credential_from_policy_observation(
+            profile,
+            policy_observation_path,
+            assessed_at=assessed_at,
+            expected_run_id=run_id,
+        )
     credentials = _principal_credentials()
     request_id = "aar-alibaba-cloud-preflight-20260802"
-    provenance = workspace_provenance(ROOT)
+    provenance = workspace_provenance_v02(ROOT)
     commit = provenance["base_commit"]
-    observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    observed_at = assessed_at.isoformat().replace("+00:00", "Z")
     request = {
         "schema_version": "0.1.0",
         "request_id": request_id,
@@ -116,7 +138,7 @@ def run(profile: str, policy_observation_path: Path, confirmation_ref: str, outp
     request["parameters_sha256"] = sha256_json(request["parameters"])
     scope = {
         "schema_version": "0.1.0",
-        "run_id": "run-alibaba-cloud-preflight-20260802",
+        "run_id": run_id,
         "correlation_id": "corr-alibaba-cloud-preflight-20260802",
         "task_id": "task-alibaba-cloud-preflight-20260802",
         "repository": request["target"]["repository"],
@@ -193,9 +215,9 @@ def run(profile: str, policy_observation_path: Path, confirmation_ref: str, outp
         profile = json.loads((service.evidence.root / retained["profile_path"]).read_text(encoding="utf-8"))
         event_envelopes = service.evidence.event_store.list()
         public = {
-            "$schema": "../../schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json",
-            "schema_version": "0.1.0",
-            "evaluation_id": "TITMAS-AAG-ALIBABACLOUD-RESOURCECENTER-20260802",
+            "$schema": "../../schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json",
+            "schema_version": "0.2.0",
+            "evaluation_id": f"TITMAS-AAG-ALIBABACLOUD-RESOURCECENTER-{run_id}",
             "observed_at": observed_at,
             "request_id": request_id,
             "provenance": {
@@ -204,7 +226,7 @@ def run(profile: str, policy_observation_path: Path, confirmation_ref: str, outp
                 "aliyun_cli_sha256": OFFICIAL_ALIYUN_CLI_SHA256,
                 "resourcecenter_plugin_version": OFFICIAL_RESOURCE_CENTER_PLUGIN_VERSION,
                 "resourcecenter_plugin_sha256": OFFICIAL_RESOURCE_CENTER_PLUGIN_SHA256,
-                "policy_observation_sha256": sha256_file(policy_observation_path),
+                "policy_observation_sha256": sha256_json(policy_observation),
             },
             "action_request": request,
             "runtime": {
@@ -271,34 +293,50 @@ def run(profile: str, policy_observation_path: Path, confirmation_ref: str, outp
     issues = validate_public_evidence(ROOT, public)
     if issues:
         raise RuntimeError("PUBLIC_EVIDENCE_VALIDATION_FAILED:" + ",".join(issues))
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(public, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    reserved_output.write_text(json.dumps(public, ensure_ascii=False, indent=2) + "\n")
     return public
+
+
+def run(
+    control_profile: str,
+    profile: str,
+    role_name: str,
+    confirmation_ref: str,
+    output_path: Path,
+) -> dict[str, Any]:
+    try:
+        with ExclusiveOutput(output_path) as reserved_output:
+            return _run_reserved(control_profile, profile, role_name, confirmation_ref, reserved_output)
+    except FileExistsError as exc:
+        raise RuntimeError("RUNTIME_EVIDENCE_OUTPUT_ALREADY_EXISTS") from exc
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--control-profile", default=os.environ.get("TITMAS_ALIBABA_CLOUD_CONTROL_PROFILE"))
     parser.add_argument("--profile", default=os.environ.get("TITMAS_ALIBABA_CLOUD_PROFILE"))
-    parser.add_argument(
-        "--policy-observation",
-        type=Path,
-        default=Path(
-            os.environ.get(
-                "TITMAS_ALIBABA_RAM_POLICY_OBSERVATION",
-                ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json",
-            )
-        ),
-    )
+    parser.add_argument("--role-name", default=os.environ.get("TITMAS_ALIBABA_CLOUD_ROLE_NAME"))
     parser.add_argument("--confirmation-ref", required=True)
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
+        required=True,
     )
     args = parser.parse_args()
-    if not args.profile:
-        raise SystemExit("profile is required; credential bytes are not accepted")
-    result = run(args.profile, args.policy_observation.resolve(), args.confirmation_ref, args.output.resolve())
+    if not args.control_profile or not args.profile or not args.role_name:
+        raise SystemExit("control profile, query profile, and role name are required; credential bytes are not accepted")
+    try:
+        result = run(
+            args.control_profile,
+            args.profile,
+            args.role_name,
+            args.confirmation_ref,
+            Path(os.path.abspath(args.output)),
+        )
+    except RuntimeError as exc:
+        if str(exc) == "RUNTIME_EVIDENCE_OUTPUT_ALREADY_EXISTS":
+            raise SystemExit(str(exc)) from exc
+        raise
     print(
         json.dumps(
             {

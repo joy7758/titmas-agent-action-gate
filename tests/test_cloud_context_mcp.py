@@ -90,6 +90,8 @@ class CloudContextMcpTests(unittest.TestCase):
             permission_role_ref="sha256:" + "c" * 64,
             permission_policy_ref="AliyunResourceCenterReadOnlyAccess",
             read_only_policy_verified=True,
+            policy_observation_freshness="FRESH",
+            same_run_policy_readback_verified=True,
         )
         with tempfile.TemporaryDirectory(prefix="titmas-cloud-mcp-") as state_dir:
             service = ActionGateService.demo(state_dir)

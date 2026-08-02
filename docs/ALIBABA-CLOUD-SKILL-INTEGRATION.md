@@ -68,13 +68,15 @@ TITMAS_ALIBABA_RAM_POLICY_OBSERVATION
 
 These names identify server-side configuration; their values are not MCP inputs and are not returned to Workers. The policy observation must pass the versioned schema and deterministic checks for an assumed-role identity, the exact six observed allow patterns, zero deny statements, zero write-operation markers, and exactly four distinct successful provider readbacks. The complete role attachment set must be exactly one matching System policy, with zero Custom or unexpected policies. Immediately before each Resource Center query, the adapter calls `sts.GetCallerIdentity` with the same CLI profile and requires both the identity digest and normalized role digest to match the observation. A profile label or successful search alone is not proof that the identity cannot write.
 
-The repository producer performs those four fixed readbacks and emits only the sanitized observation. It accepts profile and role labels, never credential bytes:
+The standalone producer performs those four fixed readbacks and emits only a sanitized observation for review or archival replay; that external file is not accepted as same-run release evidence. It accepts profile and role labels, never credential bytes:
 
 ```bash
 python3 scripts/capture_alibabacloud_ram_policy_observation.py \
   --control-profile '<RAM-readback-profile-label>' \
   --query-profile '<read-only-query-profile-label>' \
-  --role-name '<read-only-role-label>'
+  --role-name '<read-only-role-label>' \
+  --run-id '<unique-run-id>' \
+  --output '<new-private-observation-path>'
 ```
 
 ## Confirmed query
@@ -131,6 +133,8 @@ Public-safe evidence: [`../demo/evidence/alibabacloud-resourcecenter-preflight-2
 
 Native AgentTeams Worker-turn evidence: [`../demo/evidence/agentteams-native-alibabacloud-skill-20260802.json`](../demo/evidence/agentteams-native-alibabacloud-skill-20260802.json). Its validator replays the record, security, and agent-evidence chains, verifies the canonical receipt, requires a strict final Worker report with no trailing correction, binds every response event to the observed Matrix trace, and fails closed for any retained gate outcome, scoped cloud write, or upstream package member. A separate sanitized receipt records a fixed-string scan of ten known current secret values across all six reachable commits and the 150-file candidate snapshot; it retains no value, value digest, or matching content and does not claim to detect unknown historical secrets: [`../demo/evidence/known-secret-git-history-scan-20260802.json`](../demo/evidence/known-secret-git-history-scan-20260802.json).
 
+Append-only correction: [`../demo/evidence/agentteams-native-alibabacloud-skill-correction-20260802.json`](../demo/evidence/agentteams-native-alibabacloud-skill-correction-20260802.json). The original native artifact and its v0.1 schema remain byte-for-byte unchanged. The correction binds the original artifact digest and reclassifies only the unsupported prior credential-rotation assertion as `UNKNOWN`; no prior credential digest was retained, so rotation cannot be verified. It also records that the RAM observation was 5,791.862693 seconds old at the native evidence time, beyond the new 900-second maximum. Historical replay therefore remains structurally valid but release-ineligible.
+
 The official Alibaba Cloud Skill sub-milestone is complete for this bounded evidence scope. The frozen set retains four separately hashed facts—official source lock, read-only RAM policy observation, historical adapter-only evidence, and the later native Worker evidence—and is cross-validated by [`../scripts/validate_alibabacloud_evidence_set.py`](../scripts/validate_alibabacloud_evidence_set.py). Full M4 remains incomplete; this freeze does not authorize merge, release, deployment, or GOAI submission.
 
 Current truth:
@@ -157,22 +161,28 @@ UPSTREAM_SKILL_BYTES_DISTRIBUTED=false
 IAM_CONTROL_PLANE_PROVISIONING_WRITES_OCCURRED=true
 DETERMINISTIC_GATE_AUTHORITY_PRESERVED=true
 SECRETS_COMMITTED=false
+PRIOR_WORKER_CREDENTIAL_ROTATION_STATUS=UNKNOWN
+POLICY_OBSERVATION_AT_NATIVE_RUN=STALE
+HISTORICAL_REPLAY_STRUCTURALLY_VALID=true
+HISTORICAL_REPLAY_RELEASE_ELIGIBLE=false
 ```
 
 These facts apply to one disposable, direct specialist Worker turn. The query returned zero resources visible to the bounded identity; `EMPTY_RESULT` was correctly interpreted as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. This does not make the release cloud context semantically usable and does not close the broader autonomous M4 chain.
 
 ## Reproduction boundary
 
-The runner accepts a profile label, a schema-valid sanitized policy observation, and the user's explicit confirmation reference. It does not accept credential bytes:
+Future release-usable runs require a new v0.2 policy observation captured for the same unpredictable runner-generated `run_id`, containing the four ordered successful `ram.GetPolicy`, `ram.GetPolicyVersion`, `ram.ListPoliciesForRole`, and `sts.GetCallerIdentity` readbacks and consumed within 900 seconds. Both the adapter-only and native runners perform capture inside their own run before starting the MCP turn. Neither accepts an external observation, credential bytes, an operator-supplied prior Worker credential digest, or an existing output path. Output paths are atomically reserved before any provider call. The commands below describe the future real-run boundary; they were not executed by this correction commit:
 
 ```bash
-TITMAS_ALIBABA_CLOUD_PROFILE='<read-only-profile-label>' \
-TITMAS_ALIBABA_RAM_POLICY_OBSERVATION='governance/alibabacloud-ram-policy-observation-20260802.json' \
 python3 scripts/run_alibabacloud_skill_evaluation.py \
-  --confirmation-ref '<explicit-user-confirmation-reference>'
+  --control-profile '<RAM-readback-profile-label>' \
+  --profile '<read-only-profile-label>' \
+  --role-name '<read-only-role-label>' \
+  --confirmation-ref '<explicit-user-confirmation-reference>' \
+  --output '<new-runtime-evidence-path>'
 ```
 
-The observation and its producer are bound to the public evidence by SHA-256. The observation must be refreshed from provider readbacks if the role, complete attachment set, or system-policy version changes. The live STS identity is re-bound on every query. A successful query alone is not proof of a read-only identity.
+The observation and its producer are bound by SHA-256. Stale, future-dated, legacy, or different-run observations cannot satisfy release `CLOUD_CONTEXT`; the provider search is not invoked for stale or future-dated input. A successful query alone is not proof of a read-only identity.
 
 ## Negative behavior
 
@@ -181,6 +191,8 @@ The automated suite requires:
 - a write or broader operation returns `BLOCKED_BY_SKILL_BOUNDARY` before executor invocation;
 - missing credentials return `NOT_ASSESSED`;
 - RAM permission denial returns `NOT_ASSESSED_PERMISSION_DENIED` and never means zero resources;
+- stale or future-dated RAM observations return `NOT_ASSESSED_POLICY_OBSERVATION_STALE` before Resource Center invocation;
+- a non-empty `Resources` item without non-empty string `ResourceId` and `ResourceType` returns `INVOCATION_FAILED`, while `Resources=[]` remains a valid `EMPTY_RESULT`;
 - any modified official Skill byte returns `SKILL_LOAD_REJECTED` or `SKILL_DIGEST_MISMATCH`;
 - credential/profile/identity literals are absent from returned data;
 - only a semantically usable typed receipt can satisfy `CLOUD_CONTEXT` evidence;

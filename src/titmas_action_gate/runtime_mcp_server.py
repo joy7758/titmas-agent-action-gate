@@ -402,12 +402,17 @@ def build_from_environment() -> NativeRuntimeMcp:
     cloud_values = {
         "profile_name": os.environ.get("TITMAS_ALIBABA_CLOUD_PROFILE"),
         "policy_observation": os.environ.get("TITMAS_ALIBABA_RAM_POLICY_OBSERVATION"),
+        "policy_observation_run_id": os.environ.get("TITMAS_ALIBABA_POLICY_OBSERVATION_RUN_ID"),
     }
     if any(value for value in cloud_values.values()) and not all(value for value in cloud_values.values()):
         raise RuntimeError("Alibaba Cloud runtime references must be configured as a complete set")
     cloud_credential = None
     if all(value for value in cloud_values.values()):
-        cloud_credential, _ = credential_from_policy_observation(str(cloud_values["profile_name"]), str(cloud_values["policy_observation"]))
+        cloud_credential, _ = credential_from_policy_observation(
+            str(cloud_values["profile_name"]),
+            str(cloud_values["policy_observation"]),
+            expected_run_id=str(cloud_values["policy_observation_run_id"]),
+        )
     return NativeRuntimeMcp(
         service,
         principals,
