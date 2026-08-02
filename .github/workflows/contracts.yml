@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -20,15 +22,75 @@ jobs:
           cache: pip
       - name: Install reference implementation dependencies
         run: python -m pip install -e '.[dev]'
+      - name: Materialize and verify source-locked official Alibaba Cloud Skill
+        env:
+          TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH: ${{ runner.temp }}/.local/share/titmas-agent-action-gate/external-skills/alibabacloud-resourcecenter-search
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          lock = json.loads(Path("governance/alibabacloud-resourcecenter-search-source-lock.json").read_text())
+          expected = {
+              "repository": "https://github.com/aliyun/alibabacloud-aiops-skills",
+              "revision": "92bd723f7cc217b252feab574c1883fa0aa46b3c",
+          }
+          observed = {key: lock["skill"][key] for key in expected}
+          if observed != expected:
+              raise SystemExit("OFFICIAL_SKILL_SOURCE_LOCK_IDENTITY_MISMATCH")
+          print("OFFICIAL_SKILL_SOURCE_LOCK_IDENTITY=VALID")
+          PY
+          python scripts/install_official_alibabacloud_skill.py
       - name: Lint
         run: ruff check .
       - name: Validate governance boundary
         run: python scripts/validate_governance.py
       - name: Validate milestone contracts
         run: python scripts/validate_milestone.py
+      - name: Validate retained Alibaba Cloud evidence
+        run: |
+          python scripts/validate_alibabacloud_runtime_evidence.py
+          python scripts/validate_alibabacloud_evidence_set.py
+          python scripts/validate_native_agentteams_cloud_skill_evidence.py demo/evidence/agentteams-native-alibabacloud-skill-20260802.json
       - name: Validate installed integrations
+        env:
+          TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH: ${{ runner.temp }}/.local/share/titmas-agent-action-gate/external-skills/alibabacloud-resourcecenter-search
         run: python -m titmas_action_gate.cli validate-install
       - name: Run unit tests
+        env:
+          HOME: ${{ runner.temp }}
+          TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH: ${{ runner.temp }}/.local/share/titmas-agent-action-gate/external-skills/alibabacloud-resourcecenter-search
         run: python -W error::ResourceWarning -m unittest discover -s tests -v
       - name: Build source and wheel artifacts
         run: python -m build
+      - name: Verify official Skill bytes are excluded from distributions
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          lock = json.loads(Path("governance/alibabacloud-resourcecenter-search-source-lock.json").read_text())
+          upstream_hashes = {item["sha256"] for item in lock["files"]}
+          artifacts = sorted(Path("dist").glob("*"))
+          if len(artifacts) != 2 or not any(path.suffix == ".whl" for path in artifacts) or not any(path.name.endswith(".tar.gz") for path in artifacts):
+              raise SystemExit("EXPECTED_WHEEL_AND_SDIST_NOT_FOUND")
+
+          members = []
+          for artifact in artifacts:
+              if artifact.suffix == ".whl":
+                  with zipfile.ZipFile(artifact) as archive:
+                      entries = [(item.filename, archive.read(item)) for item in archive.infolist() if not item.is_dir()]
+              else:
+                  with tarfile.open(artifact, "r:gz") as archive:
+                      entries = [(item.name, archive.extractfile(item).read()) for item in archive.getmembers() if item.isfile()]
+              for name, content in entries:
+                  members.append(name)
+                  if "skills/alibabacloud-resourcecenter-search/" in name:
+                      raise SystemExit(f"UPSTREAM_SKILL_PATH_DISTRIBUTED:{artifact.name}:{name}")
+                  if hashlib.sha256(content).hexdigest() in upstream_hashes:
+                      raise SystemExit(f"UPSTREAM_SKILL_BYTES_DISTRIBUTED:{artifact.name}:{name}")
+          print(f"DISTRIBUTION_EXCLUSION_CHECK=VALID artifacts={len(artifacts)} members={len(members)}")
+          PY
