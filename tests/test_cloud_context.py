@@ -330,6 +330,63 @@ class CloudContextBoundaryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 credential_from_policy_observation("runtime-profile", path)
 
+    def test_policy_observation_max_age_accepts_only_server_bounded_integers(self) -> None:
+        assessed_at = datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-policy-max-age-valid-001", assessed_at)
+        with tempfile.TemporaryDirectory(prefix="titmas-policy-max-age-valid-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            cases = (("default", None, 900), ("strictest", 1, 1), ("ceiling", 900, 900))
+            for name, supplied, expected in cases:
+                with self.subTest(name=name):
+                    kwargs = {} if supplied is None else {"max_age_seconds": supplied}
+                    cloud_credential, _ = credential_from_policy_observation(
+                        "runtime-profile",
+                        path,
+                        assessed_at=assessed_at,
+                        expected_run_id=observation["capture"]["run_id"],
+                        **kwargs,
+                    )
+                    self.assertEqual(cloud_credential.policy_observation_max_age_seconds, expected)
+
+    def test_policy_observation_max_age_rejects_invalid_types_and_ranges(self) -> None:
+        assessed_at = datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC)
+        observation = self._fresh_v02_policy_observation("run-policy-max-age-invalid-001", assessed_at)
+        invalid_values = (901, 31_536_000, 0, -1, True, False, 1.5, "900", None)
+        with tempfile.TemporaryDirectory(prefix="titmas-policy-max-age-invalid-") as tempdir:
+            path = Path(tempdir) / "observation.json"
+            path.write_text(json.dumps(observation), encoding="utf-8")
+            for value in invalid_values:
+                with self.subTest(value=value), self.assertRaisesRegex(
+                    ValueError, "POLICY_OBSERVATION_MAXIMUM_AGE_INVALID"
+                ):
+                    credential_from_policy_observation(
+                        "runtime-profile",
+                        path,
+                        assessed_at=assessed_at,
+                        max_age_seconds=value,
+                        expected_run_id=observation["capture"]["run_id"],
+                    )
+
+    def test_inspector_rejects_invalid_stored_max_age_before_provider_call(self) -> None:
+        invalid_values = (901, 31_536_000, 0, -1, True, False, 1.5, "900", None)
+        for value in invalid_values:
+            with self.subTest(value=value):
+                cloud_credential = replace(credential(), policy_observation_max_age_seconds=value)
+                executor = FakeExecutor(available_execution())
+                result = CloudContextInspector(ROOT, executor).inspect(
+                    "aar-cloud-context-policy-max-age-invalid",
+                    confirmed_query(),
+                    cloud_credential,
+                )
+                self.assertEqual(result["status"], "NOT_ASSESSED")
+                self.assertEqual(result["uncertainty"], ["POLICY_OBSERVATION_MAXIMUM_AGE_INVALID"])
+                self.assertFalse(result["skill"]["runtime_invoked"])
+                self.assertFalse(result["invocation"]["invoked"])
+                self.assertEqual(result["invocation"]["result_class"], "NOT_INVOKED")
+                self.assertEqual(result["resourcecenter_write_api_calls"], 0)
+                self.assertEqual(executor.calls, 0)
+
     def test_stale_policy_observation_fails_closed_before_provider_call(self) -> None:
         path = ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json"
         assessed_at = datetime(2026, 8, 2, 7, 4, 43, tzinfo=UTC)
@@ -405,8 +462,10 @@ class CloudContextBoundaryTests(unittest.TestCase):
                 "runtime-profile",
                 path,
                 assessed_at=datetime(2026, 8, 2, 6, 49, 43, tzinfo=UTC),
+                max_age_seconds=900,
                 expected_run_id=observation["capture"]["run_id"],
             )
+        self.assertEqual(cloud_credential.policy_observation_max_age_seconds, 900)
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(
             "aar-cloud-context-aged-before-use",

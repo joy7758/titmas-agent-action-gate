@@ -75,6 +75,10 @@ def _is_timezone_aware(value: datetime | None) -> bool:
     return value is not None and value.tzinfo is not None and value.utcoffset() is not None
 
 
+def _is_valid_policy_observation_max_age(value: object) -> bool:
+    return type(value) is int and 1 <= value <= DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS
+
+
 @dataclass(frozen=True)
 class CloudCredentialContext:
     """Non-secret references for one externally configured CLI profile."""
@@ -161,8 +165,8 @@ def credential_from_policy_observation(
         or any(item["exit_status"] != 0 for item in observation["read_trace"])
     ):
         raise ValueError("READ_ONLY_POLICY_OBSERVATION_INVALID")
-    if max_age_seconds <= 0:
-        raise ValueError("POLICY_OBSERVATION_MAX_AGE_INVALID")
+    if not _is_valid_policy_observation_max_age(max_age_seconds):
+        raise ValueError("POLICY_OBSERVATION_MAXIMUM_AGE_INVALID")
     try:
         policy_observed_at = datetime.fromisoformat(observation["observed_at"].replace("Z", "+00:00"))
     except (TypeError, ValueError) as exc:
@@ -849,7 +853,10 @@ class CloudContextInspector:
     ) -> dict[str, Any]:
         checked_at = observed_at or utc_now()
         policy_freshness = credential.policy_observation_freshness if credential else "NOT_ASSESSED"
-        if credential and _is_timezone_aware(credential.policy_observation_observed_at):
+        maximum_age_valid = credential is not None and _is_valid_policy_observation_max_age(
+            credential.policy_observation_max_age_seconds
+        )
+        if credential and maximum_age_valid and _is_timezone_aware(credential.policy_observation_observed_at):
             invocation_age = (
                 checked_at.astimezone(UTC) - credential.policy_observation_observed_at.astimezone(UTC)
             ).total_seconds()
@@ -940,6 +947,23 @@ class CloudContextInspector:
                 invocation=_null_invocation(),
                 checks=[{"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": False}],
                 uncertainty=["READ_ONLY_CREDENTIAL_NOT_AVAILABLE"],
+                observed_at=checked_at,
+            )
+        if not maximum_age_valid:
+            return self._base_result(
+                request_id,
+                query,
+                status="NOT_ASSESSED",
+                skill=skill,
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[
+                    {"check_id": "CREDENTIAL_REFERENCE_PRESENT", "passed": True},
+                    {"check_id": "POLICY_OBSERVATION_MAXIMUM_AGE", "passed": False},
+                    {"check_id": "POLICY_OBSERVATION_FRESH", "passed": False},
+                    {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
+                ],
+                uncertainty=["POLICY_OBSERVATION_MAXIMUM_AGE_INVALID"],
                 observed_at=checked_at,
             )
 

@@ -182,7 +182,7 @@ python3 scripts/run_alibabacloud_skill_evaluation.py \
   --output '<new-runtime-evidence-path>'
 ```
 
-The observation and its producer are bound by SHA-256. A `FRESH` label is insufficient without a non-null, timezone-aware observation timestamp. Missing, timezone-naive, stale, future-dated, legacy, or different-run observations cannot satisfy release `CLOUD_CONTEXT`; the provider search is not invoked for any of those inputs. A successful query alone is not proof of a read-only identity.
+The observation and its producer are bound by SHA-256. The server-owned maximum age ceiling is the single canonical constant `DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS=900`; callers may select only an exact integer from 1 through 900, and oversized or incorrectly typed values are rejected rather than clamped. Construction and invocation independently enforce this range. A `FRESH` label is insufficient without a non-null, timezone-aware observation timestamp. Missing, timezone-naive, stale, future-dated, legacy, or different-run observations cannot satisfy release `CLOUD_CONTEXT`; the provider search is not invoked for any of those inputs. A successful query alone is not proof of a read-only identity.
 
 ## Negative behavior
 
@@ -193,6 +193,7 @@ The automated suite requires:
 - RAM permission denial returns `NOT_ASSESSED_PERMISSION_DENIED` and never means zero resources;
 - stale or future-dated RAM observations return `NOT_ASSESSED_POLICY_OBSERVATION_STALE` before Resource Center invocation;
 - a caller-labelled `FRESH` observation with a missing or timezone-naive timestamp returns `NOT_ASSESSED` before Resource Center invocation;
+- maximum-age values outside the strict integer range 1 through 900 return or raise `POLICY_OBSERVATION_MAXIMUM_AGE_INVALID` before Resource Center invocation and are never silently clamped;
 - a fresh same-run observation whose read-only policy verification failed returns `NOT_ASSESSED_POLICY_NOT_VERIFIED` before Resource Center invocation;
 - a non-empty `Resources` item without non-empty string `ResourceId` and `ResourceType` returns `INVOCATION_FAILED`, while `Resources=[]` remains a valid `EMPTY_RESULT`;
 - any modified official Skill byte returns `SKILL_LOAD_REJECTED` or `SKILL_DIGEST_MISMATCH`;
