@@ -1,5 +1,7 @@
 import pytest
+
 from titmas_action_gate.workflow import validate_agentteams_template
+
 
 @pytest.fixture
 def valid_yaml(tmp_path):
