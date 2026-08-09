@@ -171,6 +171,42 @@ class AgentEvidenceAdapter:
                 values.append(value)
         return list(dict.fromkeys(values))
 
+    def _validate_profile(self, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Validate profile against schema and return report and parsed profile."""
+        try:
+            schema_path = schema_directory() / "agent-evidence-oap-v0.1.schema.json"
+            if sha256_file(schema_path) != AGENT_EVIDENCE_OAP_SCHEMA_SHA256:
+                raise ActionGateError("VERIFIER_SCHEMA_DIGEST_MISMATCH", "Pinned agent-evidence OAP schema digest does not match the source lock.")
+            report = validate_profile_file(path, schema_path=schema_path, fail_fast=False)
+            profile = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, json.JSONDecodeError):
+            report = {"ok": False, "issues": [{"code": "schema_violation"}], "stages": []}
+            profile = {}
+        return report, profile
+
+    def _evaluate_bindings(
+        self,
+        request: dict[str, Any],
+        profile: dict[str, Any],
+        declared_types: list[str],
+        evidence_types: list[str],
+    ) -> list[dict[str, Any]]:
+        """Evaluate binding checks for the profile."""
+        request_digest = f"sha256:{sha256_json(request)}"
+        subject = profile.get("subject", {})
+        return [
+            {"check_id": "SUBJECT_ID", "passed": subject.get("id") == f"obj:{request['request_id']}"},
+            {
+                "check_id": "SUBJECT_LOCATOR",
+                "passed": subject.get("locator") == f"urn:titmas:action-request:{request['request_id']}",
+            },
+            {"check_id": "SUBJECT_DIGEST", "passed": subject.get("digest") == request_digest},
+            {
+                "check_id": "EVIDENCE_TYPES",
+                "passed": set(declared_types) == set(evidence_types),
+            },
+        ]
+
     def verify_profile(
         self,
         request: dict[str, Any],
@@ -197,15 +233,7 @@ class AgentEvidenceAdapter:
             digest = sha256_file(path)
             if expected_sha256 is not None:
                 binding_checks.append({"check_id": "ATTACHMENT_DIGEST", "passed": digest == expected_sha256})
-            try:
-                schema_path = schema_directory() / "agent-evidence-oap-v0.1.schema.json"
-                if sha256_file(schema_path) != AGENT_EVIDENCE_OAP_SCHEMA_SHA256:
-                    raise ActionGateError("VERIFIER_SCHEMA_DIGEST_MISMATCH", "Pinned agent-evidence OAP schema digest does not match the source lock.")
-                report = validate_profile_file(path, schema_path=schema_path, fail_fast=False)
-                profile = json.loads(path.read_text(encoding="utf-8"))
-            except (ValueError, json.JSONDecodeError):
-                report = {"ok": False, "issues": [{"code": "schema_violation"}], "stages": []}
-                profile = {}
+            report, profile = self._validate_profile(path)
             issue_codes = {item["code"] for item in report.get("issues", [])}
             declared_types = self.declared_evidence_types(profile)
             if report.get("ok"):
@@ -215,22 +243,7 @@ class AgentEvidenceAdapter:
             else:
                 status = "INVALID"
             checks = [{"check_id": str(stage["name"]).upper().replace("-", "_"), "passed": bool(stage.get("ok"))} for stage in report.get("stages", [])]
-            request_digest = f"sha256:{sha256_json(request)}"
-            subject = profile.get("subject", {})
-            binding_checks.extend(
-                [
-                    {"check_id": "SUBJECT_ID", "passed": subject.get("id") == f"obj:{request['request_id']}"},
-                    {
-                        "check_id": "SUBJECT_LOCATOR",
-                        "passed": subject.get("locator") == f"urn:titmas:action-request:{request['request_id']}",
-                    },
-                    {"check_id": "SUBJECT_DIGEST", "passed": subject.get("digest") == request_digest},
-                    {
-                        "check_id": "EVIDENCE_TYPES",
-                        "passed": set(declared_types) == set(evidence_types),
-                    },
-                ]
-            )
+            binding_checks.extend(self._evaluate_bindings(request, profile, declared_types, evidence_types))
             if binding_checks and not all(item["passed"] for item in binding_checks):
                 status = "TAMPERED"
             checks = binding_checks + checks
