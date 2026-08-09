@@ -74,10 +74,7 @@ class RealGitHubSandboxWorkflow:
         )["payload"]
         return {"evidence": evidence_result, "decision": decision}
 
-    def run(self, *, branch: str, base: str = "main", title: str = "TITMAS Agent Action Gate sandbox demo") -> dict[str, Any]:
-        observed = datetime.now(UTC)
-        commit = exact_head_commit(self.worktree)
-
+    def _execute_branch_push(self, branch: str, commit: str, observed: datetime) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         push_request = self.analyst.analyze(
             action="github.branch.push",
             repository=self.repository,
@@ -103,7 +100,9 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             consumed_at=observed + timedelta(seconds=3),
         )
+        return push_request, push_gate, push_receipt
 
+    def _execute_pull_request_create(self, branch: str, base: str, title: str, observed: datetime, push_receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         pr_request = self.analyst.analyze(
             action="github.pull_request.create",
             repository=self.repository,
@@ -129,8 +128,9 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             consumed_at=observed + timedelta(seconds=7),
         )
+        return pr_request, pr_gate, pr_receipt
 
-        pull_number = pr_receipt["provider_result"]["result"]["pull_number"]
+    def _execute_pull_request_merge(self, pull_number: int, observed: datetime, pr_receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
         merge_request = self.analyst.analyze(
             action="github.pull_request.merge",
             repository=self.repository,
@@ -161,6 +161,18 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             decided_at=observed + timedelta(seconds=12),
         )["payload"]
+        return merge_request, merge_gate, before_approval, approval, after_approval
+
+    def run(self, *, branch: str, base: str = "main", title: str = "TITMAS Agent Action Gate sandbox demo") -> dict[str, Any]:
+        observed = datetime.now(UTC)
+        commit = exact_head_commit(self.worktree)
+
+        push_request, push_gate, push_receipt = self._execute_branch_push(branch, commit, observed)
+
+        pr_request, pr_gate, pr_receipt = self._execute_pull_request_create(branch, base, title, observed, push_receipt)
+
+        pull_number = pr_receipt["provider_result"]["result"]["pull_number"]
+        merge_request, merge_gate, before_approval, approval, after_approval = self._execute_pull_request_merge(pull_number, observed, pr_receipt)
 
         return {
             "demo_version": "0.2.0",
