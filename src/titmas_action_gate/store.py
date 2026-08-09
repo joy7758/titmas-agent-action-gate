@@ -6,12 +6,26 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import closing, contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .canonical import canonical_json_text, format_datetime, parse_datetime, sha256_json, utc_now
 from .errors import ConflictError, NotFoundError
+
+
+@dataclass
+class SecurityEventInput:
+    event_id: str
+    scope: dict[str, str]
+    principal_id: str
+    tool_name: str
+    outcome: str
+    reason_code: str
+    business_state_delta: int
+    details: dict[str, Any] | None = None
+    created_at: datetime | None = None
 
 
 class AppendOnlyStore:
@@ -329,39 +343,27 @@ class AppendOnlyStore:
         if actual != scope:
             raise ConflictError("CORRELATION_MISMATCH", "request runtime scope does not match the admitted correlation and task.")
 
-    def append_security_event(
-        self,
-        *,
-        event_id: str,
-        scope: dict[str, str],
-        principal_id: str,
-        tool_name: str,
-        outcome: str,
-        reason_code: str,
-        business_state_delta: int,
-        details: dict[str, Any] | None = None,
-        created_at: datetime | None = None,
-    ) -> dict[str, Any]:
+    def append_security_event(self, event: SecurityEventInput) -> dict[str, Any]:
         """Append a per-run security record without mutating request business state."""
 
-        observed = created_at or utc_now()
-        payload = details or {}
+        observed = event.created_at or utc_now()
+        payload = event.details or {}
         with self._transaction() as connection:
             prior = connection.execute(
                 "SELECT record_hash FROM runtime_security_events WHERE run_id = ? ORDER BY sequence DESC LIMIT 1",
-                (scope["run_id"],),
+                (event.scope["run_id"],),
             ).fetchone()
             previous_hash = prior["record_hash"] if prior else None
             material = {
-                "event_id": event_id,
-                "run_id": scope["run_id"],
-                "correlation_id": scope["correlation_id"],
-                "task_id": scope["task_id"],
-                "principal_id": principal_id,
-                "tool_name": tool_name,
-                "outcome": outcome,
-                "reason_code": reason_code,
-                "business_state_delta": business_state_delta,
+                "event_id": event.event_id,
+                "run_id": event.scope["run_id"],
+                "correlation_id": event.scope["correlation_id"],
+                "task_id": event.scope["task_id"],
+                "principal_id": event.principal_id,
+                "tool_name": event.tool_name,
+                "outcome": event.outcome,
+                "reason_code": event.reason_code,
+                "business_state_delta": event.business_state_delta,
                 "details": payload,
                 "previous_hash": previous_hash,
             }
@@ -374,15 +376,15 @@ class AppendOnlyStore:
                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
-                    event_id,
-                    scope["run_id"],
-                    scope["correlation_id"],
-                    scope["task_id"],
-                    principal_id,
-                    tool_name,
-                    outcome,
-                    reason_code,
-                    business_state_delta,
+                    event.event_id,
+                    event.scope["run_id"],
+                    event.scope["correlation_id"],
+                    event.scope["task_id"],
+                    event.principal_id,
+                    event.tool_name,
+                    event.outcome,
+                    event.reason_code,
+                    event.business_state_delta,
                     canonical_json_text(payload),
                     previous_hash,
                     record_hash,
