@@ -1,12 +1,15 @@
-import pytest
+import tempfile
+import unittest
+from pathlib import Path
 
 from titmas_action_gate.workflow import validate_agentteams_template
 
 
-@pytest.fixture
-def valid_yaml(tmp_path):
-    f = tmp_path / "test.yaml"
-    content = """
+class TestValidateAgentteamsTemplate(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.file_path = Path(self.temp_dir.name) / "test.yaml"
+        self.valid_content = """
 kind: Worker
 metadata:
   name: workflow-lead
@@ -39,23 +42,25 @@ spec:
   workerMembers:
     - role: team_leader
 """
-    f.write_text(content)
-    return f
+        self.file_path.write_text(self.valid_content)
 
-def test_validate_agentteams_template_valid(valid_yaml):
-    assert isinstance(validate_agentteams_template(valid_yaml), dict)
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
-def test_validate_agentteams_template_invalid_worker(valid_yaml):
-    valid_yaml.write_text(valid_yaml.read_text().replace("workflow-lead", "wrong-worker"))
-    with pytest.raises(ValueError, match="Worker resources do not match"):
-        validate_agentteams_template(valid_yaml)
+    def test_validate_agentteams_template_valid(self):
+        self.assertIsInstance(validate_agentteams_template(self.file_path), dict)
 
-def test_validate_agentteams_template_invalid_team(valid_yaml):
-    valid_yaml.write_text(valid_yaml.read_text().replace("kind: Team", "kind: Other"))
-    with pytest.raises(ValueError, match="exactly one AgentTeams Team"):
-        validate_agentteams_template(valid_yaml)
+    def test_validate_agentteams_template_invalid_worker(self):
+        self.file_path.write_text(self.valid_content.replace("workflow-lead", "wrong-worker"))
+        with self.assertRaisesRegex(ValueError, "Worker resources do not match"):
+            validate_agentteams_template(self.file_path)
 
-def test_validate_agentteams_template_invalid_leader(valid_yaml):
-    valid_yaml.write_text(valid_yaml.read_text().replace("team_leader", "member"))
-    with pytest.raises(ValueError, match="exactly one team_leader"):
-        validate_agentteams_template(valid_yaml)
+    def test_validate_agentteams_template_invalid_team(self):
+        self.file_path.write_text(self.valid_content.replace("kind: Team", "kind: Other"))
+        with self.assertRaisesRegex(ValueError, "exactly one AgentTeams Team"):
+            validate_agentteams_template(self.file_path)
+
+    def test_validate_agentteams_template_invalid_leader(self):
+        self.file_path.write_text(self.valid_content.replace("team_leader", "member"))
+        with self.assertRaisesRegex(ValueError, "exactly one team_leader"):
+            validate_agentteams_template(self.file_path)
