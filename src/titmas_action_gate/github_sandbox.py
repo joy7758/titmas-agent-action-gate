@@ -102,7 +102,9 @@ class RealGitHubSandboxWorkflow:
         )
         return push_request, push_gate, push_receipt
 
-    def _execute_pull_request_create(self, branch: str, base: str, title: str, observed: datetime, push_receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    def _execute_pull_request_create(
+        self, branch: str, base: str, title: str, observed: datetime, push_receipt: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         pr_request = self.analyst.analyze(
             action="github.pull_request.create",
             repository=self.repository,
@@ -130,7 +132,9 @@ class RealGitHubSandboxWorkflow:
         )
         return pr_request, pr_gate, pr_receipt
 
-    def _execute_pull_request_merge(self, pull_number: int, observed: datetime, pr_receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    def _execute_pull_request_merge(
+        self, pull_number: int, observed: datetime, pr_receipt: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
         merge_request = self.analyst.analyze(
             action="github.pull_request.merge",
             repository=self.repository,
