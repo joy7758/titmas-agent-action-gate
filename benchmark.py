@@ -1,5 +1,6 @@
 import time
-from src.titmas_action_gate.contracts import _validator, validate_contract
+
+from src.titmas_action_gate.contracts import _validator
 
 start_time = time.time()
 for _ in range(100):
