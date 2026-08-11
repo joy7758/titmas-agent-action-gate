@@ -42,6 +42,78 @@ class AgentEvidenceAdapter:
             raise ActionGateError("EVIDENCE_PATH_OUT_OF_SCOPE", "Evidence profile path escapes the configured evidence root.")
         return candidate
 
+    def _build_operation(
+        self,
+        operation_id: str,
+        operation_type: str | None,
+        request: dict[str, Any],
+        phase: str,
+        subject_id: str,
+        policy_id: str,
+        input_ref: str,
+        output_ref: str,
+        operation_status: str,
+    ) -> dict[str, Any]:
+        return {
+            "id": operation_id,
+            "type": operation_type or request["action"],
+            "description": f"TITMAS Action Gate {phase} evidence for one bounded request.",
+            "subject_ref": subject_id,
+            "policy_ref": policy_id,
+            "input_refs": [input_ref],
+            "output_refs": [output_ref],
+            "result": {"status": operation_status, "summary": f"{phase} evidence captured"},
+        }
+
+    def _build_evidence(
+        self,
+        evidence_id: str,
+        subject_id: str,
+        operation_id: str,
+        policy_id: str,
+        input_ref: str,
+        output_ref: str,
+        request_id: str,
+        phase: str,
+        request: dict[str, Any],
+        output: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "id": evidence_id,
+            "subject_ref": subject_id,
+            "operation_ref": operation_id,
+            "policy_ref": policy_id,
+            "references": [
+                {
+                    "ref_id": input_ref,
+                    "role": "input",
+                    "object_id": subject_id,
+                    "locator": f"urn:titmas:action-request:{request_id}",
+                    "digest": f"sha256:{sha256_json(request)}",
+                },
+                {
+                    "ref_id": output_ref,
+                    "role": "output",
+                    "object_id": f"obj:{request_id}:{phase}-output",
+                    "locator": f"urn:titmas:action-output:{request_id}:{phase}",
+                    "digest": f"sha256:{sha256_json(output)}",
+                },
+            ],
+            "artifacts": [
+                {
+                    "artifact_id": f"artifact:{request_id}:{phase}",
+                    "type": "execution-log",
+                    "locator": f"urn:titmas:artifact:{request_id}:{phase}",
+                    "digest": f"sha256:{sha256_json({'request': request, 'output': output})}",
+                }
+            ],
+            "integrity": {
+                "references_digest": "sha256:" + "0" * 64,
+                "artifacts_digest": "sha256:" + "0" * 64,
+                "statement_digest": "sha256:" + "0" * 64,
+            },
+        }
+
     def build_profile(
         self,
         request: dict[str, Any],
@@ -78,16 +150,17 @@ class AgentEvidenceAdapter:
                 "locator": f"urn:titmas:action-request:{request_id}",
                 "digest": f"sha256:{sha256_json(request)}",
             },
-            "operation": {
-                "id": operation_id,
-                "type": operation_type or request["action"],
-                "description": f"TITMAS Action Gate {phase} evidence for one bounded request.",
-                "subject_ref": subject_id,
-                "policy_ref": policy_id,
-                "input_refs": [input_ref],
-                "output_refs": [output_ref],
-                "result": {"status": operation_status, "summary": f"{phase} evidence captured"},
-            },
+            "operation": self._build_operation(
+                operation_id=operation_id,
+                operation_type=operation_type,
+                request=request,
+                phase=phase,
+                subject_id=subject_id,
+                policy_id=policy_id,
+                input_ref=input_ref,
+                output_ref=output_ref,
+                operation_status=operation_status,
+            ),
             "policy": {
                 "id": policy_id,
                 "name": "titmas-action-gate-evidence-requirements",
@@ -102,41 +175,18 @@ class AgentEvidenceAdapter:
                 "input_refs": [input_ref],
                 "output_refs": [output_ref],
             },
-            "evidence": {
-                "id": evidence_id,
-                "subject_ref": subject_id,
-                "operation_ref": operation_id,
-                "policy_ref": policy_id,
-                "references": [
-                    {
-                        "ref_id": input_ref,
-                        "role": "input",
-                        "object_id": subject_id,
-                        "locator": f"urn:titmas:action-request:{request_id}",
-                        "digest": f"sha256:{sha256_json(request)}",
-                    },
-                    {
-                        "ref_id": output_ref,
-                        "role": "output",
-                        "object_id": f"obj:{request_id}:{phase}-output",
-                        "locator": f"urn:titmas:action-output:{request_id}:{phase}",
-                        "digest": f"sha256:{sha256_json(output)}",
-                    },
-                ],
-                "artifacts": [
-                    {
-                        "artifact_id": f"artifact:{request_id}:{phase}",
-                        "type": "execution-log",
-                        "locator": f"urn:titmas:artifact:{request_id}:{phase}",
-                        "digest": f"sha256:{sha256_json({'request': request, 'output': output})}",
-                    }
-                ],
-                "integrity": {
-                    "references_digest": "sha256:" + "0" * 64,
-                    "artifacts_digest": "sha256:" + "0" * 64,
-                    "statement_digest": "sha256:" + "0" * 64,
-                },
-            },
+            "evidence": self._build_evidence(
+                evidence_id=evidence_id,
+                subject_id=subject_id,
+                operation_id=operation_id,
+                policy_id=policy_id,
+                input_ref=input_ref,
+                output_ref=output_ref,
+                request_id=request_id,
+                phase=phase,
+                request=request,
+                output=output,
+            ),
             "validation": {
                 "id": f"validation:{request_id}:{phase}",
                 "method": "schema+reference+consistency",
