@@ -9,7 +9,12 @@ from scripts.validate_milestone import ROOT, reference_decision
 class ContractFixtureTests(unittest.TestCase):
     def setUp(self) -> None:
         registry = json.loads((ROOT / "evaluations/case-registry.json").read_text(encoding="utf-8"))
-        self.cases = {item["id"]: json.loads((ROOT / "evaluations" / item["path"]).read_text(encoding="utf-8")) for item in registry["cases"]}
+        self.cases = {
+            item["id"]: json.loads(
+                (ROOT / "evaluations" / item["path"]).read_text(encoding="utf-8")
+            )
+            for item in registry["cases"]
+        }
 
     def test_required_outcomes(self) -> None:
         expected = {

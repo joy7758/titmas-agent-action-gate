@@ -16,7 +16,9 @@ class EvidenceAdapterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory(prefix="titmas-aag-evidence-")
         self.adapter = AgentEvidenceAdapter(self.tempdir.name)
-        self.request = json.loads((ROOT / "evaluations/cases/valid-execution/case.json").read_text(encoding="utf-8"))["action_request"]
+        self.request = json.loads(
+            (ROOT / "evaluations/cases/valid-execution/case.json").read_text(encoding="utf-8")
+        )["action_request"]
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()

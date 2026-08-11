@@ -63,9 +63,15 @@ def workspace_content_provenance(root: Path) -> dict[str, Any]:
         "evidence_adapter_sha256": sha256_file(root / "src/titmas_action_gate/evidence.py"),
         "public_evidence_validator_sha256": sha256_file(root / VALIDATOR_RELATIVE_PATH),
         "result_schema_sha256": sha256_file(root / "schemas/cloud-context-result.v0.1.schema.json"),
-        "policy_observation_schema_sha256": sha256_file(root / "schemas/alibabacloud-ram-policy-observation.v0.1.schema.json"),
-        "policy_observation_producer_sha256": sha256_file(root / "scripts/capture_alibabacloud_ram_policy_observation.py"),
-        "public_evidence_schema_sha256": sha256_file(root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json"),
+        "policy_observation_schema_sha256": sha256_file(
+            root / "schemas/alibabacloud-ram-policy-observation.v0.1.schema.json"
+        ),
+        "policy_observation_producer_sha256": sha256_file(
+            root / "scripts/capture_alibabacloud_ram_policy_observation.py"
+        ),
+        "public_evidence_schema_sha256": sha256_file(
+            root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.1.schema.json"
+        ),
         "source_lock_sha256": sha256_file(root / SOURCE_LOCK_RELATIVE_PATH),
         "policy_observation_sha256": sha256_file(root / POLICY_OBSERVATION_RELATIVE_PATH),
     }
@@ -75,7 +81,9 @@ def workspace_provenance(root: Path) -> dict[str, Any]:
     """Capture historical Git state plus commit-stable content provenance."""
 
     root = root.resolve()
-    base_commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
+    base_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+    ).stdout.strip()
     status = subprocess.run(
         ["git", "status", "--porcelain=v1", "-z", "--", ".", f":(exclude){PUBLIC_EVIDENCE_RELATIVE_PATH}"],
         cwd=root,
@@ -97,8 +105,12 @@ def workspace_provenance_v02(root: Path) -> dict[str, Any]:
     provenance.update(
         {
             "result_schema_sha256": sha256_file(root / "schemas/cloud-context-result.v0.2.schema.json"),
-            "policy_observation_schema_sha256": sha256_file(root / "schemas/alibabacloud-ram-policy-observation.v0.2.schema.json"),
-            "public_evidence_schema_sha256": sha256_file(root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json"),
+            "policy_observation_schema_sha256": sha256_file(
+                root / "schemas/alibabacloud-ram-policy-observation.v0.2.schema.json"
+            ),
+            "public_evidence_schema_sha256": sha256_file(
+                root / "schemas/alibabacloud-resourcecenter-runtime-evidence.v0.2.schema.json"
+            ),
         }
     )
     return provenance

@@ -156,7 +156,12 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
 
         tampered_events = copy.deepcopy(evidence)
         tampered_events["agent_evidence_event_chain"]["events"][0]["hashes"]["chain_hash"] = "sha256:" + "0" * 64
-        self.assertTrue(any(issue.startswith("AGENT_EVIDENCE_EVENT_CHAIN:") for issue in validate_public_evidence(ROOT, tampered_events)))
+        self.assertTrue(
+            any(
+                issue.startswith("AGENT_EVIDENCE_EVENT_CHAIN:")
+                for issue in validate_public_evidence(ROOT, tampered_events)
+            )
+        )
 
     def test_public_evidence_contains_no_local_profile_or_identity_literals(self) -> None:
         serialized = EVIDENCE_PATH.read_text(encoding="utf-8")

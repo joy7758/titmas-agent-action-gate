@@ -21,7 +21,10 @@ def credentials() -> dict[str, str]:
         "release-steward",
         HUMAN_PRINCIPAL_ID,
     }
-    return {principal: f"transport-test-{index:02d}-" + (chr(97 + index) * 32) for index, principal in enumerate(sorted(principals))}
+    return {
+        principal: f"transport-test-{index:02d}-" + (chr(97 + index) * 32)
+        for index, principal in enumerate(sorted(principals))
+    }
 
 
 class RuntimeMcpTransportTests(unittest.TestCase):

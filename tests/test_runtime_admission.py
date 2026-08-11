@@ -32,7 +32,10 @@ ALL_RUNTIME_TOOLS = {
 
 
 def credentials() -> dict[str, str]:
-    return {principal: f"test-only-{index:02d}-" + (chr(97 + index) * 32) for index, principal in enumerate(sorted(WORKERS | {HUMAN_PRINCIPAL_ID}))}
+    return {
+        principal: f"test-only-{index:02d}-" + (chr(97 + index) * 32)
+        for index, principal in enumerate(sorted(WORKERS | {HUMAN_PRINCIPAL_ID}))
+    }
 
 
 def scope(run_id: str = "run-native-00000001") -> dict[str, str]:

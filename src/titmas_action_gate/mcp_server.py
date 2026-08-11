@@ -31,7 +31,10 @@ def configured_mcp_host() -> str:
 
 mcp = FastMCP(
     "titmas-action-gate",
-    instructions=("Deterministic evidence and authorization boundary. Tool discovery is not permission. No tool in this server mutates an external provider."),
+    instructions=(
+        "Deterministic evidence and authorization boundary. Tool discovery is not permission. "
+        "No tool in this server mutates an external provider."
+    ),
     host=configured_mcp_host(),
     port=8766,
 )

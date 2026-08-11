@@ -88,7 +88,12 @@ class WheelInstallTests(unittest.TestCase):
             credentials_path = runtime_dir / "credentials.json"
             credentials_path.write_text(
                 json.dumps(
-                    {"credentials": {principal: f"wheel-test-{index:02d}-" + chr(97 + index) * 32 for index, principal in enumerate(sorted(principals))}}
+                    {
+                        "credentials": {
+                            principal: f"wheel-test-{index:02d}-" + chr(97 + index) * 32
+                            for index, principal in enumerate(sorted(principals))
+                        }
+                    }
                 ),
                 encoding="utf-8",
             )

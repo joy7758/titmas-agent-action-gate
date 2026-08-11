@@ -65,9 +65,13 @@ class RealGitHubSandboxWorkflow:
             timestamp=observed,
         )
         profile_path = self.service.evidence.write_profile(profile, f"{request['request_id']}-{phase}.json")
-        self.service.attach_evidence(request["request_id"], profile_path, request["evidence_requirements"], caller_token=self.caller_token)
+        self.service.attach_evidence(
+            request["request_id"], profile_path, request["evidence_requirements"], caller_token=self.caller_token
+        )
         evidence_result = self.verifier.verify(self.service, request["request_id"], caller_token=self.caller_token)
-        decision = self.lead.decide(self.service, request["request_id"], caller_token=self.caller_token, decided_at=observed + timedelta(seconds=1))["payload"]
+        decision = self.lead.decide(
+            self.service, request["request_id"], caller_token=self.caller_token, decided_at=observed + timedelta(seconds=1)
+        )["payload"]
         return {"evidence": evidence_result, "decision": decision}
 
     def run(self, *, branch: str, base: str = "main", title: str = "TITMAS Agent Action Gate sandbox demo") -> dict[str, Any]:

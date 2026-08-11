@@ -404,7 +404,9 @@ def _run_reserved(args: argparse.Namespace, reserved_output: ExclusiveOutput) ->
         RuntimeError,
     ):
         prior_worker_token = _worker_consumer_token()
-    prior_worker_credential_ref = "sha256:" + hashlib.sha256(prior_worker_token.encode()).hexdigest() if prior_worker_token else None
+    prior_worker_credential_ref = (
+        "sha256:" + hashlib.sha256(prior_worker_token.encode()).hexdigest() if prior_worker_token else None
+    )
     prior_worker_credential_ref_source = "LIVE_PRE_APPLY_READBACK" if prior_worker_token else "NOT_AVAILABLE"
     package_apply = _apply_worker_package(args.worker_package)
     worker = _worker_readback()
@@ -457,7 +459,9 @@ def _run_reserved(args: argparse.Namespace, reserved_output: ExclusiveOutput) ->
             args.role_name,
             scope["run_id"],
         )
-        private_observation_output.write_text(json.dumps(policy_observation, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+        private_observation_output.write_text(
+            json.dumps(policy_observation, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        )
     request = _prepare_request(state_dir, credentials, scope)
     query = {
         "schema_version": "0.1.0",
@@ -667,7 +671,9 @@ def _run_reserved(args: argparse.Namespace, reserved_output: ExclusiveOutput) ->
             "resourcecenter_read_api_calls": 1,
             "runtime_sts_identity_read_api_calls": 1,
             "permission_observation_cloud_read_calls": policy_observation["effects"]["cloud_read_calls"],
-            "permission_observation_local_cli_config_writes": policy_observation["effects"]["local_cli_config_writes"],
+            "permission_observation_local_cli_config_writes": policy_observation["effects"][
+                "local_cli_config_writes"
+            ],
             "resourcecenter_write_api_calls": 0,
             "cloud_resource_write_executed": False,
             "cloud_resource_created_for_nonempty_result": False,
