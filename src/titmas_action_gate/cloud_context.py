@@ -842,16 +842,12 @@ class CloudContextInspector:
         validate_contract("cloud_context_result", result)
         return result
 
-    def inspect(
+
+    def _evaluate_policy_freshness(
         self,
-        request_id: str,
-        query: dict[str, Any],
         credential: CloudCredentialContext | None,
-        *,
-        observed_at: datetime | None = None,
-        native_agentteams_loaded: bool = False,
-    ) -> dict[str, Any]:
-        checked_at = observed_at or utc_now()
+        checked_at: datetime
+    ) -> tuple[str, bool]:
         policy_freshness = credential.policy_observation_freshness if credential else "NOT_ASSESSED"
         maximum_age_valid = credential is not None and _is_valid_policy_observation_max_age(
             credential.policy_observation_max_age_seconds
@@ -867,35 +863,18 @@ class CloudContextInspector:
                 if invocation_age > credential.policy_observation_max_age_seconds
                 else "FRESH"
             )
-        try:
-            skill = {**self.verify_skill_source(), "runtime_invoked": False}
-        except (OSError, ValueError, KeyError, json.JSONDecodeError):
-            result = self._base_result(
-                request_id,
-                query,
-                status="SKILL_LOAD_REJECTED",
-                skill={
-                    "name": OFFICIAL_SKILL_NAME,
-                    "repository": OFFICIAL_SKILL_REPOSITORY,
-                    "revision": OFFICIAL_SKILL_REVISION,
-                    "source_lock_sha256": "0" * 64,
-                    "external_path_reference": EXTERNAL_SKILL_PATH_REFERENCE,
-                    "discovered": False,
-                    "loaded": False,
-                    "load_scope": "EXTERNAL_SKILL_SOURCE_VERIFICATION",
-                    "native_agentteams_loaded": False,
-                    "runtime_load_result": "LOAD_REJECTED",
-                    "runtime_invoked": False,
-                    "invocation_scope": "SKILL_BOUND_ADAPTER",
-                },
-                credential=credential,
-                invocation=_null_invocation(),
-                checks=[{"check_id": "SKILL_SOURCE_HASH", "passed": False}],
-                uncertainty=["OFFICIAL_SKILL_SOURCE_OR_HASH_NOT_VERIFIED"],
-                observed_at=checked_at,
-            )
-            return result
+        return policy_freshness, maximum_age_valid
 
+    def _validate_pre_invocation(
+        self,
+        request_id: str,
+        query: dict[str, Any],
+        credential: CloudCredentialContext | None,
+        skill: dict[str, Any],
+        policy_freshness: str,
+        maximum_age_valid: bool,
+        checked_at: datetime,
+    ) -> dict[str, Any] | None:
         try:
             validate_contract("cloud_context_query", query)
         except Exception:
@@ -1060,7 +1039,18 @@ class CloudContextInspector:
                 ],
                 observed_at=checked_at,
             )
+        return None
 
+    def _invoke_runtime(
+        self,
+        request_id: str,
+        query: dict[str, Any],
+        credential: CloudCredentialContext,
+        skill: dict[str, Any],
+        policy_freshness: str,
+        native_agentteams_loaded: bool,
+        checked_at: datetime,
+    ) -> dict[str, Any]:
         skill["native_agentteams_loaded"] = native_agentteams_loaded
         skill["runtime_load_result"] = "LOADED_READ_ONLY_RESOURCECENTER_SEARCH_ONLY" if native_agentteams_loaded else "SOURCE_VERIFIED_NOT_NATIVE_LOADED"
         execution = self.executor.execute(query, credential)
@@ -1135,6 +1125,59 @@ class CloudContextInspector:
             checks=checks,
             uncertainty=list(execution.uncertainty),
             observed_at=checked_at,
+        )
+
+
+    def inspect(
+        self,
+        request_id: str,
+        query: dict[str, Any],
+        credential: CloudCredentialContext | None,
+        *,
+        observed_at: datetime | None = None,
+        native_agentteams_loaded: bool = False,
+    ) -> dict[str, Any]:
+        checked_at = observed_at or utc_now()
+        policy_freshness, maximum_age_valid = self._evaluate_policy_freshness(credential, checked_at)
+
+        try:
+            skill = {**self.verify_skill_source(), "runtime_invoked": False}
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
+            return self._base_result(
+                request_id,
+                query,
+                status="SKILL_LOAD_REJECTED",
+                skill={
+                    "name": OFFICIAL_SKILL_NAME,
+                    "repository": OFFICIAL_SKILL_REPOSITORY,
+                    "revision": OFFICIAL_SKILL_REVISION,
+                    "source_lock_sha256": "0" * 64,
+                    "external_path_reference": EXTERNAL_SKILL_PATH_REFERENCE,
+                    "discovered": False,
+                    "loaded": False,
+                    "load_scope": "EXTERNAL_SKILL_SOURCE_VERIFICATION",
+                    "native_agentteams_loaded": False,
+                    "runtime_load_result": "LOAD_REJECTED",
+                    "runtime_invoked": False,
+                    "invocation_scope": "SKILL_BOUND_ADAPTER",
+                },
+                credential=credential,
+                invocation=_null_invocation(),
+                checks=[{"check_id": "SKILL_SOURCE_HASH", "passed": False}],
+                uncertainty=["OFFICIAL_SKILL_SOURCE_OR_HASH_NOT_VERIFIED"],
+                observed_at=checked_at,
+            )
+
+        pre_invocation_result = self._validate_pre_invocation(
+            request_id, query, credential, skill, policy_freshness, maximum_age_valid, checked_at
+        )
+        if pre_invocation_result:
+            return pre_invocation_result
+
+        # _validate_pre_invocation checks for credential is None, so here we can cast it
+        assert credential is not None
+        return self._invoke_runtime(
+            request_id, query, credential, skill, policy_freshness, native_agentteams_loaded, checked_at
         )
 
 
