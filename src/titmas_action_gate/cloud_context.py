@@ -116,30 +116,8 @@ class CloudCredentialContext:
         return _opaque_ref(f"role:{self.permission_role_ref.lower()}")
 
 
-def credential_from_policy_observation(
-    profile_name: str,
-    observation_path: str | Path,
-    *,
-    assessed_at: datetime | None = None,
-    max_age_seconds: int = DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS,
-    expected_run_id: str | None = None,
-) -> tuple[CloudCredentialContext, dict[str, Any]]:
-    """Build a credential reference from a bounded provider readback.
 
-    Structural validity is retained separately from freshness.  A historical
-    observation remains reviewable, but cannot become release-usable unless it
-    is current and its four provider reads belong to the same runtime turn.
-    """
-
-    path = Path(observation_path).resolve()
-    observation = json.loads(path.read_text(encoding="utf-8"))
-    observation_version = observation.get("schema_version")
-    validate_contract(
-        "alibabacloud_ram_policy_observation_v01"
-        if observation_version == "0.1.0"
-        else "alibabacloud_ram_policy_observation",
-        observation,
-    )
+def _verify_read_only_policy_observation(observation: dict[str, Any]) -> None:
     policy = observation["policy"]
     attachment = observation["attachment"]
     identity = observation["identity"]
@@ -165,39 +143,85 @@ def credential_from_policy_observation(
         or any(item["exit_status"] != 0 for item in observation["read_trace"])
     ):
         raise ValueError("READ_ONLY_POLICY_OBSERVATION_INVALID")
-    if not _is_valid_policy_observation_max_age(max_age_seconds):
-        raise ValueError("POLICY_OBSERVATION_MAXIMUM_AGE_INVALID")
+
+
+def _parse_policy_observation_timestamp(observation: dict[str, Any]) -> datetime:
     try:
         policy_observed_at = datetime.fromisoformat(observation["observed_at"].replace("Z", "+00:00"))
     except (TypeError, ValueError) as exc:
         raise ValueError("POLICY_OBSERVATION_TIMESTAMP_INVALID") from exc
     if policy_observed_at.tzinfo is None:
         raise ValueError("POLICY_OBSERVATION_TIMESTAMP_INVALID")
+    return policy_observed_at
+
+
+def _verify_policy_observation_capture_v02(observation: dict[str, Any], policy_observed_at: datetime, expected_run_id: str | None) -> tuple[datetime, bool]:
+    capture = observation["capture"]
+    try:
+        started_at = datetime.fromisoformat(capture["started_at"].replace("Z", "+00:00"))
+        completed_at = datetime.fromisoformat(capture["completed_at"].replace("Z", "+00:00"))
+        trace_times = [datetime.fromisoformat(item["observed_at"].replace("Z", "+00:00")) for item in observation["read_trace"]]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID") from exc
+    capture_ids = {item["capture_id"] for item in observation["read_trace"]}
+    if (
+        any(item.tzinfo is None for item in (started_at, completed_at, *trace_times))
+        or capture_ids != {capture["capture_id"]}
+        or not started_at <= trace_times[0] <= trace_times[1] <= trace_times[2] <= trace_times[3] <= completed_at
+        or (completed_at - started_at).total_seconds() > MAX_POLICY_OBSERVATION_CAPTURE_SECONDS
+        or policy_observed_at != completed_at
+    ):
+        raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID")
+    same_run_binding_verified = isinstance(expected_run_id, str) and capture["run_id"] == expected_run_id
+    return completed_at, same_run_binding_verified
+
+
+
+def credential_from_policy_observation(
+    profile_name: str,
+    observation_path: str | Path,
+    *,
+    assessed_at: datetime | None = None,
+    max_age_seconds: int = DEFAULT_POLICY_OBSERVATION_MAX_AGE_SECONDS,
+    expected_run_id: str | None = None,
+) -> tuple[CloudCredentialContext, dict[str, Any]]:
+    """Build a credential reference from a bounded provider readback.
+
+    Structural validity is retained separately from freshness.  A historical
+    observation remains reviewable, but cannot become release-usable unless it
+    is current and its four provider reads belong to the same runtime turn.
+    """
+
+    path = Path(observation_path).resolve()
+    observation = json.loads(path.read_text(encoding="utf-8"))
+    observation_version = observation.get("schema_version")
+    validate_contract(
+        "alibabacloud_ram_policy_observation_v01"
+        if observation_version == "0.1.0"
+        else "alibabacloud_ram_policy_observation",
+        observation,
+    )
+
+    _verify_read_only_policy_observation(observation)
+
+    if not _is_valid_policy_observation_max_age(max_age_seconds):
+        raise ValueError("POLICY_OBSERVATION_MAXIMUM_AGE_INVALID")
+
+    policy_observed_at = _parse_policy_observation_timestamp(observation)
+
     same_run_binding_verified = False
     if observation_version == "0.2.0":
-        capture = observation["capture"]
-        try:
-            started_at = datetime.fromisoformat(capture["started_at"].replace("Z", "+00:00"))
-            completed_at = datetime.fromisoformat(capture["completed_at"].replace("Z", "+00:00"))
-            trace_times = [datetime.fromisoformat(item["observed_at"].replace("Z", "+00:00")) for item in observation["read_trace"]]
-        except (TypeError, ValueError) as exc:
-            raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID") from exc
-        capture_ids = {item["capture_id"] for item in observation["read_trace"]}
-        if (
-            any(item.tzinfo is None for item in (started_at, completed_at, *trace_times))
-            or capture_ids != {capture["capture_id"]}
-            or not started_at <= trace_times[0] <= trace_times[1] <= trace_times[2] <= trace_times[3] <= completed_at
-            or (completed_at - started_at).total_seconds() > MAX_POLICY_OBSERVATION_CAPTURE_SECONDS
-            or policy_observed_at != completed_at
-        ):
-            raise ValueError("POLICY_OBSERVATION_CAPTURE_INVALID")
-        policy_observed_at = completed_at
-        same_run_binding_verified = isinstance(expected_run_id, str) and capture["run_id"] == expected_run_id
+        policy_observed_at, same_run_binding_verified = _verify_policy_observation_capture_v02(
+            observation, policy_observed_at, expected_run_id
+        )
+
     evaluated_at = assessed_at or utc_now()
     if evaluated_at.tzinfo is None:
         raise ValueError("POLICY_OBSERVATION_ASSESSMENT_TIMESTAMP_INVALID")
     age_seconds = (evaluated_at.astimezone(UTC) - policy_observed_at.astimezone(UTC)).total_seconds()
     freshness = "FUTURE" if age_seconds < 0 else "STALE" if age_seconds > max_age_seconds else "FRESH"
+
+    identity = observation["identity"]
     credential = CloudCredentialContext(
         profile_name=profile_name,
         permission_identity=identity["identity_ref"],
