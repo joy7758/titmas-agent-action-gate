@@ -299,6 +299,87 @@ def build_worker_packages(
     return index
 
 
+def _verify_package_structure(archive: zipfile.ZipFile, expected_hashes: dict[str, str]) -> None:
+    names = archive.namelist()
+    if len(names) != len(set(names)) or any(name.startswith("/") or ".." in Path(name).parts for name in names):
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package contains duplicate or unsafe paths.")
+    required = {"manifest.json", "skill-attestation.json", "config/AGENTS.md", "config/SOUL.md", *expected_hashes}
+    missing = sorted(required - set(names))
+    if missing:
+        raise ActionGateError("SKILL_MISSING", "Worker package is missing attested files.", details={"paths": missing})
+    extra = sorted(set(names) - required)
+    if extra:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package contains unattested files.", details={"paths": extra})
+
+
+def _verify_package_attestation(
+    attestation: dict[str, Any],
+    expected_worker: str,
+    expected_version: str,
+    workers: dict[str, Any],
+    runtime: str,
+    expected_source_commit: str | None = None,
+    expected_model: str | None = None,
+) -> tuple[str, str]:
+    if attestation.get("worker_id") != expected_worker:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package attestation identity does not match.")
+    if attestation.get("skill") != {"name": workers[expected_worker]["skills"][0], "version": expected_version}:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package Skill name or version does not match the registry source.")
+    source_commit = attestation.get("source_commit")
+    model = attestation.get("model")
+    if expected_source_commit is not None and source_commit != expected_source_commit:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit does not match the requested source commit.")
+    if expected_model is not None and model != expected_model:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package model does not match the requested model.")
+    if not isinstance(source_commit, str) or len(source_commit) != 40 or any(value not in "0123456789abcdef" for value in source_commit):
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit is not exact.")
+    if not isinstance(model, str) or not model or "preview" in model.lower() or attestation.get("runtime") != runtime:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package runtime or model contract is invalid.")
+    return source_commit, model
+
+
+def _verify_package_hashes(archive: zipfile.ZipFile, attestation: dict[str, Any], expected_hashes: dict[str, str]) -> None:
+    attested_hashes = {item["package_path"]: item["sha256"] for item in attestation.get("files", [])}
+    if attested_hashes != expected_hashes:
+        raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package attestation does not match repository source hashes.")
+    observed_hashes = {name: hashlib.sha256(archive.read(name)).hexdigest() for name in expected_hashes}
+    if observed_hashes != expected_hashes:
+        raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package bytes do not match repository source hashes.")
+
+
+def _verify_package_control_files(
+    archive: zipfile.ZipFile,
+    workers: dict[str, Any],
+    expected_worker: str,
+    source_commit: str,
+    model: str,
+    runtime: str,
+    expected_version: str,
+    expected_files: list[dict[str, str]],
+) -> dict[str, Any]:
+    package_manifest = json.loads(archive.read("manifest.json"))
+    expected_manifest = _package_manifest(workers[expected_worker], source_commit=source_commit, model=model, runtime=runtime)
+    expected_attestation = _attestation(
+        workers[expected_worker],
+        source_commit=source_commit,
+        model=model,
+        runtime=runtime,
+        skill_version=expected_version,
+        source_files=expected_files,
+    )
+    expected_special = {
+        "manifest.json": _json_bytes(expected_manifest),
+        "skill-attestation.json": _json_bytes(expected_attestation),
+        "config/AGENTS.md": _agents_markdown(workers[expected_worker], workers[expected_worker]["skills"][0]),
+        "config/SOUL.md": _soul_markdown(workers[expected_worker]),
+    }
+    if any(archive.read(name) != data for name, data in expected_special.items()):
+        raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package control files do not match deterministic source.")
+    if package_manifest != expected_manifest:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package manifest does not match its verified identity.")
+    return package_manifest
+
+
 def verify_worker_package(
     package_path: str | Path,
     root: str | Path,
@@ -322,59 +403,32 @@ def verify_worker_package(
         schema_names=schema_names,
     )
     expected_hashes = {item["package_path"]: item["sha256"] for item in expected_files}
+    runtime = LEADER_RUNTIME if expected_worker == "workflow-lead" else SPECIALIST_RUNTIME
+
     with zipfile.ZipFile(archive_path) as archive:
-        names = archive.namelist()
-        if len(names) != len(set(names)) or any(name.startswith("/") or ".." in Path(name).parts for name in names):
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package contains duplicate or unsafe paths.")
-        required = {"manifest.json", "skill-attestation.json", "config/AGENTS.md", "config/SOUL.md", *expected_hashes}
-        missing = sorted(required - set(names))
-        if missing:
-            raise ActionGateError("SKILL_MISSING", "Worker package is missing attested files.", details={"paths": missing})
-        extra = sorted(set(names) - required)
-        if extra:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package contains unattested files.", details={"paths": extra})
+        _verify_package_structure(archive, expected_hashes)
         attestation = json.loads(archive.read("skill-attestation.json"))
-        if attestation.get("worker_id") != expected_worker:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package attestation identity does not match.")
-        if attestation.get("skill") != {"name": workers[expected_worker]["skills"][0], "version": expected_version}:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package Skill name or version does not match the registry source.")
-        source_commit = attestation.get("source_commit")
-        model = attestation.get("model")
-        runtime = LEADER_RUNTIME if expected_worker == "workflow-lead" else SPECIALIST_RUNTIME
-        if expected_source_commit is not None and source_commit != expected_source_commit:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit does not match the requested source commit.")
-        if expected_model is not None and model != expected_model:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package model does not match the requested model.")
-        if not isinstance(source_commit, str) or len(source_commit) != 40 or any(value not in "0123456789abcdef" for value in source_commit):
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit is not exact.")
-        if not isinstance(model, str) or not model or "preview" in model.lower() or attestation.get("runtime") != runtime:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package runtime or model contract is invalid.")
-        attested_hashes = {item["package_path"]: item["sha256"] for item in attestation.get("files", [])}
-        if attested_hashes != expected_hashes:
-            raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package attestation does not match repository source hashes.")
-        observed_hashes = {name: hashlib.sha256(archive.read(name)).hexdigest() for name in expected_hashes}
-        if observed_hashes != expected_hashes:
-            raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package bytes do not match repository source hashes.")
-        package_manifest = json.loads(archive.read("manifest.json"))
-        expected_manifest = _package_manifest(workers[expected_worker], source_commit=source_commit, model=model, runtime=runtime)
-        expected_attestation = _attestation(
-            workers[expected_worker],
-            source_commit=source_commit,
-            model=model,
-            runtime=runtime,
-            skill_version=expected_version,
-            source_files=expected_files,
+        source_commit, model = _verify_package_attestation(
+            attestation,
+            expected_worker,
+            expected_version,
+            workers,
+            runtime,
+            expected_source_commit,
+            expected_model,
         )
-        expected_special = {
-            "manifest.json": _json_bytes(expected_manifest),
-            "skill-attestation.json": _json_bytes(expected_attestation),
-            "config/AGENTS.md": _agents_markdown(workers[expected_worker], workers[expected_worker]["skills"][0]),
-            "config/SOUL.md": _soul_markdown(workers[expected_worker]),
-        }
-        if any(archive.read(name) != data for name, data in expected_special.items()):
-            raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package control files do not match deterministic source.")
-        if package_manifest != expected_manifest:
-            raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package manifest does not match its verified identity.")
+        _verify_package_hashes(archive, attestation, expected_hashes)
+        package_manifest = _verify_package_control_files(
+            archive,
+            workers,
+            expected_worker,
+            source_commit,
+            model,
+            runtime,
+            expected_version,
+            expected_files,
+        )
+
     skill_name = workers[expected_worker]["skills"][0]
     manifest_path = f"skills/{skill_name}/manifest.json"
     if skill_name == OFFICIAL_CLOUD_SKILL:
