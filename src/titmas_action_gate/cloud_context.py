@@ -135,9 +135,7 @@ def credential_from_policy_observation(
     observation = json.loads(path.read_text(encoding="utf-8"))
     observation_version = observation.get("schema_version")
     validate_contract(
-        "alibabacloud_ram_policy_observation_v01"
-        if observation_version == "0.1.0"
-        else "alibabacloud_ram_policy_observation",
+        "alibabacloud_ram_policy_observation_v01" if observation_version == "0.1.0" else "alibabacloud_ram_policy_observation",
         observation,
     )
     policy = observation["policy"]
@@ -202,15 +200,10 @@ def credential_from_policy_observation(
         profile_name=profile_name,
         permission_identity=identity["identity_ref"],
         permission_role_ref=identity["role_ref"],
-        permission_policy_ref="sha256:" + (
-            sha256_json(observation) if observation_version == "0.2.0" else sha256_file(path)
-        ),
+        permission_policy_ref="sha256:" + (sha256_json(observation) if observation_version == "0.2.0" else sha256_file(path)),
         read_only_policy_verified=True,
         policy_observation_freshness=freshness,
-        same_run_policy_readback_verified=(
-            freshness == "FRESH"
-            and same_run_binding_verified
-        ),
+        same_run_policy_readback_verified=(freshness == "FRESH" and same_run_binding_verified),
         policy_observation_observed_at=policy_observed_at,
         policy_observation_max_age_seconds=max_age_seconds,
     )
@@ -826,13 +819,7 @@ class CloudContextInspector:
                 "permission_identity_ref": credential.permission_identity_ref if credential else None,
                 "permission_role_ref": credential.permission_role_opaque_ref if credential else None,
                 "permission_policy_ref": credential.permission_policy_opaque_ref if credential else None,
-                "read_only_policy_verified": (
-                    "PASS"
-                    if credential and credential.read_only_policy_verified
-                    else "FAIL"
-                    if credential
-                    else "NOT_ASSESSED"
-                ),
+                "read_only_policy_verified": ("PASS" if credential and credential.read_only_policy_verified else "FAIL" if credential else "NOT_ASSESSED"),
             },
             "invocation": invocation,
             "checks": checks,
@@ -853,20 +840,10 @@ class CloudContextInspector:
     ) -> dict[str, Any]:
         checked_at = observed_at or utc_now()
         policy_freshness = credential.policy_observation_freshness if credential else "NOT_ASSESSED"
-        maximum_age_valid = credential is not None and _is_valid_policy_observation_max_age(
-            credential.policy_observation_max_age_seconds
-        )
+        maximum_age_valid = credential is not None and _is_valid_policy_observation_max_age(credential.policy_observation_max_age_seconds)
         if credential and maximum_age_valid and _is_timezone_aware(credential.policy_observation_observed_at):
-            invocation_age = (
-                checked_at.astimezone(UTC) - credential.policy_observation_observed_at.astimezone(UTC)
-            ).total_seconds()
-            policy_freshness = (
-                "FUTURE"
-                if invocation_age < 0
-                else "STALE"
-                if invocation_age > credential.policy_observation_max_age_seconds
-                else "FRESH"
-            )
+            invocation_age = (checked_at.astimezone(UTC) - credential.policy_observation_observed_at.astimezone(UTC)).total_seconds()
+            policy_freshness = "FUTURE" if invocation_age < 0 else "STALE" if invocation_age > credential.policy_observation_max_age_seconds else "FRESH"
         try:
             skill = {**self.verify_skill_source(), "runtime_invoked": False}
         except (OSError, ValueError, KeyError, json.JSONDecodeError):
@@ -981,11 +958,7 @@ class CloudContextInspector:
                     {"check_id": "POLICY_OBSERVATION_FRESH", "passed": False},
                     {"check_id": "SAME_RUN_POLICY_READBACK", "passed": False},
                 ],
-                uncertainty=[
-                    "POLICY_OBSERVATION_FUTURE_DATED"
-                    if policy_freshness == "FUTURE"
-                    else "POLICY_OBSERVATION_MAXIMUM_AGE_EXCEEDED"
-                ],
+                uncertainty=["POLICY_OBSERVATION_FUTURE_DATED" if policy_freshness == "FUTURE" else "POLICY_OBSERVATION_MAXIMUM_AGE_EXCEEDED"],
                 observed_at=checked_at,
             )
         if policy_freshness != "FRESH":
