@@ -1,0 +1,96 @@
+name: TITMAS Evidence Gate
+description: Block a pull-request merge unless tests, exact-head evidence, policy, and approval boundaries pass.
+author: joy7758
+
+inputs:
+  task:
+    description: Existing TITMAS action-request JSON bound to the exact pull-request head.
+    required: true
+  evidence:
+    description: agent-evidence profile for the exact action request.
+    required: true
+  policy:
+    description: Versioned deterministic policy JSON controlled by the repository.
+    required: true
+  test-command:
+    description: Exact command already bound into task.parameters.test_command.
+    required: true
+  approval:
+    description: Optional scoped human-approval JSON.
+    required: false
+    default: ""
+  execution-identity:
+    description: Non-secret CI execution identity reference bound into the task.
+    required: true
+  output-directory:
+    description: Receipt directory. The canonical default is artifacts/titmas.
+    required: false
+    default: artifacts/titmas
+
+outputs:
+  state:
+    description: PASS, FAIL, INCOMPLETE, or REVIEW_REQUIRED.
+    value: ${{ steps.verify.outputs.state }}
+  receipt:
+    description: Machine-readable receipt path.
+    value: ${{ steps.verify.outputs.receipt }}
+  summary:
+    description: Human-readable summary path.
+    value: ${{ steps.verify.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install source-pinned TITMAS Action Gate
+      shell: bash
+      run: python -m pip install "$GITHUB_ACTION_PATH"
+
+    - name: Verify exact pull-request head
+      id: verify
+      shell: bash
+      env:
+        TITMAS_INPUT_TASK: ${{ inputs.task }}
+        TITMAS_INPUT_EVIDENCE: ${{ inputs.evidence }}
+        TITMAS_INPUT_POLICY: ${{ inputs.policy }}
+        TITMAS_INPUT_TEST_COMMAND: ${{ inputs.test-command }}
+        TITMAS_INPUT_APPROVAL: ${{ inputs.approval }}
+        TITMAS_INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+        TITMAS_CURRENT_REPOSITORY: ${{ github.repository }}
+        TITMAS_CURRENT_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        TITMAS_CURRENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        TITMAS_EXECUTION_IDENTITY: ${{ inputs.execution-identity }}
+      run: |
+        set +e
+        args=(
+          --task "$TITMAS_INPUT_TASK"
+          --evidence "$TITMAS_INPUT_EVIDENCE"
+          --policy "$TITMAS_INPUT_POLICY"
+          --test-command "$TITMAS_INPUT_TEST_COMMAND"
+          --output-dir "$TITMAS_INPUT_OUTPUT_DIRECTORY"
+        )
+        if [[ -n "$TITMAS_INPUT_APPROVAL" ]]; then
+          args+=(--approval "$TITMAS_INPUT_APPROVAL")
+        fi
+        titmas-action-gate verify-pr "${args[@]}"
+        status=$?
+        if [[ -f "$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json" ]]; then
+          state=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["final_state"])' "$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json")
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "receipt=$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json" >> "$GITHUB_OUTPUT"
+          echo "summary=$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" >> "$GITHUB_OUTPUT"
+        fi
+        exit "$status"
+
+    - name: Publish human-readable gate summary
+      if: always()
+      shell: bash
+      env:
+        TITMAS_INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+      run: |
+        if [[ -f "$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" ]]; then
+          cat "$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+branding:
+  icon: shield
+  color: blue

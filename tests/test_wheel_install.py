@@ -63,6 +63,7 @@ class WheelInstallTests(unittest.TestCase):
                 import json
                 from pathlib import Path
                 import titmas_action_gate
+                from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES
                 from titmas_action_gate.runtime_mcp_server import build_from_environment
 
                 runtime = build_from_environment()
@@ -71,6 +72,7 @@ class WheelInstallTests(unittest.TestCase):
                     "package_file": str(Path(titmas_action_gate.__file__).resolve()),
                     "data_root": str(runtime.cloud_context_inspector.root),
                     "runtime_load_result": receipt["runtime_load_result"],
+                    "merge_gate_exit_codes": PUBLIC_EXIT_CODES,
                 }))
                 """
             )
@@ -120,6 +122,7 @@ class WheelInstallTests(unittest.TestCase):
             self.assertTrue(Path(result["data_root"]).is_relative_to(environment), result)
             self.assertTrue((Path(result["data_root"]) / "governance/alibabacloud-resourcecenter-search-source-lock.json").is_file())
             self.assertEqual(result["runtime_load_result"], "SOURCE_VERIFIED_THROUGH_AUTHENTICATED_MCP")
+            self.assertEqual(result["merge_gate_exit_codes"], {"PASS": 0, "FAIL": 1, "INCOMPLETE": 2, "REVIEW_REQUIRED": 3})
 
 
 if __name__ == "__main__":

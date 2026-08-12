@@ -6,15 +6,25 @@
   "canonical_name": "TITMAS Agent Action Gate",
   "canonical_name_zh": "TITMAS 智能体行动闸门",
   "repository": "https://github.com/joy7758/titmas-agent-action-gate",
-  "purpose": "A deterministic evidence and authorization boundary for agent-proposed external actions orchestrated through AgentTeams.",
+  "purpose": "Block unreliable pull-request merges by binding tests, exact-head evidence, policy, and required approval to one deterministic Action Gate decision.",
   "competition_context": {
     "name": "GOAI 2026 Agent Infra",
     "status": "COMPETITION_CANDIDATE_REPOSITORY_NOT_SUBMITTED",
     "official_affiliation_claimed": false,
     "submission_claimed": false
   },
-  "maturity": "M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
-  "implementation_status": "REFERENCE_IMPLEMENTATION",
+  "maturity": "DESIGN_WITH_RUNTIME_COMPONENTS",
+  "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_LOCAL_VALIDATED_PUBLIC_PROOF_PENDING",
+  "merge_blocking_product": {
+    "customer_sentence_zh": "这是一个真正会阻止不可靠代码变更合并的证据闸门。",
+    "public_states": ["PASS", "FAIL", "INCOMPLETE", "REVIEW_REQUIRED"],
+    "internal_authority_states": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"],
+    "required_check_proven": false,
+    "public_blind_spot_demo_proven": false,
+    "demo_recording_retained": false,
+    "acceptance_progress": "5/8",
+    "local_test_count": 178
+  },
   "submilestones": {
     "official_alibaba_cloud_skill": "COMPLETE_BOUNDED_NATIVE_WORKER_EVIDENCE",
     "full_m4": "INCOMPLETE"
@@ -66,6 +76,11 @@
     "evidence_result_schema": "schemas/evidence-verification-result.v0.1.schema.json",
     "approval_schema": "schemas/human-approval.v0.1.schema.json",
     "decision_schema": "schemas/action-gate-decision.v0.1.schema.json",
+    "merge_blocking_cli": "titmas-action-gate verify-pr",
+    "merge_blocking_runtime": "src/titmas_action_gate/pr_gate.py",
+    "merge_blocking_reusable_action": "action.yml",
+    "merge_blocking_clean_replay": "scripts/replay_merge_gate_scenarios.py",
+    "merge_blocking_gap_list": "docs/P0-MERGE-BLOCKING-GAP-LIST.md",
     "skill_manifest_schema": "schemas/skill-manifest.v0.1.schema.json",
     "mcp_manifest": "mcp/server-manifest.v0.1.json",
     "native_runtime_mcp_manifest": "mcp/native-runtime-server-manifest.v0.2.json",
@@ -83,6 +98,7 @@
   ],
   "when_not_to_use": [
     "as a general agent framework or central intelligent controller",
+    "as proof that a required GitHub check has been configured before retained public evidence exists",
     "as certification, compliance, or production-readiness proof",
     "to let an agent self-authorize or bypass provider permissions",
     "to claim a competition submission"

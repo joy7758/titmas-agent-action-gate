@@ -13,10 +13,10 @@
     "remote_observation": "PUBLIC_REPOSITORY_WITH_DBA_EXISTENCE_REPORT_MERGED_PR_100_G0_ADMISSION_PENDING",
     "primary_repository": true,
     "primary_responsibility_domain": "GOVERNANCE_SERVICE_APPLICATION_BOUNDARY",
-    "purpose": "Provide an experimental fail-closed, auditable decision boundary for agent-proposed external or high-impact actions.",
-    "initial_use_case": "GOAI_COMPETITION_DIALOGUE_REQUIREMENTS_CONTEXT",
-    "maturity": "M4_EXPERIMENTAL_REFERENCE_IMPLEMENTATION",
-    "implementation_status": "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE_EVIDENCE"
+    "purpose": "Block unreliable pull-request merges by binding tests, exact-head evidence, policy, and required approval to one deterministic Action Gate decision.",
+    "initial_use_case": "GITHUB_PULL_REQUEST_REQUIRED_EVIDENCE_CHECK",
+    "maturity": "DESIGN_WITH_RUNTIME_COMPONENTS",
+    "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_LOCAL_VALIDATED_PUBLIC_PROOF_PENDING"
   },
   "dba_report_reference": {
     "repository": "joy7758/digital-biosphere-architecture-specification",
@@ -49,6 +49,8 @@
     "NO_COMPETITION_SUBMISSION",
     "NO_PORTFOLIO_ADMISSION_YET",
     "NO_PUBLIC_RELEASE_OR_PRODUCTION_DEPLOYMENT",
-    "NO_PRODUCTION_READINESS_OR_CERTIFICATION"
+    "NO_PRODUCTION_READINESS_OR_CERTIFICATION",
+    "NO_PUBLIC_REQUIRED_CHECK_PROOF_YET",
+    "NO_NINETY_SECOND_DEMO_RECORDING_YET"
   ]
 }

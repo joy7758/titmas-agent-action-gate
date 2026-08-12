@@ -1,0 +1,27 @@
+{
+  "policy_id": "github-merge-gate-low-risk-demo",
+  "version": "0.1.0",
+  "default": {
+    "effect": "DENY",
+    "risk_class": "CRITICAL",
+    "required_evidence_types": ["SOURCE_PIN", "REQUEST_AUTHORIZATION"]
+  },
+  "rules": [
+    {
+      "action": "github.pull_request.merge",
+      "effect": "ALLOW_WITHOUT_APPROVAL",
+      "risk_class": "LOW",
+      "required_evidence_types": ["SOURCE_PIN", "DIFF", "TEST_RESULT", "PULL_REQUEST_STATE"]
+    }
+  ],
+  "invariants": [
+    "UNKNOWN_ACTION_DENIED",
+    "TEST_COMMAND_MUST_MATCH_ACTION_REQUEST",
+    "EVIDENCE_MUST_BIND_EXACT_PULL_REQUEST_HEAD",
+    "ALLOW_BINDS_EXACT_ACTION_TARGET_AND_PARAMETERS"
+  ],
+  "non_claims": [
+    "DEMO_POLICY_NOT_PRODUCTION_POLICY",
+    "PASS_DOES_NOT_BYPASS_OTHER_GITHUB_RULES"
+  ]
+}
