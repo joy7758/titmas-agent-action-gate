@@ -13,17 +13,26 @@
     "official_affiliation_claimed": false,
     "submission_claimed": false
   },
-  "maturity": "DESIGN_WITH_RUNTIME_COMPONENTS",
-  "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_LOCAL_VALIDATED_PUBLIC_PROOF_PENDING",
+  "maturity": "PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT",
+  "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_PUBLICLY_REPRODUCED",
   "merge_blocking_product": {
     "customer_sentence_zh": "这是一个真正会阻止不可靠代码变更合并的证据闸门。",
     "public_states": ["PASS", "FAIL", "INCOMPLETE", "REVIEW_REQUIRED"],
     "internal_authority_states": ["ALLOW", "BLOCK", "REQUIRE_APPROVAL"],
-    "required_check_proven": false,
-    "public_blind_spot_demo_proven": false,
-    "demo_recording_retained": false,
-    "acceptance_progress": "5/8",
+    "required_check_proven": true,
+    "public_blind_spot_demo_proven": true,
+    "demo_recording_retained": true,
+    "acceptance_progress": "8/8",
     "local_test_count": 178
+  },
+  "strategic_positioning": {
+    "long_term_direction": "FUTURE_AGENT_TO_AGENT_ERA",
+    "primary_risk": "AGENT_ERROR_SCALING_AND_PROPAGATION",
+    "core_mission_zh": "我们不是防止 AI 犯错，而是防止 AI 把错误规模化。",
+    "github_merge_gate": "FIRST_REFERENCE_SURFACE",
+    "github_merge_gate_ne_final_product": true,
+    "current_scale_capability": "UNPROVEN",
+    "agent_claim_ne_verified_fact": true
   },
   "submilestones": {
     "official_alibaba_cloud_skill": "COMPLETE_BOUNDED_NATIVE_WORKER_EVIDENCE",
@@ -81,6 +90,7 @@
     "merge_blocking_reusable_action": "action.yml",
     "merge_blocking_clean_replay": "scripts/replay_merge_gate_scenarios.py",
     "merge_blocking_gap_list": "docs/P0-MERGE-BLOCKING-GAP-LIST.md",
+    "merge_blocking_public_proof": "demo/evidence/merge-blocking-public-proof-20260812.json",
     "skill_manifest_schema": "schemas/skill-manifest.v0.1.schema.json",
     "mcp_manifest": "mcp/server-manifest.v0.1.json",
     "native_runtime_mcp_manifest": "mcp/native-runtime-server-manifest.v0.2.json",

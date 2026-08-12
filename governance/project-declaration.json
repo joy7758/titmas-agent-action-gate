@@ -15,8 +15,8 @@
     "primary_responsibility_domain": "GOVERNANCE_SERVICE_APPLICATION_BOUNDARY",
     "purpose": "Block unreliable pull-request merges by binding tests, exact-head evidence, policy, and required approval to one deterministic Action Gate decision.",
     "initial_use_case": "GITHUB_PULL_REQUEST_REQUIRED_EVIDENCE_CHECK",
-    "maturity": "DESIGN_WITH_RUNTIME_COMPONENTS",
-    "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_LOCAL_VALIDATED_PUBLIC_PROOF_PENDING"
+    "maturity": "PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT",
+    "implementation_status": "MERGE_BLOCKING_PRODUCT_P0_PUBLICLY_REPRODUCED"
   },
   "dba_report_reference": {
     "repository": "joy7758/digital-biosphere-architecture-specification",
@@ -49,8 +49,6 @@
     "NO_COMPETITION_SUBMISSION",
     "NO_PORTFOLIO_ADMISSION_YET",
     "NO_PUBLIC_RELEASE_OR_PRODUCTION_DEPLOYMENT",
-    "NO_PRODUCTION_READINESS_OR_CERTIFICATION",
-    "NO_PUBLIC_REQUIRED_CHECK_PROOF_YET",
-    "NO_NINETY_SECOND_DEMO_RECORDING_YET"
+    "NO_PRODUCTION_READINESS_OR_CERTIFICATION"
   ]
 }

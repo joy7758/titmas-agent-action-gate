@@ -8,7 +8,7 @@ It is an evidence gate that returns a non-passing required check when tests, exa
 
 TITMAS Agent Action Gate is an experimental competition demo candidate for the GOAI 2026 Agent Infra track. It separates uncertain agent analysis from deterministic authorization, evidence verification, policy evaluation, and human approval.
 
-Current product status: `DESIGN_WITH_RUNTIME_COMPONENTS`. The merge-blocking P0 path is under bounded validation; it is not yet a publicly reproduced merge-blocking product. The historical bounded Alibaba Cloud official Skill sub-milestone remains `COMPLETE`, while full M4 remains `INCOMPLETE` and is outside the current work scope.
+Current product status: `PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT` for the bounded GitHub reference surface. The 8/8 acceptance proof is retained in [`demo/evidence/merge-blocking-public-proof-20260812.json`](demo/evidence/merge-blocking-public-proof-20260812.json): a public required check blocks commit-A evidence against pull-request head B while ordinary CI passes, then passes after the evidence subject is corrected, with receipts, summaries, and an approximately 90-second public recording. This does not prove production readiness, large-scale agent concurrency, agent-to-agent production governance, certification, compliance, or complete M4 autonomy. The historical bounded Alibaba Cloud official Skill sub-milestone remains `COMPLETE`, while full M4 remains `INCOMPLETE` and is outside the current work scope.
 
 The deterministic Action Gate, append-only state store, pinned `agent-evidence` adapter, authenticated native MCP boundary, six-role target topology, and allowlisted in-memory GitHub provider adapter are implemented in the current worktree. A bounded public sandbox run previously created a branch and Draft PR. On 2026-08-02, a historical isolated deployment of official AgentTeams `v1.2.0` started one Manager and five Workers; it remains operator-supervised negative evidence. A separate disposable `cloud-context-inspector` ran one native Qwen Worker turn: it resolved the externally installed official Alibaba Cloud Resource Center Skill, verified the source-lock digest, invoked the frozen typed read-only adapter, and returned `EMPTY_RESULT` as `NOT_ASSESSED_NO_VISIBLE_RESOURCE`. The retained chains and canonical `agent-evidence` receipt validate, while Worker decision records and Resource Center write calls remain zero. This proves only the bounded specialist turn, not a complete cloud inventory, broader autonomous M4 completion, or deployment authorization.
 
@@ -54,7 +54,17 @@ The root [`action.yml`](action.yml) is the reusable composite Action. Consumers 
 python scripts/replay_merge_gate_scenarios.py
 ```
 
-It covers valid low-risk, failing-test, missing-evidence, high-risk unapproved, high-risk approved rerun, and commit-A-evidence/commit-B-head mismatch. The current gap list is [`docs/P0-MERGE-BLOCKING-GAP-LIST.md`](docs/P0-MERGE-BLOCKING-GAP-LIST.md).
+It covers valid low-risk, failing-test, missing-evidence, high-risk unapproved, high-risk approved rerun, and commit-A-evidence/commit-B-head mismatch. The baseline gap list and its bounded closure record are in [`docs/P0-MERGE-BLOCKING-GAP-LIST.md`](docs/P0-MERGE-BLOCKING-GAP-LIST.md).
+
+## Competition positioning
+
+AI coding is moving from one assistant toward populations of agents operating across repositories at machine speed. The systemic risk is not that an agent can make one mistake, but that a mistaken task interpretation, unstable behavior, or unsupported claim can be handed onward and replicated quickly.
+
+TITMAS answers with task, identity, authority, and evidence verification before effect. The current real proof is deliberately smaller than that long-term vision: one AI-generated code change is bound to its task, actor, authorization, exact commit, and evidence, and a mismatched change is genuinely blocked before merge.
+
+GitHub manages repositories, workflows, tests, reviews, and merge rules. TITMAS uses those enforcement surfaces while checking a different question: whether the AI action is actually covered by the current task authorization and evidence. The GitHub merge gate is the first reference surface, not the final identity of TITMAS. Large-scale concurrency, production agent-to-agent governance, and prevention of error propagation at scale remain `UNPROVEN`.
+
+> **我们不是防止 AI 犯错，而是防止 AI 把错误规模化。**
 
 ## Why this exists
 

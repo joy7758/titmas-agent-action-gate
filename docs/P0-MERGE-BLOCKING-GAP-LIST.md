@@ -27,3 +27,11 @@ Customer-facing product sentence: **这是一个真正会阻止不可靠代码�
 Add one PR-verification adapter around the existing policy, evidence, approval and Action Gate components; expose it through the existing CLI; add one composite Action; add regression fixtures/tests and a clean replay workflow. After local validation, use an already authorized public sandbox for the required-check proof. Do not add agents, protocols, Skills, providers, production credentials, releases, deployments, tags or GOAI submission behavior.
 
 Until all eight items have retained proof, status remains `DESIGN_WITH_RUNTIME_COMPONENTS`.
+
+## Bounded closure
+
+Observed: `2026-08-12T23:04:28+08:00`
+
+All eight items now have bounded retained proof. The public sandbox required check, commit-A/commit-B blind spot, failed and corrected workflow attempts, receipt and summary hashes, branch-protection observation, and public approximately 90-second recording are bound in [`../demo/evidence/merge-blocking-public-proof-20260812.json`](../demo/evidence/merge-blocking-public-proof-20260812.json).
+
+Current bounded product status: `PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT` (`8/8`). This is a status for the GitHub reference surface only; it is not production readiness, large-scale concurrency proof, certification, compliance, complete M4 autonomy, a release, a deployment, or a GOAI submission.

@@ -1,7 +1,7 @@
 {
-  "gate_version": "2.4.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260812-014",
-  "evaluated_at": "2026-08-12T21:37:14+08:00",
+  "gate_version": "2.5.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260812-015",
+  "evaluated_at": "2026-08-12T23:04:28+08:00",
   "evaluator_class": "AI_AGENT",
   "development_context": {
     "task_scope": "PUBLIC_REPRODUCIBLE_MERGE_BLOCKING_EVIDENCE_GATE_P0",
@@ -12,23 +12,23 @@
     "implementation_boundary": "VERIFY_PR_CLI_REUSABLE_GITHUB_ACTION_FOUR_PUBLIC_STATES_PER_RUN_RECEIPTS_CLEAN_REPLAY_AND_EXISTING_PUBLIC_SANDBOX_REQUIRED_CHECK_ONLY",
     "external_read_authorized": true,
     "external_write_authorized": true,
-    "external_write_executed": false,
+    "external_write_executed": true,
     "prior_iam_provisioning_external_write_executed": true,
-    "authorized_external_writes": ["GIT_BRANCH_PUSH", "PULL_REQUEST_CREATE_OR_UPDATE", "EXISTING_PUBLIC_SANDBOX_BRANCH_PROTECTION", "EXISTING_PUBLIC_SANDBOX_CHECK_EXECUTION"],
+    "authorized_external_writes": ["GIT_BRANCH_PUSH", "PULL_REQUEST_CREATE_OR_UPDATE", "EXISTING_PUBLIC_SANDBOX_BRANCH_PROTECTION", "EXISTING_PUBLIC_SANDBOX_CHECK_EXECUTION", "PUBLIC_SANDBOX_DEMONSTRATION_COMMENT_AND_VIDEO_ATTACHMENT"],
     "prohibited_external_writes": ["FORCE_PUSH", "PULL_REQUEST_MERGE", "NEW_REPOSITORY_CREATION_WITHOUT_SEPARATE_AUTHORIZATION", "TAG", "RELEASE", "DEPLOYMENT", "GOAI_SUBMISSION", "CREDENTIAL_CHANGE"]
   },
   "customer_need": "Prevent unreliable code changes from merging by binding tests, negative checks, authorization and verified evidence to the exact pull-request head commit.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "Bounded development remains recommended because the verify-pr CLI, reusable Action, four public states, exact-head binding, pre-reserved per-run receipts and clean replay now pass 178 local tests and validators without a new protocol. Current product use remains not recommended until a public required check actually blocks a stale-evidence pull request, the corrected rerun passes, and the uninterrupted demonstration is retained."
+    "reason": "The bounded GitHub reference surface completed 8/8 acceptance with 178 local tests, clean replay, a public required check, commit-A evidence blocked against pull-request head B while ordinary CI passed, a corrected rerun, retained receipts and summaries, and a public approximately 90-second recording. Current product use remains not recommended because this competition proof is not an independent security or operational review and does not establish production identity, key management, recovery, multi-tenant isolation, large-scale concurrency, or complete M4 autonomy."
   },
   "advisory_agent_reviews": [
     {
       "agent": "Codex local implementation validation",
       "executed": true,
       "scope": "VERIFY_PR_ACTION_FOUR_STATE_RECEIPTS_AND_CLEAN_REPLAY",
-      "result": "178_OF_178_TESTS_RUFF_GOVERNANCE_MILESTONE_EVIDENCE_VALIDATORS_AND_SIX_SCENARIO_CLEAN_REPLAY_PASS_PUBLIC_REQUIRED_CHECK_AND_RECORDING_PENDING",
+      "result": "178_OF_178_TESTS_RUFF_GOVERNANCE_MILESTONE_EVIDENCE_VALIDATORS_AND_SIX_SCENARIO_CLEAN_REPLAY_PASS_PUBLIC_REQUIRED_CHECK_BLIND_SPOT_AND_RECORDING_RETAINED_8_OF_8",
       "authorization_effect": "NONE",
       "independent_security_review": false
     },
@@ -220,11 +220,6 @@
       "id": "NR-006",
       "reason": "The real Resource Center query used a dedicated assume-only RAM caller and read-only role, but the caller AccessKey remains in the local 0600 CLI configuration and no rotation, revocation, or recovery exercise is retained.",
       "required_fix": "Define and test bounded credential rotation, revocation, recovery, and incident response without exposing credential bytes."
-    },
-    {
-      "id": "NR-007",
-      "reason": "The merge-blocking CLI and Action pass locally, but no retained public sandbox run yet proves the check is required, blocks commit-A evidence against pull-request head B, and passes after corrected evidence or verified approval.",
-      "required_fix": "Publish the bounded changes, configure the check as required in an existing authorized public sandbox, retain blocked and corrected runs with receipts, and record the uninterrupted demonstration."
     }
   ],
   "completed_corrections": [
@@ -287,6 +282,10 @@
     ,"EXACT_PR_HEAD_EVIDENCE_SUBJECT_BINDING_REGRESSION_PASSED"
     ,"EVERY_RUN_MACHINE_RECEIPT_AND_HUMAN_SUMMARY_IMPLEMENTED"
     ,"CLEAN_ENVIRONMENT_SIX_SCENARIO_REPLAY_PASSED"
+    ,"PUBLIC_REQUIRED_CHECK_MERGE_BLOCKING_PROOF_RETAINED"
+    ,"PUBLIC_ORDINARY_CI_BLIND_SPOT_DEMONSTRATED"
+    ,"PUBLIC_NINETY_SECOND_UNINTERRUPTED_DEMO_RECORDING_RETAINED"
+    ,"MERGE_BLOCKING_PRODUCT_P0_ACCEPTANCE_8_OF_8"
   ],
   "remaining_gaps": [
     "DBA_PORTFOLIO_DECISION",
@@ -304,9 +303,6 @@
     "COMPETITION_MATERIAL_REVIEW_AND_SEPARATELY_AUTHORIZED_SUBMISSION"
     ,"READ_ONLY_RAM_CREDENTIAL_ROTATION_REVOCATION_AND_RECOVERY_EXERCISE"
     ,"UPSTREAM_SKILL_LICENSE_CLARIFICATION"
-    ,"PUBLIC_REQUIRED_CHECK_MERGE_BLOCKING_PROOF"
-    ,"PUBLIC_ORDINARY_CI_BLIND_SPOT_DEMONSTRATION"
-    ,"NINETY_SECOND_UNINTERRUPTED_DEMO_RECORDING"
   ],
   "stop_conditions": [
     "ACTION_EXECUTION_REQUESTED_OUTSIDE_EXPLICIT_USER_OR_PROVIDER_AUTHORIZATION",
@@ -333,5 +329,5 @@
     ,"OFFICIAL_SKILL_SOURCE_HASH_OR_RUNTIME_LOAD_MISMATCH"
   ],
   "new_human_decision_required": true,
-  "next_decision": "REASSESS_PUBLIC_PRODUCT_STATUS_ONLY_AFTER_ALL_EIGHT_MERGE_BLOCKING_ACCEPTANCE_ITEMS_ARE_EVIDENCED"
+  "next_decision": "INDEPENDENT_OPERATIONAL_REVIEW_REQUIRED_BEFORE_CUSTOMER_USE_PRODUCTION_DEPLOYMENT_OR_SECURITY_CLAIMS"
 }
