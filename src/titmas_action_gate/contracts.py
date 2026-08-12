@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import sysconfig
@@ -45,6 +46,7 @@ def schema_directory() -> Path:
     )
 
 
+@functools.cache
 def _validator(contract: str) -> Draft202012Validator:
     try:
         filename = SCHEMA_FILES[contract]
