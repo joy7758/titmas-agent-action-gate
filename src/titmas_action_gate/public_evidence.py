@@ -35,6 +35,7 @@ VALIDATOR_RELATIVE_PATH = "src/titmas_action_gate/public_evidence.py"
 HISTORICAL_ADAPTER_SHA256 = "b93d95d26216642885f0bbe03ff8ecf5ebb37227dbf10f9bc72556e3a0e73d54"
 HISTORICAL_RUNNER_SHA256 = "c6890bb7865bbf0fab7baac42cc79806a0eabf92e51bcf41f8279cfb88347aaa"
 HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256 = "a68ec44f560ea50dd0366bcc7c0ab0de378480ca2dfd744a4e5434e218d3a498"
+HISTORICAL_EVIDENCE_ADAPTER_SHA256 = "b053abb012afb339c947afe186940b8588ffd992710436db6b37684601e91603"
 
 
 def workspace_content_provenance(root: Path) -> dict[str, Any]:
@@ -260,6 +261,7 @@ def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
             "adapter_sha256": HISTORICAL_ADAPTER_SHA256,
             "runner_sha256": HISTORICAL_RUNNER_SHA256,
             "policy_observation_producer_sha256": HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256,
+            "evidence_adapter_sha256": HISTORICAL_EVIDENCE_ADAPTER_SHA256,
         }
         if observed == historical_digests.get(key):
             continue

@@ -34,7 +34,7 @@ class RuntimeTokenVerifier:
         except AuthenticationError:
             return None
         return AccessToken(
-            token="<redacted>",
+            token=token,
             client_id=principal.principal_id,
             subject=principal.principal_id,
             scopes=["titmas.runtime"],

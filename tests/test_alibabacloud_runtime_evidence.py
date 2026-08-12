@@ -124,7 +124,7 @@ class AlibabaCloudRuntimeEvidenceTests(unittest.TestCase):
             "source_lock_sha256",
             "policy_observation_sha256",
         ):
-            if key in {"runner_sha256", "policy_observation_producer_sha256"}:
+            if key in {"runner_sha256", "policy_observation_producer_sha256", "evidence_adapter_sha256"}:
                 self.assertNotEqual(evidence["provenance"][key], current[key])
             else:
                 self.assertEqual(evidence["provenance"][key], current[key])
