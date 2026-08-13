@@ -20,41 +20,141 @@ class ExclusiveOutput:
     """
 
     def __init__(self, path: str | Path, *, mode: int = 0o600):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-        self._fd = os.open(self.path, flags, mode)
+        requested = Path(path).expanduser().absolute()
+        requested.parent.mkdir(parents=True, exist_ok=True)
+        parent = requested.parent.resolve(strict=True)
+        self.path = parent / requested.name
+        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        self._parent_fd = os.open(parent, directory_flags)
+        parent_observation = os.fstat(self._parent_fd)
+        if not stat.S_ISDIR(parent_observation.st_mode):
+            os.close(self._parent_fd)
+            self._parent_fd = -1
+            raise RuntimeError("EXCLUSIVE_OUTPUT_PARENT_NOT_DIRECTORY")
+        self._parent_path = parent
+        self._parent_identity = (parent_observation.st_dev, parent_observation.st_ino)
+        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            self._fd = os.open(self.path.name, flags, mode, dir_fd=self._parent_fd)
+        except Exception:
+            os.close(self._parent_fd)
+            self._parent_fd = -1
+            raise
         os.fchmod(self._fd, mode)
         created = os.fstat(self._fd)
         if not stat.S_ISREG(created.st_mode):
             os.close(self._fd)
             self._fd = -1
+            os.close(self._parent_fd)
+            self._parent_fd = -1
             raise RuntimeError("EXCLUSIVE_OUTPUT_NOT_REGULAR")
         self._identity = (created.st_dev, created.st_ino)
+        self._initial_link_count = created.st_nlink
+        self._initial_mode = stat.S_IMODE(created.st_mode)
+        self._initial_uid = created.st_uid
+        self._initial_gid = created.st_gid
+        self._initial_mtime_ns = created.st_mtime_ns
+        self._initial_ctime_ns = created.st_ctime_ns
         self._committed = False
 
     def __enter__(self) -> ExclusiveOutput:
         return self
 
-    def _path_is_reserved_inode(self) -> bool:
+    def _parent_is_reserved_directory(self) -> bool:
+        if self._parent_fd < 0:
+            return False
         try:
-            observed = os.stat(self.path, follow_symlinks=False)
-        except FileNotFoundError:
+            descriptor_observation = os.fstat(self._parent_fd)
+            path_observation = self._parent_path.lstat()
+        except (FileNotFoundError, OSError):
+            return False
+        current = Path(self._parent_path.anchor)
+        for part in self._parent_path.parts[1:]:
+            current = current / part
+            try:
+                component = current.lstat()
+            except (FileNotFoundError, OSError):
+                return False
+            if stat.S_ISLNK(component.st_mode):
+                return False
+        return bool(
+            stat.S_ISDIR(descriptor_observation.st_mode)
+            and stat.S_ISDIR(path_observation.st_mode)
+            and (descriptor_observation.st_dev, descriptor_observation.st_ino) == self._parent_identity
+            and (path_observation.st_dev, path_observation.st_ino) == self._parent_identity
+        )
+
+    def _directory_entry_is_reserved_inode(self) -> bool:
+        if self._parent_fd < 0:
+            return False
+        try:
+            observed = os.stat(self.path.name, dir_fd=self._parent_fd, follow_symlinks=False)
+        except (FileNotFoundError, OSError):
             return False
         return stat.S_ISREG(observed.st_mode) and (observed.st_dev, observed.st_ino) == self._identity
+
+    def _path_is_reserved_inode(self) -> bool:
+        if not self._parent_is_reserved_directory() or not self._directory_entry_is_reserved_inode():
+            return False
+        try:
+            observed = os.stat(self.path, follow_symlinks=False)
+        except (FileNotFoundError, OSError):
+            return False
+        return stat.S_ISREG(observed.st_mode) and (observed.st_dev, observed.st_ino) == self._identity
+
+    def pristine(self) -> bool:
+        """Return whether the reserved inode is still empty and exclusively linked."""
+
+        if self._fd < 0 or not self._path_is_reserved_inode():
+            return False
+        observed = os.fstat(self._fd)
+        if (
+            not stat.S_ISREG(observed.st_mode)
+            or observed.st_nlink != self._initial_link_count
+            or stat.S_IMODE(observed.st_mode) != self._initial_mode
+            or observed.st_uid != self._initial_uid
+            or observed.st_gid != self._initial_gid
+            or observed.st_mtime_ns != self._initial_mtime_ns
+            or observed.st_ctime_ns != self._initial_ctime_ns
+            or observed.st_size != 0
+        ):
+            return False
+        os.lseek(self._fd, 0, os.SEEK_SET)
+        return os.read(self._fd, 1) == b""
 
     def write_text(self, value: str) -> None:
         if self._committed or self._fd < 0:
             raise RuntimeError("EXCLUSIVE_OUTPUT_ALREADY_COMMITTED")
         if not self._path_is_reserved_inode():
             raise RuntimeError("EXCLUSIVE_OUTPUT_PATH_REPLACED")
-        with os.fdopen(self._fd, "w", encoding="utf-8") as handle:
-            self._fd = -1
-            handle.write(value)
-            handle.flush()
-            os.fsync(handle.fileno())
+        if not self.pristine():
+            raise RuntimeError("EXCLUSIVE_OUTPUT_NOT_PRISTINE")
+        payload = value.encode("utf-8")
+        os.ftruncate(self._fd, 0)
+        os.lseek(self._fd, 0, os.SEEK_SET)
+        written = 0
+        while written < len(payload):
+            written += os.write(self._fd, payload[written:])
+        os.fsync(self._fd)
+        os.lseek(self._fd, 0, os.SEEK_SET)
+        observed = b""
+        while len(observed) < len(payload):
+            chunk = os.read(self._fd, len(payload) - len(observed))
+            if not chunk:
+                break
+            observed += chunk
+        if (
+            observed != payload
+            or hashlib.sha256(observed).digest() != hashlib.sha256(payload).digest()
+            or os.fstat(self._fd).st_size != len(payload)
+        ):
+            raise RuntimeError("EXCLUSIVE_OUTPUT_WRITE_VERIFICATION_FAILED")
+        os.close(self._fd)
+        self._fd = -1
         if not self._path_is_reserved_inode():
             raise RuntimeError("EXCLUSIVE_OUTPUT_PATH_REPLACED")
+        os.close(self._parent_fd)
+        self._parent_fd = -1
         self._committed = True
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
@@ -62,8 +162,11 @@ class ExclusiveOutput:
             os.close(self._fd)
             self._fd = -1
         if not self._committed:
-            if self._path_is_reserved_inode():
-                self.path.unlink()
+            if self._directory_entry_is_reserved_inode():
+                os.unlink(self.path.name, dir_fd=self._parent_fd)
+            if self._parent_fd >= 0:
+                os.close(self._parent_fd)
+                self._parent_fd = -1
             if exc_type is None:
                 raise RuntimeError("EXCLUSIVE_OUTPUT_NOT_COMMITTED")
         return False

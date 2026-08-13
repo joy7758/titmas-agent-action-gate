@@ -23,7 +23,22 @@
     "public_blind_spot_demo_proven": true,
     "demo_recording_retained": true,
     "acceptance_progress": "8/8",
-    "local_test_count": 205
+    "local_test_count": 239
+  },
+  "post_merge_security_closure": {
+    "pr_24_merged": true,
+    "pr_24_merge_commit": "40a76fe1ca221c0e8c23192c3044a67340e7060e",
+    "pr_24_merge_authorized_in_this_task": false,
+    "base_main_security_candidate": false,
+    "root_causes": [
+      "RC1_GIT_EXECUTION_ADMISSION_BASELINE_INCOMPLETE",
+      "RC2_RESERVED_OUTPUT_CONTENT_INTEGRITY_INCOMPLETE",
+      "RC3_TEST_OUTPUT_BUDGET_ACCOUNTING_SPLIT"
+    ],
+    "local_implementation": "PASS_239_TESTS_PENDING_DUAL_CI_AND_FINAL_REVIEW",
+    "public_demo_invalidated": false,
+    "video_rerecord_required": false,
+    "preliminary_submission_candidate_ready": false
   },
   "strategic_positioning": {
     "long_term_direction": "FUTURE_AGENT_TO_AGENT_ERA",
