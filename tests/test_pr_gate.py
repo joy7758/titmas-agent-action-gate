@@ -33,7 +33,7 @@ APPROVAL_KEY = "public-disposable-demo-key-material-0001"
 class PullRequestGateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory(prefix="titmas-pr-gate-")
-        self.root = Path(self.tempdir.name)
+        self.root = Path(self.tempdir.name).resolve(strict=True)
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()

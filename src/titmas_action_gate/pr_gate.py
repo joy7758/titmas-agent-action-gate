@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import signal
@@ -25,14 +26,23 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
 from urllib.parse import urlsplit
 
 import yaml
 
 from .approval import ApprovalAuthority
-from .canonical import ExclusiveOutput, canonical_json_bytes, format_datetime, request_binding, sha256_json, utc_now
+from .canonical import (
+    ExclusiveOutput,
+    UnsafePathError,
+    _open_directory_no_follow,
+    canonical_json_bytes,
+    format_datetime,
+    request_binding,
+    sha256_json,
+    utc_now,
+)
 from .contracts import validate_action_request, validate_contract
 from .errors import ActionGateError
 from .evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
@@ -78,6 +88,7 @@ class FrozenJsonInput:
     inode: int | None
     missing: bool
     allowed_root: Path | None
+    ancestor_identities: tuple[tuple[str, int, int], ...]
 
     def payload(self) -> dict[str, Any]:
         if self.canonical_bytes is None:
@@ -108,6 +119,19 @@ class GitSnapshot:
     status_sha256: str | None = None
     state_sha256: str | None = None
     credential_risks: tuple[str, ...] = ()
+    submodule_count: int = 0
+    submodule_paths: tuple[str, ...] = ()
+    submodule_config_sha256: str | None = None
+    submodule_state_sha256: str | None = None
+    submodule_credential_risks: tuple[str, ...] = ()
+    submodule_config_source_categories: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class _EffectiveGitConfig:
+    sha256: str
+    source_categories: tuple[str, ...]
+    risk_categories: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -118,6 +142,7 @@ class FrozenActionConfiguration:
     device: int | None
     inode: int | None
     allowed_root: Path | None
+    ancestor_identities: tuple[tuple[str, int, int], ...]
 
 
 @dataclass(frozen=True)
@@ -145,10 +170,10 @@ class _SharedOutputBudget:
 
     def claim(self, chunk: bytes) -> tuple[bytes, bool]:
         with self._lock:
-            remaining = self.limit + 1 - self._observed_bytes
+            remaining = self.limit - self._observed_bytes
             accepted = chunk[: max(remaining, 0)]
             self._observed_bytes += len(accepted)
-            exceeded = self._observed_bytes > self.limit or len(accepted) < len(chunk)
+            exceeded = len(accepted) < len(chunk)
             return accepted, exceeded
 
     @property
@@ -172,40 +197,34 @@ def _read_json_object(path: Path) -> dict[str, Any]:
 
 
 def _bounded_path(path: str | Path, *, workspace: Path | None, enforce_workspace: bool) -> tuple[Path, Path | None]:
-    workspace_lexical = workspace.expanduser().absolute() if workspace is not None else None
-    root = workspace_lexical.resolve(strict=True) if workspace_lexical is not None else None
-    candidate = Path(path).expanduser()
-    if not candidate.is_absolute():
-        candidate = (workspace_lexical or Path.cwd()) / candidate
+    raw_workspace = workspace.expanduser() if workspace is not None else None
+    workspace_lexical = raw_workspace if raw_workspace is None or raw_workspace.is_absolute() else Path.cwd() / raw_workspace
+    if workspace_lexical is not None:
+        workspace_lexical = Path(os.path.abspath(workspace_lexical))
+        if _path_has_symlink_component(workspace_lexical):
+            raise ActionGateError("SYMLINK_ANCESTOR_NOT_ALLOWED", "The trusted workspace may not contain symbolic links.")
+        try:
+            root_observation = workspace_lexical.lstat()
+        except OSError as exc:
+            raise ActionGateError("INPUT_PATH_OUT_OF_SCOPE", "The trusted workspace is unavailable.") from exc
+        if not stat.S_ISDIR(root_observation.st_mode):
+            raise ActionGateError("PATH_COMPONENT_NOT_TRUSTED_DIRECTORY", "The trusted workspace must be a real directory.")
+    root = workspace_lexical
+    raw_candidate = Path(path).expanduser()
+    if not str(raw_candidate) or any(part in {".", ".."} for part in raw_candidate.parts):
+        raise ActionGateError("PATH_ESCAPES_REPOSITORY_ROOT", "Gate input paths may not contain dot traversal components.")
+    candidate = raw_candidate if raw_candidate.is_absolute() else (workspace_lexical or Path.cwd()) / raw_candidate
     candidate = Path(os.path.abspath(candidate))
     if enforce_workspace:
         if root is None:
             raise ActionGateError("INPUT_PATH_OUT_OF_SCOPE", "A trusted workspace is required for GitHub input paths.")
         try:
-            relative = candidate.relative_to(workspace_lexical)
+            relative = candidate.relative_to(root)
         except ValueError as exc:
-            try:
-                relative = candidate.relative_to(root)
-            except ValueError:
-                raise ActionGateError("INPUT_PATH_OUT_OF_SCOPE", "Gate input path escapes the trusted workspace.") from exc
+            raise ActionGateError("PATH_ESCAPES_REPOSITORY_ROOT", "Gate input path escapes the trusted workspace.") from exc
         candidate = root / relative
-        current = root
-        for part in relative.parts:
-            current = current / part
-            try:
-                observed = current.lstat()
-            except FileNotFoundError:
-                break
-            if stat.S_ISLNK(observed.st_mode):
-                raise ActionGateError("INPUT_SYMLINK_NOT_ALLOWED", "Gate input paths may not contain symbolic links.")
-    else:
-        try:
-            observed = candidate.lstat()
-        except FileNotFoundError:
-            pass
-        else:
-            if stat.S_ISLNK(observed.st_mode):
-                raise ActionGateError("INPUT_SYMLINK_NOT_ALLOWED", "Gate input files may not be symbolic links.")
+    if _path_has_symlink_component(candidate):
+        raise ActionGateError("SYMLINK_ANCESTOR_NOT_ALLOWED", "Gate input paths may not contain symbolic links.")
     return candidate, root
 
 
@@ -215,15 +234,19 @@ def _read_regular_bytes(
     workspace: Path | None,
     enforce_workspace: bool,
     allow_missing: bool,
-) -> tuple[Path, bytes | None, os.stat_result | None]:
+) -> tuple[Path, bytes | None, os.stat_result | None, tuple[tuple[str, int, int], ...]]:
     candidate, _ = _bounded_path(path, workspace=workspace, enforce_workspace=enforce_workspace)
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    parent_descriptor: int | None = None
     try:
-        descriptor = os.open(candidate, flags)
+        parent_descriptor, ancestor_identities = _open_directory_no_follow(candidate.parent, create=False)
+        descriptor = os.open(candidate.name, flags, dir_fd=parent_descriptor)
     except FileNotFoundError:
         if allow_missing:
-            return candidate, None, None
+            return candidate, None, None, ()
         raise ActionGateError("INPUT_MISSING", "A required gate input is missing.") from None
+    except UnsafePathError as exc:
+        raise ActionGateError(exc.code, "A gate input path could not be opened without following links.") from exc
     except OSError as exc:
         raise ActionGateError("INPUT_NOT_READABLE", "A gate input could not be opened safely.") from exc
     try:
@@ -236,9 +259,11 @@ def _read_regular_bytes(
             if not chunk:
                 break
             chunks.append(chunk)
-        return candidate, b"".join(chunks), observed
+        return candidate, b"".join(chunks), observed, ancestor_identities
     finally:
         os.close(descriptor)
+        if parent_descriptor is not None:
+            os.close(parent_descriptor)
 
 
 def _freeze_executable(name: str, environment: Mapping[str, str]) -> FrozenExecutable:
@@ -248,7 +273,7 @@ def _freeze_executable(name: str, environment: Mapping[str, str]) -> FrozenExecu
     resolved_path = Path(resolved).absolute()
     if _path_has_symlink_component(resolved_path):
         resolved_path = resolved_path.resolve(strict=True)
-    candidate, raw_bytes, observed = _read_regular_bytes(
+    candidate, raw_bytes, observed, _ = _read_regular_bytes(
         resolved_path,
         workspace=None,
         enforce_workspace=False,
@@ -266,7 +291,7 @@ def _freeze_executable(name: str, environment: Mapping[str, str]) -> FrozenExecu
 
 def _executable_unchanged(frozen: FrozenExecutable) -> bool:
     try:
-        _, raw_bytes, observed = _read_regular_bytes(
+        _, raw_bytes, observed, _ = _read_regular_bytes(
             frozen.path,
             workspace=None,
             enforce_workspace=False,
@@ -290,14 +315,27 @@ def _freeze_json_input(
     enforce_workspace: bool,
     allow_missing: bool = False,
 ) -> FrozenJsonInput:
-    candidate, raw_bytes, observed = _read_regular_bytes(
+    candidate, raw_bytes, observed, ancestor_identities = _read_regular_bytes(
         path,
         workspace=workspace,
         enforce_workspace=enforce_workspace,
         allow_missing=allow_missing,
     )
     if raw_bytes is None:
-        return FrozenJsonInput(role, candidate, candidate.name, None, None, None, None, None, None, True, workspace.resolve(strict=True) if workspace else None)
+        return FrozenJsonInput(
+            role,
+            candidate,
+            candidate.name,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            True,
+            Path(os.path.abspath(workspace)) if workspace else None,
+            ancestor_identities,
+        )
     try:
         payload = json.loads(raw_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -316,7 +354,8 @@ def _freeze_json_input(
         device=observed.st_dev if observed else None,
         inode=observed.st_ino if observed else None,
         missing=False,
-        allowed_root=workspace.resolve(strict=True) if enforce_workspace and workspace else None,
+        allowed_root=Path(os.path.abspath(workspace)) if enforce_workspace and workspace else None,
+        ancestor_identities=ancestor_identities,
     )
 
 
@@ -327,26 +366,33 @@ def _freeze_action_configuration(
     require_trusted_root: bool = False,
 ) -> FrozenActionConfiguration:
     if path is None:
-        return FrozenActionConfiguration(None, None, None, None, None, None)
+        return FrozenActionConfiguration(None, None, None, None, None, None, ())
     root: Path | None = None
     if trusted_root is not None:
-        root_candidate = Path(trusted_root).expanduser().absolute()
+        raw_root = Path(trusted_root).expanduser()
+        if not str(raw_root) or any(part in {".", ".."} for part in raw_root.parts):
+            raise ActionGateError("PATH_ESCAPES_REPOSITORY_ROOT", "The Action installation root may not contain dot traversal components.")
+        root_candidate = Path(os.path.abspath(raw_root))
         if _path_has_symlink_component(root_candidate):
-            raise ActionGateError("INPUT_SYMLINK_NOT_ALLOWED", "The Action installation root may not contain symbolic links.")
+            raise ActionGateError("SYMLINK_ANCESTOR_NOT_ALLOWED", "The Action installation root may not contain symbolic links.")
         try:
-            root = root_candidate.resolve(strict=True)
+            root_observation = root_candidate.lstat()
         except OSError as exc:
             raise ActionGateError("ACTION_CONFIGURATION_ROOT_INVALID", "The Action installation root is unavailable.") from exc
-        if not root.is_dir():
+        if not stat.S_ISDIR(root_observation.st_mode):
             raise ActionGateError("ACTION_CONFIGURATION_ROOT_INVALID", "The Action installation root must be a directory.")
+        root = root_candidate
     elif require_trusted_root:
         raise ActionGateError("ACTION_CONFIGURATION_ROOT_REQUIRED", "GitHub enforcement requires a trusted Action installation root.")
-    candidate_path = Path(path).expanduser().absolute()
-    if require_trusted_root and _path_has_symlink_component(candidate_path):
-        raise ActionGateError("INPUT_SYMLINK_NOT_ALLOWED", "The Action configuration path may not contain symbolic links.")
+    raw_candidate_path = Path(path).expanduser()
+    if not str(raw_candidate_path) or any(part in {".", ".."} for part in raw_candidate_path.parts):
+        raise ActionGateError("PATH_ESCAPES_REPOSITORY_ROOT", "The Action configuration path may not contain dot traversal components.")
+    candidate_path = Path(os.path.abspath(raw_candidate_path))
+    if _path_has_symlink_component(candidate_path):
+        raise ActionGateError("SYMLINK_ANCESTOR_NOT_ALLOWED", "The Action configuration path may not contain symbolic links.")
     if root is not None and candidate_path != root / "action.yml":
         raise ActionGateError("ACTION_CONFIGURATION_PATH_MISMATCH", "The Action configuration must be action.yml under the trusted installation root.")
-    candidate, raw_bytes, observed = _read_regular_bytes(
+    candidate, raw_bytes, observed, ancestor_identities = _read_regular_bytes(
         candidate_path,
         workspace=root,
         enforce_workspace=root is not None,
@@ -394,6 +440,7 @@ def _freeze_action_configuration(
         device=observed.st_dev if observed else None,
         inode=observed.st_ino if observed else None,
         allowed_root=root,
+        ancestor_identities=ancestor_identities,
     )
 
 
@@ -413,9 +460,24 @@ def _path_has_symlink_component(path: Path) -> bool:
     return False
 
 
+def _ancestor_identities_unchanged(identities: tuple[tuple[str, int, int], ...]) -> bool:
+    for path_text, expected_device, expected_inode in identities:
+        try:
+            observed = Path(path_text).lstat()
+        except OSError:
+            return False
+        if (
+            stat.S_ISLNK(observed.st_mode)
+            or not stat.S_ISDIR(observed.st_mode)
+            or (observed.st_dev, observed.st_ino) != (expected_device, expected_inode)
+        ):
+            return False
+    return True
+
+
 def _post_input_observation(frozen: FrozenJsonInput) -> dict[str, Any]:
     try:
-        candidate, raw_bytes, observed = _read_regular_bytes(
+        candidate, raw_bytes, observed, ancestor_identities = _read_regular_bytes(
             frozen.path,
             workspace=frozen.allowed_root,
             enforce_workspace=frozen.allowed_root is not None,
@@ -424,7 +486,12 @@ def _post_input_observation(frozen: FrozenJsonInput) -> dict[str, Any]:
     except ActionGateError as exc:
         return {"sha256": None, "identity_changed": True, "mutated": True, "error": exc.code}
     digest = hashlib.sha256(raw_bytes).hexdigest() if raw_bytes is not None else None
+    ancestors_changed = not _ancestor_identities_unchanged(frozen.ancestor_identities) or (
+        raw_bytes is not None and ancestor_identities != frozen.ancestor_identities
+    )
     identity_changed = bool(
+        ancestors_changed
+        or
         frozen.missing != (raw_bytes is None)
         or observed is not None
         and (observed.st_dev, observed.st_ino) != (frozen.device, frozen.inode)
@@ -437,11 +504,15 @@ def _post_input_observation(frozen: FrozenJsonInput) -> dict[str, Any]:
     }
 
 
+def _input_ancestor_check_id(role: str) -> str:
+    return f"{role.upper()}_PATH_ANCESTOR_MUTATED_DURING_TEST"
+
+
 def _post_action_configuration_observation(frozen: FrozenActionConfiguration) -> dict[str, Any]:
     if frozen.path is None:
         return {"sha256": None, "identity_changed": False, "mutated": False}
     try:
-        _, raw_bytes, observed = _read_regular_bytes(
+        _, raw_bytes, observed, ancestor_identities = _read_regular_bytes(
             frozen.path,
             workspace=frozen.allowed_root,
             enforce_workspace=frozen.allowed_root is not None,
@@ -450,7 +521,12 @@ def _post_action_configuration_observation(frozen: FrozenActionConfiguration) ->
     except ActionGateError as exc:
         return {"sha256": None, "identity_changed": True, "mutated": True, "error": exc.code}
     digest = hashlib.sha256(raw_bytes).hexdigest() if raw_bytes is not None else None
-    identity_changed = observed is None or (observed.st_dev, observed.st_ino) != (frozen.device, frozen.inode)
+    identity_changed = bool(
+        not _ancestor_identities_unchanged(frozen.ancestor_identities)
+        or ancestor_identities != frozen.ancestor_identities
+        or observed is None
+        or (observed.st_dev, observed.st_ino) != (frozen.device, frozen.inode)
+    )
     return {"sha256": digest, "identity_changed": identity_changed, "mutated": identity_changed or digest != frozen.sha256}
 
 
@@ -534,14 +610,26 @@ def _repository_slug(value: str) -> str | None:
 def _git_config_records(config_bytes: bytes) -> list[tuple[str, str, str, str]]:
     """Parse ``--show-scope --show-origin --null --list`` without values leaking."""
 
-    fields = [field for field in config_bytes.split(b"\0") if field]
+    fields = config_bytes.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if not fields or len(fields) % 3 != 0 or any(not field for field in fields):
+        raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The effective Git configuration output was incomplete.")
     records: list[tuple[str, str, str, str]] = []
-    for offset in range(0, len(fields) - 2, 3):
-        scope = fields[offset].decode("utf-8", "replace")
-        origin = fields[offset + 1].decode("utf-8", "replace")
+    for offset in range(0, len(fields), 3):
+        try:
+            scope = fields[offset].decode("utf-8", "strict")
+            origin = fields[offset + 1].decode("utf-8", "strict")
+        except UnicodeDecodeError as exc:
+            raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The effective Git configuration metadata was invalid.") from exc
         key_bytes, separator, value_bytes = fields[offset + 2].partition(b"\n")
-        key = key_bytes.decode("utf-8", "replace").lower()
-        value = value_bytes.decode("utf-8", "replace") if separator else ""
+        if not separator or not key_bytes:
+            raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The effective Git configuration record was incomplete.")
+        try:
+            key = key_bytes.decode("utf-8", "strict").lower()
+            value = value_bytes.decode("utf-8", "strict")
+        except UnicodeDecodeError as exc:
+            raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The effective Git configuration record was invalid.") from exc
         records.append((scope, origin, key, value))
     return records
 
@@ -599,6 +687,265 @@ def _untracked_paths(status_bytes: bytes) -> tuple[str, ...]:
     return tuple(paths)
 
 
+def _capture_effective_git_config(
+    git_executable: FrozenExecutable,
+    repository: Path,
+) -> _EffectiveGitConfig:
+    """Hash all effective local/worktree/include config without retaining values."""
+
+    config = _git_command(
+        git_executable,
+        repository,
+        "config",
+        "--includes",
+        "--show-origin",
+        "--show-scope",
+        "--null",
+        "--list",
+    )
+    extensions = _git_command(
+        git_executable,
+        repository,
+        "config",
+        "--local",
+        "--bool",
+        "--get",
+        "extensions.worktreeConfig",
+    )
+    if config.returncode != 0 or extensions.returncode not in {0, 1}:
+        raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The effective Git configuration could not be read.")
+    config_bytes = config.stdout
+    if extensions.returncode == 0:
+        if extensions.stdout.strip() != b"true":
+            raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The worktree configuration flag was invalid.")
+        worktree_path = _git_command(
+            git_executable,
+            repository,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "config.worktree",
+        )
+        if worktree_path.returncode != 0:
+            raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The worktree configuration location was unavailable.")
+        try:
+            worktree_config_path = Path(worktree_path.stdout.decode("utf-8", "strict").strip())
+            worktree_observation = worktree_config_path.lstat()
+        except FileNotFoundError:
+            worktree_observation = None
+        except (UnicodeDecodeError, OSError) as exc:
+            raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The worktree configuration location was invalid.") from exc
+        if worktree_observation is not None:
+            if stat.S_ISLNK(worktree_observation.st_mode) or not stat.S_ISREG(worktree_observation.st_mode):
+                raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The worktree configuration was not a regular file.")
+            worktree_config = _git_command(
+                git_executable,
+                repository,
+                "config",
+                "--worktree",
+                "--show-origin",
+                "--show-scope",
+                "--null",
+                "--list",
+            )
+            if worktree_config.returncode != 0:
+                raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The worktree Git configuration could not be read.")
+            config_bytes += worktree_config.stdout
+    records = _git_config_records(config_bytes)
+    return _EffectiveGitConfig(
+        sha256=hashlib.sha256(config_bytes).hexdigest(),
+        source_categories=tuple(
+            sorted({_git_config_source_category(scope, origin) for scope, origin, _key, _value in records})
+        ),
+        risk_categories=_git_credential_risks(config_bytes),
+    )
+
+
+def _gitlink_entries(index_bytes: bytes) -> tuple[tuple[str, str], ...]:
+    """Return safe stage-zero gitlinks from ``ls-files --stage -z`` output."""
+
+    entries: list[tuple[str, str]] = []
+    for raw_record in index_bytes.split(b"\0"):
+        if not raw_record:
+            continue
+        metadata, separator, raw_path = raw_record.partition(b"\t")
+        fields = metadata.split(b" ")
+        if not separator or len(fields) != 3:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "The Git index record was incomplete.")
+        mode, raw_sha, stage = fields
+        if mode != b"160000":
+            continue
+        try:
+            expected_sha = raw_sha.decode("ascii", "strict")
+            path_text = raw_path.decode("utf-8", "surrogateescape")
+        except (UnicodeDecodeError, UnicodeError) as exc:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule index record was invalid.") from exc
+        relative = PurePosixPath(path_text)
+        if (
+            stage != b"0"
+            or _SHA_PATTERN.fullmatch(expected_sha) is None
+            or relative.is_absolute()
+            or not relative.parts
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule index path or binding was unsafe.")
+        entries.append((path_text, expected_sha))
+    return tuple(entries)
+
+
+def _capture_initialized_submodules(
+    *,
+    git_executable: FrozenExecutable,
+    workspace: Path,
+    repository: Path,
+    prefix: PurePosixPath,
+    index_bytes: bytes,
+    visited: set[tuple[int, int]],
+    depth: int = 0,
+) -> tuple[dict[str, Any], ...]:
+    if depth > 16:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "The initialized submodule nesting limit was exceeded.")
+    records: list[dict[str, Any]] = []
+    for local_path, expected_sha in _gitlink_entries(index_bytes):
+        relative = prefix / PurePosixPath(local_path)
+        if len(records) + len(visited) >= 64:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "The initialized submodule count limit was exceeded.")
+        submodule_path = repository.joinpath(*PurePosixPath(local_path).parts)
+        if _path_has_symlink_component(submodule_path):
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule path contained a symbolic link.")
+        try:
+            path_observation = submodule_path.lstat()
+        except FileNotFoundError:
+            records.append(
+                {
+                    "path": str(relative),
+                    "expected_head_sha": expected_sha,
+                    "present": False,
+                    "initialized": False,
+                }
+            )
+            continue
+        if not stat.S_ISDIR(path_observation.st_mode):
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree path was not a directory.")
+        git_marker = submodule_path / ".git"
+        try:
+            git_marker_observation = git_marker.lstat()
+        except FileNotFoundError:
+            raise ActionGateError(
+                "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
+                "A present submodule worktree could not be proven initialized or bound to its gitlink.",
+            ) from None
+        except OSError as exc:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory was unavailable.") from exc
+        if stat.S_ISLNK(git_marker_observation.st_mode) or not (
+            stat.S_ISREG(git_marker_observation.st_mode) or stat.S_ISDIR(git_marker_observation.st_mode)
+        ):
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory binding was unsafe.")
+        top_level = _git_command(git_executable, submodule_path, "rev-parse", "--show-toplevel")
+        if top_level.returncode != 0:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule could not be inspected.")
+        try:
+            observed_top_level = Path(os.path.abspath(top_level.stdout.decode("utf-8", "strict").strip()))
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree could not be classified.") from exc
+        if observed_top_level != submodule_path:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree root was not exact.")
+        identity = (path_observation.st_dev, path_observation.st_ino)
+        if identity in visited:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule cycle was detected.")
+        visited.add(identity)
+        try:
+            audit = _capture_effective_git_config(git_executable, submodule_path)
+        except ActionGateError as exc:
+            raise ActionGateError(
+                "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
+                "An initialized submodule Git configuration could not be audited.",
+            ) from exc
+        record: dict[str, Any] = {
+            "path": str(relative),
+            "expected_head_sha": expected_sha,
+            "present": True,
+            "initialized": True,
+            "directory_identity": [path_observation.st_dev, path_observation.st_ino],
+            "config_sha256": audit.sha256,
+            "config_source_categories": list(audit.source_categories),
+            "credential_risk_categories": list(audit.risk_categories),
+        }
+        if audit.risk_categories:
+            record["clean"] = False
+            records.append(record)
+            continue
+        head = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{commit}")
+        head_tree = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{tree}")
+        index_tree = _git_command(git_executable, submodule_path, "write-tree")
+        index_result = _git_command(git_executable, submodule_path, "ls-files", "--stage", "-z")
+        staged_diff = _git_command(
+            git_executable,
+            submodule_path,
+            "diff",
+            "--cached",
+            "--quiet",
+            "--no-ext-diff",
+            "--no-textconv",
+            "HEAD",
+            "--",
+        )
+        worktree_clean = _git_command(
+            git_executable,
+            submodule_path,
+            "diff",
+            "--quiet",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--",
+        )
+        status_result = _git_command(
+            git_executable,
+            submodule_path,
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+        )
+        required = (head, head_tree, index_tree, index_result, status_result)
+        if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule state could not be read.")
+        head_sha = head.stdout.decode("ascii", "strict").strip()
+        head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
+        index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
+        if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
+            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule Git object identifier was invalid.")
+        nested = _capture_initialized_submodules(
+            git_executable=git_executable,
+            workspace=workspace,
+            repository=submodule_path,
+            prefix=relative,
+            index_bytes=index_result.stdout,
+            visited=visited,
+            depth=depth + 1,
+        )
+        record.update(
+            {
+                "head_sha": head_sha,
+                "head_tree_sha": head_tree_sha,
+                "index_tree_sha": index_tree_sha,
+                "index_sha256": hashlib.sha256(index_result.stdout).hexdigest(),
+                "status_sha256": hashlib.sha256(status_result.stdout).hexdigest(),
+                "clean": bool(
+                    head_sha == expected_sha
+                    and head_tree_sha == index_tree_sha
+                    and staged_diff.returncode == 0
+                    and worktree_clean.returncode == 0
+                    and not status_result.stdout
+                    and all(item.get("clean", True) for item in nested)
+                ),
+            }
+        )
+        records.append(record)
+        records.extend(nested)
+    return tuple(records)
+
+
 def _capture_git_snapshot(
     workspace: Path | None,
     expected_repository: str,
@@ -613,20 +960,8 @@ def _capture_git_snapshot(
     inside = _git_command(git_executable, workspace, "rev-parse", "--is-inside-work-tree")
     if inside.returncode != 0 or inside.stdout.strip() != b"true":
         return GitSnapshot()
-    config = _git_command(git_executable, workspace, "config", "--includes", "--show-origin", "--show-scope", "--null", "--list")
-    extensions = _git_command(git_executable, workspace, "config", "--local", "--bool", "--get", "extensions.worktreeConfig")
-    worktree_enabled = extensions.returncode == 0 and extensions.stdout.strip() == b"true"
-    worktree_path = _git_command(git_executable, workspace, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree")
-    worktree_file_exists = worktree_path.returncode == 0 and Path(worktree_path.stdout.decode("utf-8", "surrogateescape").strip()).is_file()
-    worktree_config = (
-        _git_command(git_executable, workspace, "config", "--worktree", "--show-origin", "--show-scope", "--null", "--list")
-        if worktree_enabled and worktree_file_exists
-        else subprocess.CompletedProcess([], 0, b"", b"")
-    )
-    if config.returncode != 0 or worktree_config.returncode != 0 or extensions.returncode not in {0, 1}:
-        raise ActionGateError("GIT_STATE_UNAVAILABLE", "The effective repository and worktree configuration could not be read.")
-    config_bytes = config.stdout + worktree_config.stdout
-    credential_risks = _git_credential_risks(config_bytes)
+    main_config = _capture_effective_git_config(git_executable, workspace)
+    credential_risks = main_config.risk_categories
     head = _git_command(git_executable, workspace, "rev-parse", "--verify", "HEAD^{commit}")
     head_tree = _git_command(git_executable, workspace, "rev-parse", "--verify", "HEAD^{tree}")
     index_tree = _git_command(git_executable, workspace, "write-tree")
@@ -637,19 +972,35 @@ def _capture_git_snapshot(
         staged_diff = subprocess.CompletedProcess([], 1, b"", b"")
         worktree_clean = subprocess.CompletedProcess([], 1, b"", b"")
         worktree_diff = subprocess.CompletedProcess([], 0, b"", b"")
-        submodule_result = subprocess.CompletedProcess([], 0, b"", b"")
         status_result = subprocess.CompletedProcess([], 0, b"", b"")
+        submodule_records: tuple[dict[str, Any], ...] = ()
     else:
+        if index_result.returncode != 0:
+            raise ActionGateError("GIT_STATE_UNAVAILABLE", "The repository index could not be read.")
+        root_observation = workspace.lstat()
+        submodule_records = _capture_initialized_submodules(
+            git_executable=git_executable,
+            workspace=workspace,
+            repository=workspace,
+            prefix=PurePosixPath(),
+            index_bytes=index_result.stdout,
+            visited={(root_observation.st_dev, root_observation.st_ino)},
+        )
         staged_diff = _git_command(git_executable, workspace, "diff", "--cached", "--quiet", "--no-ext-diff", "--no-textconv", "HEAD", "--")
         worktree_clean = _git_command(git_executable, workspace, "diff", "--quiet", "--no-ext-diff", "--no-textconv", "--")
         worktree_diff = _git_command(git_executable, workspace, "diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--")
-        submodule_result = _git_command(git_executable, workspace, "submodule", "status", "--recursive")
         status_result = _git_command(git_executable, workspace, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-    required = (head, head_tree, index_tree, config, worktree_config, index_result, worktree_diff, submodule_result, status_result)
+    required = (head, head_tree, index_tree, index_result, worktree_diff, status_result)
     if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
         raise ActionGateError("GIT_STATE_UNAVAILABLE", "The repository HEAD, index, worktree, or local configuration could not be read.")
-    config_records = _git_config_records(config_bytes)
-    source_categories = tuple(sorted({_git_config_source_category(scope, origin) for scope, origin, _key, _value in config_records}))
+    try:
+        head_sha = head.stdout.decode("ascii", "strict").strip()
+        head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
+        index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
+    except UnicodeDecodeError as exc:
+        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was invalid.") from exc
+    if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
+        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was incomplete.")
     unexpected_untracked = tuple(
         path for path in _untracked_paths(status_result.stdout) if (workspace / path).absolute() not in allowed_untracked_paths
     )
@@ -657,37 +1008,71 @@ def _capture_git_snapshot(
     worktree_diff_sha256 = hashlib.sha256(worktree_diff.stdout).hexdigest()
     status_sha256 = hashlib.sha256(status_result.stdout).hexdigest()
     index_sha256 = hashlib.sha256(index_result.stdout).hexdigest()
+    submodule_config_projection = [
+        {
+            "path": record["path"],
+            "initialized": record["initialized"],
+            "config_sha256": record.get("config_sha256"),
+            "config_source_categories": record.get("config_source_categories", []),
+            "credential_risk_categories": record.get("credential_risk_categories", []),
+        }
+        for record in submodule_records
+    ]
+    submodule_config_sha256 = sha256_json(submodule_config_projection)
+    submodule_state_sha256 = sha256_json(list(submodule_records))
+    submodule_risks = tuple(
+        sorted(
+            f"{record['path']}:{risk}"
+            for record in submodule_records
+            for risk in record.get("credential_risk_categories", [])
+        )
+    )
+    submodule_sources = tuple(
+        sorted(
+            f"{record['path']}:{source}"
+            for record in submodule_records
+            for source in record.get("config_source_categories", [])
+        )
+    )
     state_sha256 = sha256_json(
         {
-            "head_sha": head.stdout.decode("ascii", "replace").strip(),
-            "head_tree_sha": head_tree.stdout.decode("ascii", "replace").strip(),
-            "index_tree_sha": index_tree.stdout.decode("ascii", "replace").strip(),
+            "head_sha": head_sha,
+            "head_tree_sha": head_tree_sha,
+            "index_tree_sha": index_tree_sha,
             "symbolic_head": symbolic.stdout.decode("utf-8", "replace").strip() if symbolic.returncode == 0 else None,
-            "effective_config_sha256": hashlib.sha256(config_bytes).hexdigest(),
+            "effective_config_sha256": main_config.sha256,
             "index_sha256": index_sha256,
             "worktree_diff_sha256": worktree_diff_sha256,
             "status_sha256": status_sha256,
+            "submodule_config_sha256": submodule_config_sha256,
+            "submodule_state_sha256": submodule_state_sha256,
         }
     )
     return GitSnapshot(
         available=True,
-        head_sha=head.stdout.decode("ascii", "replace").strip(),
-        head_tree_sha=head_tree.stdout.decode("ascii", "replace").strip(),
-        index_tree_sha=index_tree.stdout.decode("ascii", "replace").strip(),
+        head_sha=head_sha,
+        head_tree_sha=head_tree_sha,
+        index_tree_sha=index_tree_sha,
         symbolic_head=symbolic.stdout.decode("utf-8", "replace").strip() if symbolic.returncode == 0 else None,
         repository_identity_matches=observed_repository == expected_repository,
-        tracked_index_clean=staged_diff.returncode == 0 and index_tree.stdout.strip() == head_tree.stdout.strip(),
+        tracked_index_clean=staged_diff.returncode == 0 and index_tree_sha == head_tree_sha,
         tracked_worktree_clean=worktree_clean.returncode == 0,
-        submodules_clean=all(not line.startswith((b"+", b"-", b"U")) for line in submodule_result.stdout.splitlines()),
+        submodules_clean=not submodule_risks and all(record.get("clean", True) for record in submodule_records),
         unexpected_untracked_count=len(unexpected_untracked),
-        local_config_sha256=hashlib.sha256(config_bytes).hexdigest(),
-        effective_config_sha256=hashlib.sha256(config_bytes).hexdigest(),
-        config_source_categories=source_categories,
+        local_config_sha256=main_config.sha256,
+        effective_config_sha256=main_config.sha256,
+        config_source_categories=main_config.source_categories,
         index_sha256=index_sha256,
         worktree_diff_sha256=worktree_diff_sha256,
         status_sha256=status_sha256,
         state_sha256=state_sha256,
         credential_risks=credential_risks,
+        submodule_count=sum(1 for record in submodule_records if record["initialized"]),
+        submodule_paths=tuple(record["path"] for record in submodule_records),
+        submodule_config_sha256=submodule_config_sha256,
+        submodule_state_sha256=submodule_state_sha256,
+        submodule_credential_risks=submodule_risks,
+        submodule_config_source_categories=submodule_sources,
     )
 
 
@@ -706,6 +1091,16 @@ def _git_post_checks(
         _check("CURRENT_HEAD_CHANGED_DURING_TEST", after.available and after.head_sha == before.head_sha),
         _check("GIT_SYMBOLIC_HEAD_UNCHANGED", after.available and after.symbolic_head == before.symbolic_head),
         _check("GIT_SECURITY_CONFIGURATION_MUTATED_DURING_TEST", after.available and after.effective_config_sha256 == before.effective_config_sha256),
+        _check(
+            "SUBMODULE_GIT_CONFIG_MUTATED",
+            after.available and after.submodule_config_sha256 == before.submodule_config_sha256,
+        ),
+        _check(
+            "SUBMODULE_STATE_CHANGED_DURING_TEST",
+            after.available
+            and after.submodule_paths == before.submodule_paths
+            and after.submodule_state_sha256 == before.submodule_state_sha256,
+        ),
         _check("GIT_INDEX_UNCHANGED_DURING_TEST", after.available and after.index_sha256 == before.index_sha256),
         _check("GIT_WORKTREE_UNCHANGED_DURING_TEST", after.available and after.worktree_diff_sha256 == before.worktree_diff_sha256),
         _check("GIT_STATUS_UNCHANGED_DURING_TEST", after.available and after.status_sha256 == before.status_sha256),
@@ -720,6 +1115,11 @@ def _execution_preflight_checks(environment: Mapping[str, str], context: PullReq
     checks = [
         _check("TRUSTED_EVENT_TYPE", not github_mode or event_name == "pull_request", event_name or "LOCAL_READ_ONLY"),
         _check("PERSISTED_GIT_CREDENTIAL_DETECTED", not git_snapshot.credential_risks, list(git_snapshot.credential_risks)),
+        _check(
+            "SUBMODULE_GIT_CREDENTIAL_DETECTED",
+            not git_snapshot.submodule_credential_risks,
+            list(git_snapshot.submodule_credential_risks),
+        ),
     ]
     if github_mode:
         checks.extend(
@@ -1115,24 +1515,35 @@ def _public_projection(
     if test_result.get("output_limit_exceeded"):
         return "FAIL", ["TEST_OUTPUT_LIMIT_EXCEEDED"]
     reason_priority = [
+        "POST_TEST_SECURITY_RECHECK_INCOMPLETE",
+        "POST_TEST_GIT_RECHECK_FAILED",
+        "POST_TEST_STATE_UNKNOWN",
         "CURRENT_HEAD_CHANGED_DURING_TEST",
         "RESERVED_OUTPUT_CONTENT_MUTATED",
         "RESERVED_OUTPUT_IDENTITY_CHANGED",
         "GATE_OUTPUT_PATH_MUTATED_DURING_TEST",
         "GATE_OUTPUT_PATH_PREEXISTED",
         "PERSISTED_GIT_CREDENTIAL_DETECTED",
+        "SUBMODULE_GIT_CREDENTIAL_DETECTED",
+        "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
+        "SUBMODULE_GIT_CONFIG_MUTATED",
+        "SUBMODULE_STATE_CHANGED_DURING_TEST",
         "GIT_SECURITY_CONFIGURATION_MUTATED_DURING_TEST",
         "GIT_STATE_CHANGED_DURING_TEST",
         "DIRTY_TRACKED_EXECUTION_BASELINE",
         "UNDECLARED_UNTRACKED_EXECUTION_INPUTS",
         "HEAD_EXECUTION_BASELINE_MISMATCH",
+        "PATH_ANCESTOR_MUTATED_DURING_TEST",
         "GATE_INPUT_MUTATED_DURING_TEST",
         "ACTION_CONFIGURATION_REQUIRED",
         "ACTION_CONFIGURATION_ROOT_REQUIRED",
         "ACTION_CONFIGURATION_ROOT_INVALID",
         "ACTION_CONFIGURATION_PATH_MISMATCH",
         "ACTION_CONFIGURATION_INVALID",
-        "INPUT_SYMLINK_NOT_ALLOWED",
+        "SYMLINK_ANCESTOR_NOT_ALLOWED",
+        "OUTPUT_PATH_SYMLINK_NOT_ALLOWED",
+        "PATH_COMPONENT_NOT_TRUSTED_DIRECTORY",
+        "PATH_ESCAPES_REPOSITORY_ROOT",
         "INPUT_PATH_OUT_OF_SCOPE",
         "UNTRUSTED_EVENT_TYPE",
         "UNSAFE_TEST_CREDENTIAL_CONTEXT",
@@ -1145,8 +1556,12 @@ def _public_projection(
         "GIT_WORKTREE_UNCHANGED_DURING_TEST",
         "GIT_STATUS_UNCHANGED_DURING_TEST",
         "GIT_STATE_UNCHANGED_DURING_TEST",
+        "SUBMODULE_GIT_CONFIG_MUTATED",
+        "SUBMODULE_STATE_CHANGED_DURING_TEST",
     } & normalized_failed:
         normalized_failed.add("GIT_STATE_CHANGED_DURING_TEST")
+    if any(reason.endswith("_PATH_ANCESTOR_MUTATED_DURING_TEST") for reason in normalized_failed):
+        normalized_failed.add("PATH_ANCESTOR_MUTATED_DURING_TEST")
     for reason in reason_priority:
         if reason in normalized_failed:
             return "FAIL", [reason]
@@ -1203,6 +1618,47 @@ def _receipt_summary(receipt: dict[str, Any]) -> str:
     )
 
 
+def _private_output_directory() -> tuple[Path, tuple[tuple[str, int, int], ...]]:
+    """Create one server-owned private output directory without resolving links."""
+
+    configured = os.environ.get("RUNNER_TEMP")
+    candidates = [Path(configured)] if configured else []
+    candidates.append(Path("/private/tmp") if Path("/private/tmp").is_dir() else Path(tempfile.gettempdir()))
+    for parent in candidates:
+        descriptor: int | None = None
+        try:
+            lexical_parent = Path(os.path.abspath(parent))
+            descriptor, parent_identities = _open_directory_no_follow(lexical_parent, create=False)
+            for _attempt in range(128):
+                name = f"titmas-gate-output-{secrets.token_hex(16)}"
+                try:
+                    os.mkdir(name, mode=0o700, dir_fd=descriptor)
+                except FileExistsError:
+                    continue
+                flags = (
+                    os.O_RDONLY
+                    | getattr(os, "O_DIRECTORY", 0)
+                    | getattr(os, "O_NOFOLLOW", 0)
+                    | getattr(os, "O_CLOEXEC", 0)
+                )
+                child = os.open(name, flags, dir_fd=descriptor)
+                try:
+                    observation = os.fstat(child)
+                    if not stat.S_ISDIR(observation.st_mode):
+                        raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
+                    output = lexical_parent / name
+                    identities = (*parent_identities, (str(output), observation.st_dev, observation.st_ino))
+                    return output, identities
+                finally:
+                    os.close(child)
+        except (OSError, UnsafePathError):
+            continue
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+    raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
+
+
 def _evaluate_pull_request(
     *,
     task_path: str | Path,
@@ -1219,6 +1675,7 @@ def _evaluate_pull_request(
     action_configuration_path: str | Path | None = None,
     action_configuration_root: str | Path | None = None,
     output_preflight_safe: bool = True,
+    output_preflight_reason: str = "GATE_OUTPUT_PATH_PREEXISTED",
     output_integrity_check: Callable[[], str] | None = None,
     declared_output_paths: tuple[Path, ...] = (),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -1230,9 +1687,26 @@ def _evaluate_pull_request(
     workspace_error: Exception | None = None
     if configured_workspace:
         try:
-            workspace_boundary = Path(configured_workspace).expanduser().absolute()
-            workspace_path = workspace_boundary.resolve(strict=True)
-        except OSError as exc:
+            raw_workspace = Path(configured_workspace).expanduser()
+            if not str(raw_workspace) or any(part in {".", ".."} for part in raw_workspace.parts):
+                raise ActionGateError(
+                    "PATH_ESCAPES_REPOSITORY_ROOT",
+                    "The trusted workspace may not contain dot traversal components.",
+                )
+            workspace_boundary = Path(os.path.abspath(raw_workspace))
+            if _path_has_symlink_component(workspace_boundary):
+                raise ActionGateError(
+                    "SYMLINK_ANCESTOR_NOT_ALLOWED",
+                    "The trusted workspace may not contain symbolic links.",
+                )
+            workspace_observation = workspace_boundary.lstat()
+            if not stat.S_ISDIR(workspace_observation.st_mode):
+                raise ActionGateError(
+                    "PATH_COMPONENT_NOT_TRUSTED_DIRECTORY",
+                    "The trusted workspace must be a real directory.",
+                )
+            workspace_path = workspace_boundary
+        except (OSError, ActionGateError) as exc:
             workspace_error = exc
     github_mode = (
         env.get("GITHUB_ACTIONS", "").lower() == "true"
@@ -1263,13 +1737,17 @@ def _evaluate_pull_request(
     command: list[str] = []
     frozen_inputs: dict[str, FrozenJsonInput] = {}
     post_input_observations: dict[str, dict[str, Any]] = {}
-    frozen_action_configuration = FrozenActionConfiguration(None, None, None, None, None, None)
+    frozen_action_configuration = FrozenActionConfiguration(None, None, None, None, None, None, ())
     post_action_configuration = {"sha256": None, "identity_changed": False, "mutated": False}
     git_snapshot = GitSnapshot()
     git_executable: FrozenExecutable | None = None
+    git_executable_unchanged_after_test: bool | None = None
     allowed_untracked_paths: frozenset[Path] = frozenset()
+    post_test_review_completed = False
 
     try:
+        if isinstance(workspace_error, ActionGateError):
+            raise workspace_error
         if workspace_error is not None or github_mode and workspace_path is None:
             raise ActionGateError("INPUT_PATH_OUT_OF_SCOPE", "GitHub enforcement requires an existing trusted workspace.")
         task = _freeze_json_input(
@@ -1329,7 +1807,7 @@ def _evaluate_pull_request(
             allowed_untracked_paths=allowed_untracked_paths,
         )
         runtime_checks.extend(_execution_preflight_checks(env, context, git_snapshot))
-        runtime_checks.append(_check("GATE_OUTPUT_PATH_PREEXISTED", output_preflight_safe))
+        runtime_checks.append(_check(output_preflight_reason, output_preflight_safe))
         task_valid = bool(runtime_checks) and runtime_checks[0]["passed"]
         if task_valid:
             verification_at = utc_now()
@@ -1342,30 +1820,75 @@ def _evaluate_pull_request(
             preflight_passed = all(item["passed"] for item in runtime_checks)
             test_result = _run_test(command, execute=preflight_passed, environment=env, workspace=workspace_path)
             if test_result["executed"]:
-                runtime_checks.append(_check("TEST_PROCESS_GROUP_CLEANUP", test_result["process_group_cleanup"] == "COMPLETE"))
-                post_input_observations = {role: _post_input_observation(value) for role, value in frozen_inputs.items()}
-                post_action_configuration = _post_action_configuration_observation(frozen_action_configuration)
-                mutated = any(item["mutated"] for item in post_input_observations.values()) or post_action_configuration["mutated"]
-                runtime_checks.append(_check("GATE_INPUT_MUTATED_DURING_TEST", not mutated))
-                runtime_checks.extend(
-                    _git_post_checks(
-                        git_snapshot,
-                        workspace_path,
-                        context.repository,
-                        git_executable,
-                        allowed_untracked_paths=allowed_untracked_paths,
+                try:
+                    runtime_checks.append(
+                        _check("TEST_PROCESS_GROUP_CLEANUP", test_result["process_group_cleanup"] == "COMPLETE")
                     )
-                )
-                output_state = output_integrity_check() if output_integrity_check is not None else "PRISTINE"
-                runtime_checks.extend(
-                    [
-                        _check("RESERVED_OUTPUT_IDENTITY_CHANGED", output_state != "IDENTITY_CHANGED"),
-                        _check("RESERVED_OUTPUT_CONTENT_MUTATED", output_state != "CONTENT_MUTATED"),
-                    ]
-                )
-            if not all(item["passed"] for item in runtime_checks) or test_result["exit_code"] != 0:
-                policy_evaluation = deepcopy(policy_evaluation)
-                policy_evaluation["effect"] = "DENY"
+                    post_input_observations = {
+                        role: _post_input_observation(value) for role, value in frozen_inputs.items()
+                    }
+                    post_action_configuration = _post_action_configuration_observation(frozen_action_configuration)
+                    for role, observation in post_input_observations.items():
+                        runtime_checks.append(
+                            _check(_input_ancestor_check_id(role), not observation["identity_changed"])
+                        )
+                    runtime_checks.append(
+                        _check(
+                            "ACTION_CONFIGURATION_PATH_ANCESTOR_MUTATED_DURING_TEST",
+                            not post_action_configuration["identity_changed"],
+                        )
+                    )
+                    mutated = (
+                        any(item["mutated"] for item in post_input_observations.values())
+                        or post_action_configuration["mutated"]
+                    )
+                    runtime_checks.append(_check("GATE_INPUT_MUTATED_DURING_TEST", not mutated))
+                    runtime_checks.extend(
+                        _git_post_checks(
+                            git_snapshot,
+                            workspace_path,
+                            context.repository,
+                            git_executable,
+                            allowed_untracked_paths=allowed_untracked_paths,
+                        )
+                    )
+                    git_executable_unchanged_after_test = (
+                        _executable_unchanged(git_executable) if git_executable is not None else None
+                    )
+                    runtime_checks.append(
+                        _check(
+                            "TRUSTED_GIT_EXECUTABLE_UNCHANGED_DURING_TEST",
+                            git_executable_unchanged_after_test is not False,
+                        )
+                    )
+                    output_state = output_integrity_check() if output_integrity_check is not None else "PRISTINE"
+                    if output_state not in {"PRISTINE", "IDENTITY_CHANGED", "CONTENT_MUTATED"}:
+                        raise ActionGateError(
+                            "POST_TEST_STATE_UNKNOWN",
+                            "The reserved output post-test state was unknown.",
+                        )
+                    runtime_checks.extend(
+                        [
+                            _check("RESERVED_OUTPUT_IDENTITY_CHANGED", output_state != "IDENTITY_CHANGED"),
+                            _check("RESERVED_OUTPUT_CONTENT_MUTATED", output_state != "CONTENT_MUTATED"),
+                        ]
+                    )
+                    post_test_review_completed = True
+                except Exception as exc:
+                    stable_category = getattr(exc, "code", type(exc).__name__)
+                    git_category = isinstance(exc, (subprocess.TimeoutExpired, ActionGateError)) and (
+                        stable_category.startswith("GIT_")
+                        or stable_category.startswith("SUBMODULE_GIT_")
+                        or stable_category.startswith("TRUSTED_GIT_")
+                        or isinstance(exc, subprocess.TimeoutExpired)
+                    )
+                    runtime_checks.append(
+                        _check(
+                            "POST_TEST_GIT_RECHECK_FAILED" if git_category else "POST_TEST_SECURITY_RECHECK_INCOMPLETE",
+                            False,
+                            "GIT_RECHECK_UNAVAILABLE" if git_category else "SECURITY_RECHECK_UNAVAILABLE",
+                        )
+                    )
     except Exception as exc:  # fail closed and retain a receipt for malformed or unavailable inputs
         error_code = getattr(exc, "code", type(exc).__name__)
         if runtime_checks:
@@ -1373,6 +1896,17 @@ def _evaluate_pull_request(
             runtime_checks.append(_check("INPUT_LOADING_AND_POLICY_EVALUATION", False, error_code))
         else:
             runtime_checks = [_check(error_code, False), _check("TASK_CONTRACT_VALID", False, error_code)]
+
+    # This is the single fail-closed transition before the deterministic gate.
+    # The public projection never invents authorization: incomplete runtime or
+    # post-test observations convert the frozen policy fact to DENY, and the
+    # existing ActionGate remains the only ALLOW/BLOCK/REQUIRE_APPROVAL authority.
+    runtime_failed = not runtime_checks or any(not item["passed"] for item in runtime_checks)
+    test_failed = bool(test_result.get("executed") and test_result.get("exit_code") != 0)
+    post_test_incomplete = bool(test_result.get("executed") and not post_test_review_completed)
+    if policy_evaluation and (runtime_failed or test_failed or post_test_incomplete):
+        policy_evaluation = deepcopy(policy_evaluation)
+        policy_evaluation["effect"] = "DENY"
 
     authority, approval_verifier_available = _approval_authority(env, approval)
     gate = ActionGate(authority)
@@ -1480,6 +2014,12 @@ def _evaluate_pull_request(
             "tracked_index_clean": git_snapshot.tracked_index_clean,
             "tracked_worktree_clean": git_snapshot.tracked_worktree_clean,
             "submodules_clean": git_snapshot.submodules_clean,
+            "submodule_count": git_snapshot.submodule_count,
+            "submodule_paths": list(git_snapshot.submodule_paths),
+            "submodule_config_sha256": git_snapshot.submodule_config_sha256,
+            "submodule_state_sha256": git_snapshot.submodule_state_sha256,
+            "submodule_config_source_categories": list(git_snapshot.submodule_config_source_categories),
+            "submodule_credential_risk_categories": list(git_snapshot.submodule_credential_risks),
             "unexpected_untracked_count": git_snapshot.unexpected_untracked_count,
             "index_sha256": git_snapshot.index_sha256,
             "worktree_diff_sha256": git_snapshot.worktree_diff_sha256,
@@ -1489,7 +2029,7 @@ def _evaluate_pull_request(
             "git_executable": {
                 "reference": git_executable.path.name if git_executable else None,
                 "sha256": git_executable.sha256 if git_executable else None,
-                "unchanged_after_test": _executable_unchanged(git_executable) if git_executable else None,
+                "unchanged_after_test": git_executable_unchanged_after_test,
             },
         },
     }
@@ -1521,39 +2061,59 @@ def verify_pull_request(
 ) -> dict[str, Any]:
     """Run one bounded PR verification and create its receipt and summary once."""
 
-    requested_output = Path(output_directory).expanduser().absolute()
-    output = requested_output.resolve(strict=False)
+    raw_output = Path(output_directory).expanduser()
+    output_path_syntax_safe = bool(str(raw_output)) and not any(part in {".", ".."} for part in raw_output.parts)
+    requested_output = Path(os.path.abspath(raw_output)) if output_path_syntax_safe else Path(os.path.abspath("artifacts/titmas"))
+    output = requested_output
     receipt_output: ExclusiveOutput | None = None
     summary_output: ExclusiveOutput | None = None
-    try:
-        requested_observation = requested_output.lstat()
-    except FileNotFoundError:
-        output_preflight_safe = True
-    else:
-        output_preflight_safe = not stat.S_ISLNK(requested_observation.st_mode)
+    output_preflight_reason = "GATE_OUTPUT_PATH_PREEXISTED"
+    output_preflight_safe = output_path_syntax_safe and not _path_has_symlink_component(requested_output)
+    if not output_preflight_safe:
+        output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
 
     def abort_reserved(reserved: ExclusiveOutput | None) -> None:
         if reserved is not None:
             reserved.__exit__(RuntimeError, RuntimeError("OUTPUT_RESERVATION_ABORTED"), None)
 
-    def reserve(directory: Path) -> tuple[ExclusiveOutput, ExclusiveOutput]:
-        directory.mkdir(parents=True, exist_ok=True)
-        first = ExclusiveOutput(directory / "receipt.json")
+    def reserve(
+        directory: Path,
+        expected_ancestor_identities: tuple[tuple[str, int, int], ...] | None = None,
+    ) -> tuple[ExclusiveOutput, ExclusiveOutput]:
+        first = ExclusiveOutput(
+            directory / "receipt.json",
+            expected_ancestor_identities=expected_ancestor_identities,
+        )
         try:
-            second = ExclusiveOutput(directory / "summary.md")
+            second = ExclusiveOutput(
+                directory / "summary.md",
+                expected_ancestor_identities=expected_ancestor_identities,
+            )
         except Exception:
             abort_reserved(first)
             raise
         return first, second
 
+    def reserve_private() -> tuple[Path, ExclusiveOutput, ExclusiveOutput]:
+        for _attempt in range(8):
+            private_directory, private_identities = _private_output_directory()
+            try:
+                first, second = reserve(private_directory, private_identities)
+            except (FileExistsError, OSError, RuntimeError, UnsafePathError):
+                continue
+            return private_directory, first, second
+        raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
+
     if output_preflight_safe:
         try:
             receipt_output, summary_output = reserve(output)
+        except UnsafePathError:
+            output_preflight_safe = False
+            output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
         except (FileExistsError, OSError, RuntimeError):
             output_preflight_safe = False
     if not output_preflight_safe:
-        output = Path(tempfile.mkdtemp(prefix="titmas-gate-output-", dir=os.environ.get("RUNNER_TEMP")))
-        receipt_output, summary_output = reserve(output)
+        output, receipt_output, summary_output = reserve_private()
 
     assert receipt_output is not None and summary_output is not None
 
@@ -1586,6 +2146,7 @@ def verify_pull_request(
         action_configuration_path=action_configuration_path,
         action_configuration_root=action_configuration_root,
         output_preflight_safe=output_preflight_safe,
+        output_preflight_reason=output_preflight_reason,
         output_integrity_check=output_integrity_check,
         declared_output_paths=(receipt_output.path, summary_output.path),
     )
@@ -1595,8 +2156,7 @@ def verify_pull_request(
         reason = "RESERVED_OUTPUT_IDENTITY_CHANGED" if output_state == "IDENTITY_CHANGED" else "RESERVED_OUTPUT_CONTENT_MUTATED"
         abort_reserved(receipt_output)
         abort_reserved(summary_output)
-        output = Path(tempfile.mkdtemp(prefix="titmas-gate-output-", dir=os.environ.get("RUNNER_TEMP")))
-        receipt_output, summary_output = reserve(output)
+        output, receipt_output, summary_output = reserve_private()
     receipt["output_integrity"] = {
         "requested_reference": requested_output.name,
         "preflight_safe": output_preflight_safe,

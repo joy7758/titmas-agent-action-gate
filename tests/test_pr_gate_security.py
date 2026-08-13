@@ -11,6 +11,7 @@ import time
 import unittest
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -18,7 +19,7 @@ from titmas_action_gate.approval import ApprovalAuthority
 from titmas_action_gate.canonical import sha256_json, utc_now
 from titmas_action_gate.evidence import AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _git_command, _read_regular_bytes, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -32,7 +33,7 @@ APPROVAL_KEY = "security-regression-approval-key-0001"
 class PullRequestGateSecurityTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory(prefix="titmas-pr-gate-security-")
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve(strict=True)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -234,9 +235,129 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         link.symlink_to(actual)
         prepared["evidence"] = link
         result, receipt, _ = self.run_gate(prepared, command, output_name="symlink")
-        self.assertEqual(result["reason_codes"], ["INPUT_SYMLINK_NOT_ALLOWED"])
+        self.assertEqual(result["reason_codes"], ["SYMLINK_ANCESTOR_NOT_ALLOWED"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertFalse(marker.exists())
+
+    @unittest.skipUnless(Path("/var").is_symlink(), "macOS-style system temporary alias is required")
+    def test_explicit_system_alias_path_remains_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="titmas-system-alias-", dir="/private/var/tmp") as tempdir:
+            physical_root = Path(tempdir)
+            marker = physical_root / "system-alias-executed"
+            command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+            prepared = self.prepare(command, directory=physical_root)
+            physical = prepared["evidence"]
+            prepared["evidence"] = Path("/var") / physical.relative_to("/private/var")
+            result, receipt, _ = self.run_gate(prepared, command, output_name="system-alias-path")
+            self.assertEqual(result["reason_codes"], ["SYMLINK_ANCESTOR_NOT_ALLOWED"])
+            self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+            self.assertFalse(marker.exists())
+
+    def test_each_input_role_rejects_a_preexisting_symlink_ancestor(self) -> None:
+        for role in ("task", "evidence", "policy", "approval"):
+            with self.subTest(role=role):
+                actual = self.root / f"actual-{role}"
+                linked = self.root / f"linked-{role}"
+                marker = self.root / f"executed-{role}"
+                command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+                prepared = self.prepare(
+                    command,
+                    directory=actual,
+                    high_risk=role == "approval",
+                    approval=role == "approval",
+                )
+                linked.symlink_to(actual, target_is_directory=True)
+                prepared[role] = linked / prepared[role].name
+                result, receipt, _ = self.run_gate(
+                    prepared,
+                    command,
+                    output_name=f"symlink-ancestor-{role}",
+                )
+                self.assertEqual(result["reason_codes"], ["SYMLINK_ANCESTOR_NOT_ALLOWED"])
+                self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+                self.assertFalse(marker.exists())
+
+    def test_input_dot_traversal_is_rejected_before_test(self) -> None:
+        marker = self.root / "dot-traversal-executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command)
+        prepared["policy"] = self.root / "nested" / ".." / prepared["policy"].name
+        result, receipt, _ = self.run_gate(prepared, command, output_name="dot-traversal")
+        self.assertEqual(result["reason_codes"], ["PATH_ESCAPES_REPOSITORY_ROOT"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(marker.exists())
+
+    def test_preexisting_output_symlink_ancestor_returns_private_block_receipt(self) -> None:
+        actual = self.root / "actual-output-parent"
+        actual.mkdir()
+        linked = self.root / "linked-output-parent"
+        linked.symlink_to(actual, target_is_directory=True)
+        marker = self.root / "output-symlink-executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="linked-output-parent/artifacts",
+        )
+        self.assertEqual(result["reason_codes"], ["OUTPUT_PATH_SYMLINK_NOT_ALLOWED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(marker.exists())
+        self.assertNotEqual(Path(result["receipt"]).parent, linked / "artifacts")
+
+    def test_private_output_rejects_real_directory_rebinding_before_reservation(self) -> None:
+        actual = self.root / "private-rebind-actual"
+        actual.mkdir()
+        linked = self.root / "private-rebind-linked"
+        linked.symlink_to(actual, target_is_directory=True)
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        prepared = self.prepare(command)
+        from titmas_action_gate import pr_gate
+
+        original = pr_gate._private_output_directory
+        observations: dict[str, Path | int] = {"calls": 0}
+
+        def rebind_once() -> tuple[Path, tuple[tuple[str, int, int], ...]]:
+            output, identities = original()
+            observations["calls"] = int(observations["calls"]) + 1
+            if observations["calls"] == 1:
+                moved = output.with_name(f"{output.name}-moved")
+                output.rename(moved)
+                output.mkdir(mode=0o700)
+                observations["replacement"] = output
+            return output, identities
+
+        with patch("titmas_action_gate.pr_gate._private_output_directory", side_effect=rebind_once):
+            result, receipt, _ = self.run_gate(
+                prepared,
+                command,
+                output_name="private-rebind-linked/artifacts",
+            )
+        self.assertEqual(result["reason_codes"], ["OUTPUT_PATH_SYMLINK_NOT_ALLOWED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertGreaterEqual(int(observations["calls"]), 2)
+        self.assertNotEqual(Path(result["receipt"]).parent, observations["replacement"])
+
+    def test_input_ancestor_replaced_during_test_fails_closed(self) -> None:
+        inputs = self.root / "replaceable-inputs"
+        marker = self.root / "ancestor-replaced"
+        actual = self.root / "moved-inputs"
+        script = (
+            "from pathlib import Path; "
+            f"source=Path({str(inputs)!r}); target=Path({str(actual)!r}); "
+            "source.rename(target); source.symlink_to(target, target_is_directory=True); "
+            f"Path({str(marker)!r}).touch()"
+        )
+        command = [sys.executable, "-c", script]
+        prepared = self.prepare(command, directory=inputs)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="input-ancestor-replaced-output",
+        )
+        self.assertEqual(result["reason_codes"], ["PATH_ANCESTOR_MUTATED_DURING_TEST"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertTrue(marker.exists())
 
     def test_normal_unmodified_inputs_pass(self) -> None:
         command = [sys.executable, "-c", "raise SystemExit(0)"]
@@ -278,8 +399,8 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         for secret in secret_values:
             self.assertNotIn(secret, text)
 
-    def initialize_git_workspace(self) -> tuple[Path, str, str]:
-        workspace = self.root / "workspace"
+    def initialize_git_workspace(self, name: str = "workspace") -> tuple[Path, str, str]:
+        workspace = self.root / name
         workspace.mkdir()
         subprocess.run(["git", "init", "-q", workspace], check=True)
         subprocess.run(["git", "-C", workspace, "config", "user.name", "TITMAS test"], check=True)
@@ -321,6 +442,78 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self.assertEqual(result["reason_codes"], ["CURRENT_HEAD_CHANGED_DURING_TEST"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertNotEqual(receipt["git_binding"]["head_sha"], first)
+
+    def test_post_test_git_recheck_failures_force_action_gate_block(self) -> None:
+        scenarios = ("head", "diff", "config-parse", "timeout", "git-executable")
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario):
+                workspace, _, head = self.initialize_git_workspace(f"post-recheck-{scenario}")
+                marker = workspace / "executed"
+                command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+                prepared = self.prepare(command, directory=workspace, head=head)
+
+                def flaky_git(git_executable, repository, *arguments, _marker=marker, _scenario=scenario):
+                    if _marker.exists():
+                        if _scenario == "head" and arguments[:3] == ("rev-parse", "--verify", "HEAD^{commit}"):
+                            return subprocess.CompletedProcess([], 1, b"", b"secret-head-error")
+                        if _scenario == "diff" and arguments and arguments[0] == "diff":
+                            return subprocess.CompletedProcess([], 2, b"", b"secret-diff-error")
+                        if _scenario == "config-parse" and arguments[:2] == ("config", "--includes"):
+                            return subprocess.CompletedProcess([], 0, b"secret-malformed-config", b"")
+                        if _scenario == "timeout" and arguments[:3] == ("rev-parse", "--verify", "HEAD^{commit}"):
+                            raise subprocess.TimeoutExpired("secret-git-command", 10)
+                    return _git_command(git_executable, repository, *arguments)
+
+                executable_patch = (
+                    patch(
+                        "titmas_action_gate.pr_gate._executable_unchanged",
+                        side_effect=lambda _frozen, _marker=marker: not _marker.exists(),
+                    )
+                    if scenario == "git-executable"
+                    else patch("titmas_action_gate.pr_gate._git_command", side_effect=flaky_git)
+                )
+                with executable_patch:
+                    result, receipt, text = self.run_gate(
+                        prepared,
+                        command,
+                        output_name=f"post-recheck-output-{scenario}",
+                        environment=self.github_environment(workspace),
+                        workspace=workspace,
+                        head=head,
+                    )
+                self.assertEqual(result["reason_codes"], ["POST_TEST_GIT_RECHECK_FAILED"])
+                self.assertEqual(receipt["final_state"], "FAIL")
+                self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+                self.assertFalse(receipt["decision"]["may_execute"])
+                self.assertNotEqual(result["exit_code"], 0)
+                self.assertTrue(marker.exists())
+                self.assertNotIn("secret-", text)
+
+    def test_post_test_input_recheck_exception_is_sanitized_and_blocks(self) -> None:
+        workspace, _, head = self.initialize_git_workspace("post-input-exception")
+        marker = workspace / "executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        original_reader = _read_regular_bytes
+
+        def flaky_reader(*args, **kwargs):
+            if marker.exists():
+                raise RuntimeError("secret-post-input-error")
+            return original_reader(*args, **kwargs)
+
+        with patch("titmas_action_gate.pr_gate._read_regular_bytes", side_effect=flaky_reader):
+            result, receipt, text = self.run_gate(
+                prepared,
+                command,
+                output_name="post-input-exception-output",
+                environment=self.github_environment(workspace),
+                workspace=workspace,
+                head=head,
+            )
+        self.assertEqual(result["reason_codes"], ["POST_TEST_SECURITY_RECHECK_INCOMPLETE"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(receipt["decision"]["may_execute"])
+        self.assertNotIn("secret-post-input-error", text)
 
     def test_persisted_git_extraheader_fails_before_test(self) -> None:
         workspace, _, head = self.initialize_git_workspace()
@@ -608,6 +801,256 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self.assertEqual(receipt["execution_mode"], "GITHUB_PULL_REQUEST")
         self.assertTrue(receipt["git_binding"]["head_matches_context"])
 
+    def _add_submodule(self, workspace: Path, relative_path: str = "vendor/submodule") -> Path:
+        source = self.root / (f"source-{workspace.name}-" + relative_path.replace("/", "-"))
+        source.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", source], check=True)
+        subprocess.run(["git", "-C", source, "config", "user.name", "TITMAS test"], check=True)
+        subprocess.run(["git", "-C", source, "config", "user.email", "test@example.invalid"], check=True)
+        (source / "submodule.txt").write_text("clean\n", encoding="utf-8")
+        subprocess.run(["git", "-C", source, "add", "submodule.txt"], check=True)
+        subprocess.run(["git", "-C", source, "commit", "-qm", "submodule"], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "-C",
+                workspace,
+                "submodule",
+                "add",
+                "-q",
+                str(source),
+                relative_path,
+            ],
+            check=True,
+        )
+        subprocess.run(["git", "-C", workspace, "commit", "-qam", f"add {relative_path}"], check=True)
+        return workspace / relative_path
+
+    def _run_submodule_risk(self, key: str, value: str, expected_category: str, output_name: str) -> None:
+        workspace, _, _ = self.initialize_git_workspace(f"workspace-{output_name}")
+        submodule = self._add_submodule(workspace)
+        if key == "include.path":
+            git_directory = Path(
+                subprocess.check_output(
+                    ["git", "-C", submodule, "rev-parse", "--path-format=absolute", "--git-dir"],
+                    text=True,
+                ).strip()
+            )
+            included = git_directory / value
+            included.write_text("[diagnostic]\n\tvalue = safe\n", encoding="utf-8")
+        subprocess.run(["git", "-C", submodule, "config", key, value], check=True)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        marker = workspace / "executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, text = self.run_gate(
+            prepared,
+            command,
+            output_name=output_name,
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CREDENTIAL_DETECTED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(receipt["test_result"]["executed"])
+        self.assertTrue(
+            any(category.endswith(f":{expected_category}") for category in receipt["git_binding"]["submodule_credential_risk_categories"])
+        )
+        self.assertFalse(marker.exists())
+        self.assertNotIn(value, text)
+
+    def test_initialized_submodule_git_configuration_risks_fail_before_test(self) -> None:
+        cases = (
+            ("http.https://github.com/.extraheader", "secret-extra-header", "HTTP_EXTRAHEADER"),
+            ("credential.helper", "secret-helper", "CREDENTIAL_CONFIGURATION"),
+            ("core.sshCommand", "secret-ssh-command", "SSH_COMMAND"),
+            ("include.path", "secret-include-file", "CONFIG_INCLUDE"),
+            ("includeIf.gitdir:/tmp/.path", "secret-conditional-include", "CONFIG_INCLUDE"),
+            ("url.https://example.invalid/.insteadOf", "git@example.invalid:", "URL_REWRITE"),
+            ("remote.origin.url", "https://diagnostic:secret-password@example.invalid/repo.git", "AUTHENTICATED_REMOTE_URL"),
+        )
+        for index, (key, value, category) in enumerate(cases):
+            with self.subTest(key=key):
+                self._run_submodule_risk(key, value, category, f"submodule-risk-{index}")
+
+    def test_safe_initialized_submodule_preserves_pass_path(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace()
+        self._add_submodule(workspace)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="safe-submodule",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["state"], "PASS")
+        self.assertEqual(receipt["git_binding"]["submodule_count"], 1)
+
+    def test_present_uninitialized_gitlink_fails_before_test(self) -> None:
+        for retain_file in (False, True):
+            with self.subTest(retain_file=retain_file):
+                workspace, _, _ = self.initialize_git_workspace(f"present-uninitialized-{retain_file}")
+                submodule = self._add_submodule(workspace)
+                (submodule / ".git").unlink()
+                if not retain_file:
+                    (submodule / "submodule.txt").unlink()
+                else:
+                    (submodule / "untracked-executable").write_text("not parent-head bound\n", encoding="utf-8")
+                head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+                marker = workspace / "executed"
+                command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+                prepared = self.prepare(command, directory=workspace, head=head)
+                result, receipt, _ = self.run_gate(
+                    prepared,
+                    command,
+                    output_name=f"present-uninitialized-{retain_file}",
+                    environment=self.github_environment(workspace),
+                    workspace=workspace,
+                    head=head,
+                )
+                self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CONFIG_UNAUDITABLE"])
+                self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+                self.assertFalse(receipt["test_result"]["executed"])
+                self.assertFalse(marker.exists())
+
+    def test_nested_present_uninitialized_gitlink_fails_before_test(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("nested-present-uninitialized")
+        parent = self._add_submodule(workspace)
+        nested_source = self.root / "nested-uninitialized-source"
+        nested_source.mkdir()
+        subprocess.run(["git", "init", "-q", nested_source], check=True)
+        subprocess.run(["git", "-C", nested_source, "config", "user.name", "TITMAS test"], check=True)
+        subprocess.run(["git", "-C", nested_source, "config", "user.email", "test@example.invalid"], check=True)
+        (nested_source / "nested.txt").write_text("nested\n", encoding="utf-8")
+        subprocess.run(["git", "-C", nested_source, "add", "nested.txt"], check=True)
+        subprocess.run(["git", "-C", nested_source, "commit", "-qm", "nested"], check=True)
+        subprocess.run(
+            ["git", "-c", "protocol.file.allow=always", "-C", parent, "submodule", "add", "-q", str(nested_source), "nested"],
+            check=True,
+        )
+        subprocess.run(["git", "-C", parent, "commit", "-qam", "nested"], check=True)
+        subprocess.run(["git", "-C", workspace, "add", "vendor/submodule"], check=True)
+        subprocess.run(["git", "-C", workspace, "commit", "-qm", "bind nested"], check=True)
+        (parent / "nested/.git").unlink()
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        marker = workspace / "executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="nested-present-uninitialized",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CONFIG_UNAUDITABLE"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(receipt["test_result"]["executed"])
+        self.assertFalse(marker.exists())
+
+    def test_nested_submodule_configuration_risk_fails_before_test(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace()
+        parent = self._add_submodule(workspace)
+        nested_source = self.root / "nested-source"
+        nested_source.mkdir()
+        subprocess.run(["git", "init", "-q", nested_source], check=True)
+        subprocess.run(["git", "-C", nested_source, "config", "user.name", "TITMAS test"], check=True)
+        subprocess.run(["git", "-C", nested_source, "config", "user.email", "test@example.invalid"], check=True)
+        (nested_source / "nested.txt").write_text("nested\n", encoding="utf-8")
+        subprocess.run(["git", "-C", nested_source, "add", "nested.txt"], check=True)
+        subprocess.run(["git", "-C", nested_source, "commit", "-qm", "nested"], check=True)
+        subprocess.run(
+            ["git", "-c", "protocol.file.allow=always", "-C", parent, "submodule", "add", "-q", str(nested_source), "nested"],
+            check=True,
+        )
+        subprocess.run(["git", "-C", parent, "commit", "-qam", "add nested"], check=True)
+        subprocess.run(["git", "-C", parent / "nested", "config", "credential.helper", "secret-nested-helper"], check=True)
+        subprocess.run(["git", "-C", workspace, "add", "vendor/submodule"], check=True)
+        subprocess.run(["git", "-C", workspace, "commit", "-qm", "advance parent"], check=True)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, text = self.run_gate(
+            prepared,
+            command,
+            output_name="nested-submodule-risk",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CREDENTIAL_DETECTED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertNotIn("secret-nested-helper", text)
+
+    def test_submodule_config_mutation_during_test_fails_closed(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("submodule-config-mutation")
+        submodule = self._add_submodule(workspace)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        command = ["git", "-C", str(submodule), "config", "diagnostic.changed", "true"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="submodule-config-mutated",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CONFIG_MUTATED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+
+    def test_submodule_state_change_during_test_fails_closed(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("submodule-state-mutation")
+        submodule = self._add_submodule(workspace)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(submodule)!r}, 'new.txt').write_text('changed')"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, receipt, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="submodule-state-mutated",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_STATE_CHANGED_DURING_TEST"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+
+    def test_initialized_submodule_config_unavailable_fails_before_test(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("submodule-unavailable")
+        submodule = self._add_submodule(workspace)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        marker = workspace / "executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+
+        def unavailable_config(git_executable, repository, *arguments):
+            if repository == submodule and arguments[:2] == ("config", "--includes"):
+                return subprocess.CompletedProcess([], 2, b"", b"secret-submodule-error")
+            return _git_command(git_executable, repository, *arguments)
+
+        with patch("titmas_action_gate.pr_gate._git_command", side_effect=unavailable_config):
+            result, receipt, text = self.run_gate(
+                prepared,
+                command,
+                output_name="submodule-config-unavailable",
+                environment=self.github_environment(workspace),
+                workspace=workspace,
+                head=head,
+            )
+        self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CONFIG_UNAUDITABLE"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(marker.exists())
+        self.assertNotIn("secret-submodule-error", text)
+
     def _assert_preexisting_tracked_state_blocked(self, mutate, output_name: str) -> dict:
         workspace, _, head = self.initialize_git_workspace()
         mutate(workspace)
@@ -784,7 +1227,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             workspace=workspace,
             head=head,
         )
-        self.assertEqual(result["reason_codes"], ["INPUT_SYMLINK_NOT_ALLOWED"])
+        self.assertEqual(result["reason_codes"], ["SYMLINK_ANCESTOR_NOT_ALLOWED"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertFalse(marker.exists())
 
@@ -808,7 +1251,10 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             workspace=workspace,
             head=head,
         )
-        self.assertIn(result["reason_codes"][0], {"ACTION_CONFIGURATION_PATH_MISMATCH", "INPUT_SYMLINK_NOT_ALLOWED"})
+        self.assertIn(
+            result["reason_codes"][0],
+            {"ACTION_CONFIGURATION_PATH_MISMATCH", "SYMLINK_ANCESTOR_NOT_ALLOWED"},
+        )
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertFalse(marker.exists())
 
@@ -1031,7 +1477,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             workspace=workspace,
             head=head,
         )
-        self.assertEqual(result["reason_codes"], ["INPUT_PATH_OUT_OF_SCOPE"])
+        self.assertEqual(result["reason_codes"], ["PATH_ESCAPES_REPOSITORY_ROOT"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertFalse(marker.exists())
 
@@ -1052,7 +1498,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self.assertEqual(result["reason_codes"], ["TEST_OUTPUT_LIMIT_EXCEEDED"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertTrue(receipt["test_result"]["output_limit_exceeded"])
-        self.assertLessEqual(receipt["test_result"]["stdout_bytes"], 1024 * 1024 + 1)
+        self.assertLessEqual(receipt["test_result"]["stdout_bytes"], 1024 * 1024)
         self.assertNotIn("x" * 1024, text)
 
     def test_stdout_and_stderr_share_one_total_output_budget(self) -> None:
@@ -1061,7 +1507,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         result, receipt, text = self.run_gate(prepared, command, output_name="combined-output-limit")
         self.assertEqual(result["reason_codes"], ["TEST_OUTPUT_LIMIT_EXCEEDED"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
-        self.assertLessEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024 + 1)
+        self.assertLessEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024)
         self.assertEqual(receipt["test_result"]["exit_code"], 125)
         self.assertNotIn("x" * 1024, text)
         self.assertNotIn("y" * 1024, text)
@@ -1079,14 +1525,14 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         prepared = self.prepare(command)
         result, receipt, _ = self.run_gate(prepared, command, output_name="output-limit-plus-one")
         self.assertEqual(result["reason_codes"], ["TEST_OUTPUT_LIMIT_EXCEEDED"])
-        self.assertEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024 + 1)
+        self.assertEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024)
 
     def test_stderr_only_output_limit_fails_closed(self) -> None:
         command = [sys.executable, "-c", "import os; os.write(2,b'y'*(1024*1024+1))"]
         prepared = self.prepare(command)
         result, receipt, _ = self.run_gate(prepared, command, output_name="stderr-output-limit")
         self.assertEqual(result["reason_codes"], ["TEST_OUTPUT_LIMIT_EXCEEDED"])
-        self.assertEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024 + 1)
+        self.assertEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024)
 
     def test_concurrent_output_budget_race_is_bounded(self) -> None:
         code = (
@@ -1098,7 +1544,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         prepared = self.prepare(command)
         result, receipt, _ = self.run_gate(prepared, command, output_name="concurrent-output-limit")
         self.assertEqual(result["reason_codes"], ["TEST_OUTPUT_LIMIT_EXCEEDED"])
-        self.assertLessEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024 + 1)
+        self.assertLessEqual(receipt["test_result"]["combined_output_bytes"], 1024 * 1024)
         self.assertEqual(receipt["test_result"]["process_group_cleanup"], "COMPLETE")
 
     @unittest.skipUnless(hasattr(os, "killpg"), "POSIX process groups required")
