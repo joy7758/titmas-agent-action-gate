@@ -11,15 +11,25 @@ import time
 import unittest
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import yaml
 
 from titmas_action_gate.approval import ApprovalAuthority
 from titmas_action_gate.canonical import sha256_json, utc_now
+from titmas_action_gate.errors import ActionGateError
 from titmas_action_gate.evidence import AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _git_command, _read_regular_bytes, verify_pull_request
+from titmas_action_gate.pr_gate import (
+    PUBLIC_EXIT_CODES,
+    _capture_effective_git_config,
+    _close_owned_input_descriptor,
+    _freeze_executable,
+    _freeze_json_input,
+    _git_command,
+    _read_regular_bytes,
+    verify_pull_request,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -459,6 +469,323 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             "TITMAS_ACTION_CONFIG_PATH": str(ROOT / "action.yml"),
             "TITMAS_ACTION_ROOT": str(ROOT),
         }
+
+    def capture_git_config(self, workspace: Path):
+        executable = _freeze_executable("git", {"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+        return _capture_effective_git_config(executable, workspace)
+
+    def test_worktree_config_disabled_boolean_spellings_are_accepted(self) -> None:
+        for index, value in enumerate(("false", "no", "off", "0")):
+            with self.subTest(value=value):
+                workspace, _, _ = self.initialize_git_workspace(f"worktree-disabled-{index}")
+                subprocess.run(
+                    ["git", "-C", workspace, "config", "extensions.worktreeConfig", value],
+                    check=True,
+                )
+                audit = self.capture_git_config(workspace)
+                self.assertNotIn("WORKTREE", audit.source_categories)
+
+    def test_missing_worktree_config_extension_is_accepted(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("worktree-extension-missing")
+        audit = self.capture_git_config(workspace)
+        self.assertNotIn("WORKTREE", audit.source_categories)
+
+    def test_worktree_config_enabled_boolean_spellings_are_audited(self) -> None:
+        for index, value in enumerate(("true", "yes", "on", "1")):
+            with self.subTest(value=value):
+                workspace, _, _ = self.initialize_git_workspace(f"worktree-enabled-{index}")
+                subprocess.run(
+                    ["git", "-C", workspace, "config", "extensions.worktreeConfig", value],
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "-C", workspace, "config", "--worktree", "diagnostic.safe", "true"],
+                    check=True,
+                )
+                audit = self.capture_git_config(workspace)
+                self.assertIn("WORKTREE", audit.source_categories)
+
+    def test_invalid_worktree_config_extension_fails_closed(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("worktree-extension-invalid")
+        subprocess.run(
+            ["git", "-C", workspace, "config", "extensions.worktreeConfig", "invalid"],
+            check=True,
+        )
+        with self.assertRaises(ActionGateError) as observed:
+            self.capture_git_config(workspace)
+        self.assertEqual(observed.exception.code, "GIT_CONFIG_AUDIT_UNAVAILABLE")
+
+    def test_enabled_worktree_config_read_failure_fails_closed(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("worktree-config-unreadable")
+        subprocess.run(["git", "-C", workspace, "config", "extensions.worktreeConfig", "true"], check=True)
+        subprocess.run(["git", "-C", workspace, "config", "--worktree", "diagnostic.safe", "true"], check=True)
+        original = _git_command
+
+        def unreadable_worktree_config(executable, repository, *arguments):
+            if arguments and arguments[0] == "config" and "--worktree" in arguments:
+                return subprocess.CompletedProcess([], 1, b"", b"")
+            return original(executable, repository, *arguments)
+
+        with patch("titmas_action_gate.pr_gate._git_command", side_effect=unreadable_worktree_config), self.assertRaises(
+            ActionGateError
+        ) as observed:
+            self.capture_git_config(workspace)
+        self.assertEqual(observed.exception.code, "GIT_CONFIG_AUDIT_UNAVAILABLE")
+
+    def test_false_worktree_config_preserves_full_gate_pass(self) -> None:
+        workspace, _, head = self.initialize_git_workspace("worktree-false-pass")
+        subprocess.run(["git", "-C", workspace, "config", "extensions.worktreeConfig", "false"], check=True)
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, _, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="worktree-false-pass",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["state"], "PASS")
+
+    def test_linked_worktree_false_is_accepted_and_true_is_audited(self) -> None:
+        workspace, _, head = self.initialize_git_workspace("worktree-primary")
+        linked = self.root / "worktree-linked"
+        subprocess.run(["git", "-C", workspace, "worktree", "add", "--detach", str(linked), head], check=True)
+        subprocess.run(["git", "-C", workspace, "config", "extensions.worktreeConfig", "false"], check=True)
+        self.assertNotIn("WORKTREE", self.capture_git_config(linked).source_categories)
+        subprocess.run(["git", "-C", workspace, "config", "extensions.worktreeConfig", "true"], check=True)
+        subprocess.run(["git", "-C", linked, "config", "--worktree", "diagnostic.safe", "true"], check=True)
+        self.assertIn("WORKTREE", self.capture_git_config(linked).source_categories)
+
+    def test_submodule_worktree_config_false_is_accepted(self) -> None:
+        workspace, _, _ = self.initialize_git_workspace("submodule-worktree-false")
+        submodule = self._add_submodule(workspace)
+        subprocess.run(["git", "-C", submodule, "config", "extensions.worktreeConfig", "false"], check=True)
+        head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        prepared = self.prepare(command, directory=workspace, head=head)
+        result, _, _ = self.run_gate(
+            prepared,
+            command,
+            output_name="submodule-worktree-false",
+            environment=self.github_environment(workspace),
+            workspace=workspace,
+            head=head,
+        )
+        self.assertEqual(result["state"], "PASS")
+
+    def test_read_regular_bytes_closes_descriptors_on_success_and_missing_paths(self) -> None:
+        existing = self.root / "fd-existing.json"
+        existing.write_bytes(b"{}")
+        missing = self.root / "fd-missing.json"
+        real_open = os.open
+        real_close = os.close
+        opened: list[int] = []
+        closed: list[int] = []
+
+        def tracking_open(*args, **kwargs):
+            descriptor = real_open(*args, **kwargs)
+            opened.append(descriptor)
+            return descriptor
+
+        def tracking_close(descriptor):
+            closed.append(descriptor)
+            return real_close(descriptor)
+
+        for path, allow_missing in ((existing, False), (missing, True)):
+            with self.subTest(path=path.name):
+                opened.clear()
+                closed.clear()
+                with patch("titmas_action_gate.canonical.os.open", side_effect=tracking_open), patch(
+                    "titmas_action_gate.canonical.os.close", side_effect=tracking_close
+                ), patch("titmas_action_gate.pr_gate.os.open", side_effect=tracking_open), patch(
+                    "titmas_action_gate.pr_gate.os.close", side_effect=tracking_close
+                ):
+                    _read_regular_bytes(path, workspace=None, enforce_workspace=False, allow_missing=allow_missing)
+                self.assertEqual(sorted(closed), sorted(opened))
+
+    def test_read_regular_bytes_required_missing_closes_parent_once(self) -> None:
+        parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        with patch(
+            "titmas_action_gate.pr_gate._open_directory_no_follow",
+            return_value=(parent_descriptor, ()),
+        ), patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer, self.assertRaises(ActionGateError) as observed:
+            _read_regular_bytes(
+                self.root / "required-missing.json",
+                workspace=None,
+                enforce_workspace=False,
+                allow_missing=False,
+            )
+        self.assertEqual(observed.exception.code, "INPUT_MISSING")
+        self.assertEqual(closer.call_args_list, [call(parent_descriptor)])
+
+    def test_read_regular_bytes_open_error_closes_parent_once(self) -> None:
+        parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        with patch(
+            "titmas_action_gate.pr_gate._open_directory_no_follow",
+            return_value=(parent_descriptor, ()),
+        ), patch("titmas_action_gate.pr_gate.os.open", side_effect=PermissionError), patch(
+            "titmas_action_gate.pr_gate.os.close", wraps=os.close
+        ) as closer, self.assertRaises(ActionGateError) as observed:
+            _read_regular_bytes(
+                self.root / "permission-denied.json",
+                workspace=None,
+                enforce_workspace=False,
+                allow_missing=False,
+            )
+        self.assertEqual(observed.exception.code, "INPUT_NOT_READABLE")
+        self.assertEqual(closer.call_args_list, [call(parent_descriptor)])
+
+    def test_read_regular_bytes_nonregular_closes_child_then_parent_once(self) -> None:
+        parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        child_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        with patch(
+            "titmas_action_gate.pr_gate._open_directory_no_follow",
+            return_value=(parent_descriptor, ()),
+        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
+            "titmas_action_gate.pr_gate.os.close", wraps=os.close
+        ) as closer, self.assertRaises(ActionGateError) as observed:
+            _read_regular_bytes(
+                self.root / "synthetic-directory",
+                workspace=None,
+                enforce_workspace=False,
+                allow_missing=False,
+            )
+        self.assertEqual(observed.exception.code, "INPUT_NOT_REGULAR")
+        self.assertEqual(closer.call_args_list, [call(child_descriptor), call(parent_descriptor)])
+
+    def test_read_regular_bytes_read_error_closes_child_then_parent_once(self) -> None:
+        parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        child_descriptor = os.open(__file__, os.O_RDONLY)
+        with patch(
+            "titmas_action_gate.pr_gate._open_directory_no_follow",
+            return_value=(parent_descriptor, ()),
+        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
+            "titmas_action_gate.pr_gate.os.read", side_effect=OSError("read failed")
+        ), patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer, self.assertRaises(
+            ActionGateError
+        ) as observed:
+            _read_regular_bytes(
+                self.root / "synthetic-readable.json",
+                workspace=None,
+                enforce_workspace=False,
+                allow_missing=False,
+            )
+        self.assertEqual(observed.exception.code, "INPUT_NOT_READABLE")
+        self.assertEqual(closer.call_args_list, [call(child_descriptor), call(parent_descriptor)])
+
+    def test_read_regular_bytes_cleanup_failure_fails_closed_without_retry(self) -> None:
+        parent_descriptor = 9001
+        child_descriptor = 9002
+        with patch(
+            "titmas_action_gate.pr_gate._open_directory_no_follow",
+            return_value=(parent_descriptor, ()),
+        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
+            "titmas_action_gate.pr_gate.os.fstat", return_value=os.stat(self.root / "task.json") if (self.root / "task.json").exists() else os.stat(__file__)
+        ), patch("titmas_action_gate.pr_gate.os.read", return_value=b""), patch(
+            "titmas_action_gate.pr_gate._close_owned_input_descriptor",
+            side_effect=[ActionGateError("INPUT_PATH_RESOURCE_CLEANUP_FAILED", "cleanup failed"), None],
+        ) as closer, self.assertRaises(ActionGateError) as observed:
+            _read_regular_bytes(
+                self.root / "synthetic.json",
+                workspace=None,
+                enforce_workspace=False,
+                allow_missing=False,
+            )
+        self.assertEqual(observed.exception.code, "INPUT_PATH_RESOURCE_CLEANUP_FAILED")
+        self.assertEqual(closer.call_args_list, [call(child_descriptor), call(parent_descriptor)])
+
+    def test_close_owned_input_descriptor_maps_close_failure(self) -> None:
+        with patch(
+            "titmas_action_gate.pr_gate.os.close", side_effect=OSError("close failed")
+        ) as closer, self.assertRaises(ActionGateError) as observed:
+            _close_owned_input_descriptor(123)
+        self.assertEqual(observed.exception.code, "INPUT_PATH_RESOURCE_CLEANUP_FAILED")
+        closer.assert_called_once_with(123)
+
+    def test_input_descriptor_cleanup_failure_blocks_before_test(self) -> None:
+        marker = self.root / "cleanup-failure-executed"
+        command = [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"]
+        prepared = self.prepare(command)
+        real_closer = _close_owned_input_descriptor
+        close_count = 0
+
+        def fail_after_close(descriptor: int) -> None:
+            nonlocal close_count
+            close_count += 1
+            real_closer(descriptor)
+            if close_count == 2:
+                raise ActionGateError("INPUT_PATH_RESOURCE_CLEANUP_FAILED", "cleanup failed")
+
+        with patch("titmas_action_gate.pr_gate._close_owned_input_descriptor", side_effect=fail_after_close):
+            result, receipt, _ = self.run_gate(prepared, command, output_name="input-cleanup-failure")
+        self.assertEqual(result["state"], "FAIL")
+        self.assertEqual(result["reason_codes"], ["INPUT_PATH_RESOURCE_CLEANUP_FAILED"])
+        self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
+        self.assertFalse(marker.exists())
+
+    def test_missing_task_policy_evidence_and_approval_preserve_stable_states(self) -> None:
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        cases = (
+            ("task", "FAIL", "INPUT_INVALID"),
+            ("policy", "FAIL", "INPUT_INVALID"),
+            ("evidence", "INCOMPLETE", "EVIDENCE_MISSING"),
+            ("approval", "REVIEW_REQUIRED", "HUMAN_APPROVAL_REQUIRED"),
+        )
+        for role, expected_state, expected_reason in cases:
+            with self.subTest(role=role):
+                prepared = self.prepare(
+                    command,
+                    directory=self.root / f"missing-{role}",
+                    high_risk=role == "approval",
+                    approval=role == "approval",
+                )
+                Path(prepared[role]).unlink()
+                result, _, _ = self.run_gate(
+                    prepared,
+                    command,
+                    output_name=f"missing-{role}-output",
+                )
+                self.assertEqual(result["state"], expected_state)
+                self.assertEqual(result["reason_codes"], [expected_reason])
+
+    def test_invalid_json_schema_and_digest_exceptions_do_not_leak_descriptors(self) -> None:
+        descriptor_root = Path("/proc/self/fd") if Path("/proc/self/fd").is_dir() else Path("/dev/fd")
+        invalid = self.root / "invalid-input.json"
+        invalid.write_text("[]\n", encoding="utf-8")
+        before = len(list(descriptor_root.iterdir()))
+        with self.assertRaises(ActionGateError) as invalid_observed:
+            _freeze_json_input(
+                "task",
+                invalid,
+                workspace=None,
+                enforce_workspace=False,
+            )
+        self.assertEqual(invalid_observed.exception.code, "JSON_ROOT_NOT_OBJECT")
+        after_invalid = len(list(descriptor_root.iterdir()))
+        valid = self.root / "digest-input.json"
+        valid.write_text("{}\n", encoding="utf-8")
+        with patch("titmas_action_gate.pr_gate.hashlib.sha256", side_effect=RuntimeError("digest failed")), self.assertRaises(
+            RuntimeError
+        ):
+            _freeze_json_input(
+                "task",
+                valid,
+                workspace=None,
+                enforce_workspace=False,
+            )
+        after_digest = len(list(descriptor_root.iterdir()))
+        self.assertLessEqual(after_invalid, before)
+        self.assertLessEqual(after_digest, before)
+
+    @unittest.skipUnless(Path("/proc/self/fd").is_dir(), "Linux /proc fd accounting required")
+    def test_missing_input_500_times_does_not_leak_file_descriptors(self) -> None:
+        missing = self.root / "fd-loop-missing.json"
+        before = len(list(Path("/proc/self/fd").iterdir()))
+        for _ in range(500):
+            _read_regular_bytes(missing, workspace=None, enforce_workspace=False, allow_missing=True)
+        after = len(list(Path("/proc/self/fd").iterdir()))
+        self.assertLessEqual(after, before)
 
     def test_current_head_change_during_test_fails_closed(self) -> None:
         workspace, first, second = self.initialize_git_workspace()

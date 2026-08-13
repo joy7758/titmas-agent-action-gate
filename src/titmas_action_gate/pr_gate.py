@@ -238,32 +238,52 @@ def _read_regular_bytes(
     candidate, _ = _bounded_path(path, workspace=workspace, enforce_workspace=enforce_workspace)
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     parent_descriptor: int | None = None
+    descriptor: int | None = None
     try:
-        parent_descriptor, ancestor_identities = _open_directory_no_follow(candidate.parent, create=False)
-        descriptor = os.open(candidate.name, flags, dir_fd=parent_descriptor)
-    except FileNotFoundError:
-        if allow_missing:
-            return candidate, None, None, ()
-        raise ActionGateError("INPUT_MISSING", "A required gate input is missing.") from None
-    except UnsafePathError as exc:
-        raise ActionGateError(exc.code, "A gate input path could not be opened without following links.") from exc
-    except OSError as exc:
-        raise ActionGateError("INPUT_NOT_READABLE", "A gate input could not be opened safely.") from exc
-    try:
-        observed = os.fstat(descriptor)
-        if not stat.S_ISREG(observed.st_mode):
-            raise ActionGateError("INPUT_NOT_REGULAR", "Gate inputs must be regular files.")
-        chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, 1024 * 1024)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        return candidate, b"".join(chunks), observed, ancestor_identities
+        try:
+            parent_descriptor, ancestor_identities = _open_directory_no_follow(candidate.parent, create=False)
+            descriptor = os.open(candidate.name, flags, dir_fd=parent_descriptor)
+        except FileNotFoundError:
+            if allow_missing:
+                return candidate, None, None, ()
+            raise ActionGateError("INPUT_MISSING", "A required gate input is missing.") from None
+        except UnsafePathError as exc:
+            raise ActionGateError(exc.code, "A gate input path could not be opened without following links.") from exc
+        except OSError as exc:
+            raise ActionGateError("INPUT_NOT_READABLE", "A gate input could not be opened safely.") from exc
+        try:
+            observed = os.fstat(descriptor)
+            if not stat.S_ISREG(observed.st_mode):
+                raise ActionGateError("INPUT_NOT_REGULAR", "Gate inputs must be regular files.")
+            chunks: list[bytes] = []
+            while True:
+                chunk = os.read(descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            return candidate, b"".join(chunks), observed, ancestor_identities
+        except ActionGateError:
+            raise
+        except OSError as exc:
+            raise ActionGateError("INPUT_NOT_READABLE", "A gate input could not be read safely.") from exc
+        finally:
+            if descriptor is not None:
+                _close_owned_input_descriptor(descriptor)
     finally:
-        os.close(descriptor)
         if parent_descriptor is not None:
-            os.close(parent_descriptor)
+            _close_owned_input_descriptor(parent_descriptor)
+
+
+def _close_owned_input_descriptor(descriptor: int) -> None:
+    """Close one input-owned descriptor once, failing closed on uncertainty."""
+
+    try:
+        os.close(descriptor)
+    except OSError as exc:
+        raise ActionGateError(
+            "INPUT_PATH_RESOURCE_CLEANUP_FAILED",
+            "An input path resource could not be closed safely.",
+        ) from exc
 
 
 def _freeze_executable(name: str, environment: Mapping[str, str]) -> FrozenExecutable:
@@ -712,12 +732,30 @@ def _capture_effective_git_config(
         "--get",
         "extensions.worktreeConfig",
     )
-    if config.returncode != 0 or extensions.returncode not in {0, 1}:
+    if config.returncode != 0:
         raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The effective Git configuration could not be read.")
+    if extensions.returncode == 1 and not extensions.stdout.strip():
+        worktree_config_enabled = False
+    elif extensions.returncode == 0:
+        extension_value = extensions.stdout.strip()
+        if extension_value == b"true":
+            worktree_config_enabled = True
+        elif extension_value == b"false":
+            worktree_config_enabled = False
+        else:
+            raise ActionGateError(
+                "WORKTREE_CONFIG_EXTENSION_VALUE_INVALID",
+                "The worktree configuration extension value was invalid.",
+            )
+    elif extensions.returncode == 1:
+        raise ActionGateError(
+            "WORKTREE_CONFIG_EXTENSION_VALUE_INVALID",
+            "The worktree configuration extension value was invalid.",
+        )
+    else:
+        raise ActionGateError("GIT_CONFIG_AUDIT_UNAVAILABLE", "The worktree configuration extension could not be read.")
     config_bytes = config.stdout
-    if extensions.returncode == 0:
-        if extensions.stdout.strip() != b"true":
-            raise ActionGateError("GIT_CONFIG_PARSE_FAILED", "The worktree configuration flag was invalid.")
+    if worktree_config_enabled:
         worktree_path = _git_command(
             git_executable,
             repository,
@@ -1545,6 +1583,7 @@ def _public_projection(
         "PATH_COMPONENT_NOT_TRUSTED_DIRECTORY",
         "PATH_ESCAPES_REPOSITORY_ROOT",
         "INPUT_PATH_OUT_OF_SCOPE",
+        "INPUT_PATH_RESOURCE_CLEANUP_FAILED",
         "UNTRUSTED_EVENT_TYPE",
         "UNSAFE_TEST_CREDENTIAL_CONTEXT",
     ]
