@@ -265,7 +265,10 @@ class PullRequestGateTests(unittest.TestCase):
             request,
             command,
             output_name="secret-isolation",
-            environment={**os.environ, "TITMAS_APPROVAL_HMAC_KEY": APPROVAL_KEY},
+            environment={
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "TITMAS_APPROVAL_HMAC_KEY": APPROVAL_KEY,
+            },
         )
         self.assertEqual(result["state"], "PASS")
         self.assertEqual(receipt["test_result"]["exit_code"], 0)
