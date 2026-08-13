@@ -135,65 +135,72 @@ class GhCliProvider:
         if completed.returncode != 0 or len(branch) > 120:
             raise ActionGateError("PROVIDER_BRANCH_INVALID", "branch name is not allowed")
 
+    def _execute_branch_push(self, parameters: dict[str, Any]) -> dict[str, Any]:
+        worktree = self.allowed_worktree_root
+        branch = str(parameters["branch"])
+        commit = str(parameters["commit"])
+        self._validate_branch_push(branch, commit)
+        completed = subprocess.run(
+            ["git", "-C", str(worktree), "push", "origin", f"{commit}:refs/heads/{branch}"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            raise ActionGateError(
+                "PROVIDER_CALL_FAILED",
+                "GitHub branch push failed.",
+                details={"returncode": completed.returncode, "stderr": completed.stderr[-1000:]},
+            )
+        return {"branch": branch, "commit": commit, "state": "PUSHED"}
+
+    def _execute_pull_request_create(self, repository: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        payload = self._run(
+            [
+                "--method", "POST", f"repos/{repository}/pulls",
+                "-f", f"title={parameters['title']}",
+                "-f", f"head={parameters['head']}",
+                "-f", f"base={parameters['base']}",
+            ]
+        )
+        return {
+            "pull_number": int(payload["number"]),
+            "state": str(payload["state"]).upper(),
+            "html_url": payload["html_url"],
+            "base": payload["base"]["ref"],
+            "head": payload["head"]["ref"],
+        }
+
+    def _execute_pull_request_merge(self, repository: str, parameters: dict[str, Any]) -> dict[str, Any]:
+        payload = self._run(
+            [
+                "--method", "PUT", f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
+                "-f", f"merge_method={parameters['merge_method']}",
+            ]
+        )
+        return {
+            "merged": bool(payload.get("merged")),
+            "message": payload.get("message"),
+            "sha": payload.get("sha"),
+        }
+
     def execute(self, invocation: dict[str, Any]) -> dict[str, Any]:
         repository = invocation["repository"]
         if repository != self.allowed_repository:
             raise ActionGateError("PROVIDER_REPOSITORY_DENIED", "Invocation repository is outside the provider allowlist.")
         action = invocation["action"]
         parameters = invocation["parameters"]
+
         if action == "github.branch.push":
-            worktree = self.allowed_worktree_root
-            branch = str(parameters["branch"])
-            commit = str(parameters["commit"])
-            self._validate_branch_push(branch, commit)
-            completed = subprocess.run(
-                ["git", "-C", str(worktree), "push", "origin", f"{commit}:refs/heads/{branch}"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            if completed.returncode != 0:
-                raise ActionGateError(
-                    "PROVIDER_CALL_FAILED",
-                    "GitHub branch push failed.",
-                    details={"returncode": completed.returncode, "stderr": completed.stderr[-1000:]},
-                )
-            payload = {"branch": branch, "commit": commit, "state": "PUSHED"}
+            normalized = self._execute_branch_push(parameters)
         elif action == "github.pull_request.create":
-            payload = self._run(
-                [
-                    "--method", "POST", f"repos/{repository}/pulls",
-                    "-f", f"title={parameters['title']}",
-                    "-f", f"head={parameters['head']}",
-                    "-f", f"base={parameters['base']}",
-                ]
-            )
+            normalized = self._execute_pull_request_create(repository, parameters)
         elif action == "github.pull_request.merge":
-            payload = self._run(
-                [
-                    "--method", "PUT", f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
-                    "-f", f"merge_method={parameters['merge_method']}",
-                ]
-            )
+            normalized = self._execute_pull_request_merge(repository, parameters)
         else:
             raise ActionGateError("PROVIDER_ACTION_UNSUPPORTED", f"real adapter does not implement {action}")
-        if action == "github.pull_request.create":
-            normalized = {
-                "pull_number": int(payload["number"]),
-                "state": str(payload["state"]).upper(),
-                "html_url": payload["html_url"],
-                "base": payload["base"]["ref"],
-                "head": payload["head"]["ref"],
-            }
-        elif action == "github.pull_request.merge":
-            normalized = {
-                "merged": bool(payload.get("merged")),
-                "message": payload.get("message"),
-                "sha": payload.get("sha"),
-            }
-        else:
-            normalized = payload
+
         return {
             "provider": "github",
             "provider_mode": "GH_CLI_EXTERNAL_WRITE",
