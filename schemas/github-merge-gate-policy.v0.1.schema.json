@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/joy7758/titmas-agent-action-gate/schemas/github-merge-gate-policy.v0.1.schema.json",
+  "title": "GitHub merge-gate policy source v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "version", "default", "rules", "invariants"],
+  "properties": {
+    "policy_id": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "supersedes": {"type": "string", "minLength": 1},
+    "default": {"$ref": "#/$defs/ruleBody"},
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/ruleBody"},
+          {
+            "type": "object",
+            "required": ["action"],
+            "properties": {
+              "action": {
+                "enum": [
+                  "github.branch.push",
+                  "github.pull_request.create",
+                  "github.pull_request.merge",
+                  "github.tag.create",
+                  "github.release.create"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,127}$"}
+    },
+    "non_claims": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,127}$"}
+    }
+  },
+  "$defs": {
+    "ruleBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect", "risk_class", "required_evidence_types"],
+      "properties": {
+        "action": {"type": "string"},
+        "effect": {"enum": ["DENY", "ALLOW_WITHOUT_APPROVAL", "REQUIRE_HUMAN_APPROVAL"]},
+        "risk_class": {"enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+        "required_evidence_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$"}
+        }
+      }
+    }
+  }
+}

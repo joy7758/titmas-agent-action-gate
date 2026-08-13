@@ -23,7 +23,7 @@ inputs:
     description: Non-secret CI execution identity reference bound into the task.
     required: true
   output-directory:
-    description: Receipt directory. The canonical default is artifacts/titmas.
+    description: Preferred receipt directory; unsafe or preempted paths fail closed and relocate to a private directory.
     required: false
     default: artifacts/titmas
 
@@ -59,6 +59,10 @@ runs:
         TITMAS_CURRENT_PULL_REQUEST: ${{ github.event.pull_request.number }}
         TITMAS_CURRENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         TITMAS_EXECUTION_IDENTITY: ${{ inputs.execution-identity }}
+        TITMAS_CURRENT_EVENT_NAME: ${{ github.event_name }}
+        TITMAS_WORKSPACE: ${{ github.workspace }}
+        TITMAS_ACTION_CONFIG_PATH: ${{ github.action_path }}/action.yml
+        TITMAS_ACTION_ROOT: ${{ github.action_path }}
       run: |
         set +e
         args=(
@@ -67,29 +71,56 @@ runs:
           --policy "$TITMAS_INPUT_POLICY"
           --test-command "$TITMAS_INPUT_TEST_COMMAND"
           --output-dir "$TITMAS_INPUT_OUTPUT_DIRECTORY"
+          --workspace "$TITMAS_WORKSPACE"
+          --action-configuration "$TITMAS_ACTION_CONFIG_PATH"
+          --action-root "$TITMAS_ACTION_ROOT"
         )
         if [[ -n "$TITMAS_INPUT_APPROVAL" ]]; then
           args+=(--approval "$TITMAS_INPUT_APPROVAL")
         fi
-        titmas-action-gate verify-pr "${args[@]}"
+        result_json=$(titmas-action-gate verify-pr "${args[@]}")
         status=$?
-        if [[ -f "$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json" ]]; then
-          state=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["final_state"])' "$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json")
-          echo "state=$state" >> "$GITHUB_OUTPUT"
-          echo "receipt=$TITMAS_INPUT_OUTPUT_DIRECTORY/receipt.json" >> "$GITHUB_OUTPUT"
-          echo "summary=$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" >> "$GITHUB_OUTPUT"
-        fi
-        exit "$status"
+        result_file=$(mktemp "${RUNNER_TEMP:?}/titmas-gate-result.XXXXXX")
+        printf '%s\n' "$result_json" > "$result_file"
+        if python - "$result_file" "$TITMAS_INPUT_OUTPUT_DIRECTORY" "${RUNNER_TEMP:?}" <<'PY'
+        import hashlib
+        import json
+        import os
+        import stat
+        import sys
 
-    - name: Publish human-readable gate summary
-      if: always()
-      shell: bash
-      env:
-        TITMAS_INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
-      run: |
-        if [[ -f "$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" ]]; then
-          cat "$TITMAS_INPUT_OUTPUT_DIRECTORY/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        result_path, requested_output, runner_temp = sys.argv[1:]
+        with open(result_path, encoding="utf-8") as handle:
+            value = json.load(handle)
+        required = ("state", "receipt", "summary", "receipt_sha256", "summary_sha256", "output_integrity")
+        assert all(isinstance(value.get(key), str) for key in required)
+        assert value["state"] in {"PASS", "FAIL", "INCOMPLETE", "REVIEW_REQUIRED"}
+        assert value["output_integrity"] == "TRUSTED_CREATE_ONLY"
+        allowed_roots = (os.path.realpath(requested_output), os.path.realpath(runner_temp))
+        for role in ("receipt", "summary"):
+            path = os.path.abspath(value[role])
+            observed = os.lstat(path)
+            assert stat.S_ISREG(observed.st_mode) and not stat.S_ISLNK(observed.st_mode)
+            assert any(os.path.commonpath((path, root)) == root for root in allowed_roots)
+            with open(path, "rb") as handle:
+                assert hashlib.sha256(handle.read()).hexdigest() == value[f"{role}_sha256"]
+        with open(value["receipt"], encoding="utf-8") as handle:
+            receipt = json.load(handle)
+        assert receipt["final_state"] == value["state"]
+        PY
+        then
+          state=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["state"])' "$result_file")
+          receipt=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["receipt"])' "$result_file")
+          summary=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["summary"])' "$result_file")
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "receipt=$receipt" >> "$GITHUB_OUTPUT"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+        else
+          status=1
         fi
+        rm -f "$result_file"
+        exit "$status"
 
 branding:
   icon: shield

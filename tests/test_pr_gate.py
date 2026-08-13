@@ -143,6 +143,11 @@ class PullRequestGateTests(unittest.TestCase):
                 "finished_at",
                 "tool",
                 "policy",
+                "execution_mode",
+                "frozen_inputs",
+                "action_configuration",
+                "git_binding",
+                "output_integrity",
             },
             set(receipt) - {"schema_version"},
         )
@@ -308,19 +313,24 @@ class PullRequestGateTests(unittest.TestCase):
         request = self.request(HEAD_A, command)
         task = self.write_task(request, "preexisting-task.json")
         evidence = self.write_evidence(request, "preexisting-evidence.json")
-        with self.assertRaises(FileExistsError):
-            verify_pull_request(
-                task_path=task,
-                evidence_path=evidence,
-                policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
-                test_command=shlex.join(command),
-                output_directory=output,
-                repository=REPOSITORY,
-                pull_request=PULL_REQUEST,
-                head_sha=HEAD_A,
-                execution_identity=EXECUTION_IDENTITY,
-                environment={},
-            )
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+        self.assertEqual(result["state"], "FAIL")
+        self.assertEqual(result["reason_codes"], ["GATE_OUTPUT_PATH_PREEXISTED"])
+        self.assertNotEqual(Path(result["receipt"]), output / "receipt.json")
+        trusted_receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+        self.assertEqual(trusted_receipt["decision"]["outcome"], "BLOCK")
+        self.assertTrue(trusted_receipt["output_integrity"]["relocated_to_private_directory"])
         self.assertFalse(marker.exists())
         self.assertEqual((output / "receipt.json").read_text(encoding="utf-8"), "do-not-overwrite\n")
 

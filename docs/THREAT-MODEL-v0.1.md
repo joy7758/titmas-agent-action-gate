@@ -28,6 +28,8 @@ Status: controls partially implemented and locally exercised; not an independent
 | Cross-task contamination | concurrent prompt writes an unrelated request into the same workflow | task/correlation-scoped admission and assignment checks | concurrent-request isolation test |
 | Declarative reconciliation drift | model or Human update is accepted but not converged as expected | read-after-write status verification and pinned upgrade gate | AgentTeams update/re-apply test |
 | Secret leakage | token appears in prompt/evidence/log | secret manager, redaction, no secret inputs | leak scanning |
+| Gate-input time-of-check bypass | untrusted PR tests rewrite task, policy, evidence, approval, Git index/worktree, Action configuration or gate outputs before authorization | pre-test schema validation, canonical in-memory snapshots and SHA-256; post-test path, inode, digest, exact-head and Git-state recheck; create-only trusted outputs; mutation fails closed | task/evidence/policy/approval/multi-input/HEAD/Git-state/output/action/symlink tests |
+| PR test credential inheritance | untrusted tests inherit GitHub command files, OIDC, SSH, cloud, package-registry or persisted Git authentication | minimal environment allowlist, fresh HOME/TMPDIR, persisted Git credential preflight, `pull_request_target` rejection, process-group cleanup | fake credential, Git config, event, output and cleanup tests |
 | Cloud Skill scope expansion | upstream search Skill instructs enable/disable or full-access actions | server-side typed adapter permits only current-account `search-resources`; Worker has no credential bytes or arbitrary CLI | write-operation pre-process denial tests |
 | Cloud permission ambiguity | permission denial is interpreted as an empty inventory | distinct `NOT_ASSESSED_PERMISSION_DENIED`; no zero-resource inference | denied RAM identity test |
 | Stale cloud permission observation | a caller widens the freshness window, or a missing, timezone-naive, old, or future-dated RAM snapshot is reused as current policy proof | server-owned 900-second ceiling enforced at construction and invocation without clamping, non-null timezone-aware timestamp, same-run observation binding, and release-ineligible historical replay | type/range/ceiling/missing/naive/stale/future/same-run tests |
@@ -42,4 +44,4 @@ Schemas cannot prove the correctness of policy, verifier, identity provider, sto
 
 ## Explicit exclusions
 
-This reference implementation does not claim formal verification, sandbox escape resistance, supply-chain assurance, compliance, certification, or protection against every human administrator action.
+This reference implementation does not claim formal verification, sandbox escape resistance, supply-chain assurance, compliance, certification, or protection against every human administrator action. `TEST_PROCESS_ISOLATION_NE_PRODUCTION_SANDBOX=true`.

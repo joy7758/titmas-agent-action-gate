@@ -36,7 +36,7 @@ The public projection does not change internal Action Gate authority:
 | `INCOMPLETE` | `BLOCK / EVIDENCE_MISSING` | nonzero |
 | `REVIEW_REQUIRED` | `REQUIRE_APPROVAL` | nonzero until a scoped approval verifies |
 
-Every normal invocation in a fresh job writes `artifacts/titmas/receipt.json` and `artifacts/titmas/summary.md`, including repository, PR, exact head SHA, task and parameter digests, execution identity reference, test result, negative checks, authorization scope, evidence digest and verifier, risk, approval reference, internal decision, public state, reasons, time, and tool/policy versions. Both output inodes are reserved before the test subprocess starts; pre-existing or replaced paths fail closed instead of being overwritten.
+Every normal invocation in a fresh job writes `artifacts/titmas/receipt.json` and `artifacts/titmas/summary.md`, including repository, PR, exact head SHA, frozen-input digests, execution identity reference, test result, negative checks, authorization scope, evidence digest and verifier, risk, approval reference, internal decision, public state, reasons, time, and tool/policy versions. Empty create-only, no-follow output inodes are reserved before the test; their trusted contents are committed only after the test and deterministic decision complete. Pre-existing, replaced or test-created paths fail closed and relocate the trusted FAIL outputs instead of being overwritten or consumed.
 
 ```bash
 titmas-action-gate verify-pr \
@@ -46,7 +46,24 @@ titmas-action-gate verify-pr \
   --test-command 'python -m unittest discover -s tests -v'
 ```
 
-The task must be an existing `action-request.v0.1` for `github.pull_request.merge`. Its parameters bind `pull_request`, `head_sha`, `execution_identity`, and the direct-exec `test_command` array; its resource reference is `refs/pull/<number>/head@<sha>`. The evidence must be produced by a trusted earlier step and bind that exact request. The CLI does not run the command through a shell, and it removes token, secret, password, private-key, and API-key variables from the test subprocess environment. Consumer workflows should still set `permissions: contents: read` unless a separately reviewed step needs more.
+The task must be an existing `action-request.v0.1` for `github.pull_request.merge`. Its parameters bind `pull_request`, `head_sha`, `execution_identity`, and the direct-exec `test_command` array; its resource reference is `refs/pull/<number>/head@<sha>`. The evidence must be produced by a trusted earlier step and bind that exact request. Before the untrusted test starts, the gate validates and freezes task, policy, evidence, optional approval, repository identity, pull-request number, exact head and relevant Action configuration in parent-process memory. The final decision consumes only those frozen objects; any input, exact-head or relevant Git-state drift during the test fails closed.
+
+The test command does not run through a shell. It receives only a minimal environment with `PATH`, locale, `CI`, a fresh temporary `HOME` and `TMPDIR`, and non-interactive Git controls. GitHub command files, OIDC, SSH, cloud and package-registry credentials are not inherited. A persisted local Git authentication configuration, `pull_request_target` event, symbolic-link input or input path outside the trusted workspace fails before the test. The child runs in its own process group with bounded output and cleanup, but this does not claim container, virtual-machine or production sandbox isolation.
+
+Consumer workflows must use a least-privilege exact-head checkout:
+
+```yaml
+permissions:
+  contents: read
+
+steps:
+  - uses: actions/checkout@<immutable-full-sha>
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      fetch-depth: 0
+      persist-credentials: false
+  - uses: joy7758/titmas-agent-action-gate@<immutable-full-sha>
+```
 
 The root [`action.yml`](action.yml) is the reusable composite Action. Consumers must pin an immutable full commit SHA and configure its job as a required check; `PASS` does not bypass any other GitHub rule. Run the no-network regression matrix with:
 

@@ -21,6 +21,7 @@ SCHEMA_FILES = {
     "evidence_result": "evidence-verification-result.v0.1.schema.json",
     "human_approval": "human-approval.v0.1.schema.json",
     "decision": "action-gate-decision.v0.1.schema.json",
+    "github_merge_gate_policy": "github-merge-gate-policy.v0.1.schema.json",
     "runtime_scope": "runtime-scope.v0.1.schema.json",
     "cloud_context_query": "cloud-context-query.v0.1.schema.json",
     "cloud_context_result": "cloud-context-result.v0.2.schema.json",

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
+import shutil
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -117,6 +118,8 @@ def main() -> int:
     parser.add_argument("--output", default="artifacts/titmas/clean-replay")
     args = parser.parse_args()
     output_root = Path(args.output).resolve()
+    if output_root.exists():
+        shutil.rmtree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     passing_command = [sys.executable, "-c", "raise SystemExit(0)"]
     failing_command = [sys.executable, "-c", "raise SystemExit(9)"]

@@ -98,6 +98,9 @@ def build_parser() -> argparse.ArgumentParser:
     verify_pr.add_argument("--pull-request", type=int, help="Current pull-request number; defaults to the bounded CI environment.")
     verify_pr.add_argument("--head-sha", help="Current pull-request head SHA; defaults to the bounded CI environment.")
     verify_pr.add_argument("--execution-identity", help="Current execution identity reference; defaults to the bounded CI environment.")
+    verify_pr.add_argument("--workspace", help="Trusted repository workspace used to bound gate inputs and Git state.")
+    verify_pr.add_argument("--action-configuration", help="Relevant composite Action YAML to freeze before the test.")
+    verify_pr.add_argument("--action-root", help="Trusted installed Action root containing the frozen action.yml.")
     return parser
 
 
@@ -118,6 +121,9 @@ def main(argv: list[str] | None = None) -> None:
             pull_request=args.pull_request,
             head_sha=args.head_sha,
             execution_identity=args.execution_identity,
+            workspace=args.workspace,
+            action_configuration_path=args.action_configuration,
+            action_configuration_root=args.action_root,
         )
     elif args.command == "evaluate-fixtures":
         result = evaluate_fixtures()
