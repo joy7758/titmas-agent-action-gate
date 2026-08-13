@@ -47,7 +47,10 @@ PUBLIC_EXIT_CODES = {
 }
 DEFAULT_OUTPUT_DIRECTORY = Path("artifacts/titmas")
 TEST_TIMEOUT_SECONDS = 900
-TEST_OUTPUT_LIMIT_BYTES = 1024 * 1024
+MAX_TOTAL_TEST_OUTPUT_BYTES = 1024 * 1024
+# Backward-compatible alias for callers that imported the earlier name.  The
+# limit is now one aggregate server-owned budget shared by both output streams.
+TEST_OUTPUT_LIMIT_BYTES = MAX_TOTAL_TEST_OUTPUT_BYTES
 TEST_ENVIRONMENT_POLICY_VERSION = "minimal-v1"
 _SHA_PATTERN = re.compile(r"^[a-f0-9]{40}$")
 _UNAVAILABLE_APPROVAL_KEY = b"unavailable-approval-verifier-key"
@@ -87,16 +90,24 @@ class FrozenJsonInput:
 
 @dataclass(frozen=True)
 class GitSnapshot:
-    available: bool
-    head_sha: str | None
-    symbolic_head: str | None
-    repository_identity_matches: bool | None
-    local_config_sha256: str | None
-    index_sha256: str | None
-    worktree_diff_sha256: str | None
-    status_sha256: str | None
-    state_sha256: str | None
-    credential_risks: tuple[str, ...]
+    available: bool = False
+    head_sha: str | None = None
+    head_tree_sha: str | None = None
+    index_tree_sha: str | None = None
+    symbolic_head: str | None = None
+    repository_identity_matches: bool | None = None
+    tracked_index_clean: bool = False
+    tracked_worktree_clean: bool = False
+    submodules_clean: bool = False
+    unexpected_untracked_count: int = 0
+    local_config_sha256: str | None = None
+    effective_config_sha256: str | None = None
+    config_source_categories: tuple[str, ...] = ()
+    index_sha256: str | None = None
+    worktree_diff_sha256: str | None = None
+    status_sha256: str | None = None
+    state_sha256: str | None = None
+    credential_risks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -122,6 +133,28 @@ class _StreamObservation:
     sha256: str
     observed_bytes: int
     limit_exceeded: bool
+
+
+class _SharedOutputBudget:
+    """Atomically allocate one bounded capture budget across both pipes."""
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        self._observed_bytes = 0
+        self._lock = threading.Lock()
+
+    def claim(self, chunk: bytes) -> tuple[bytes, bool]:
+        with self._lock:
+            remaining = self.limit + 1 - self._observed_bytes
+            accepted = chunk[: max(remaining, 0)]
+            self._observed_bytes += len(accepted)
+            exceeded = self._observed_bytes > self.limit or len(accepted) < len(chunk)
+            return accepted, exceeded
+
+    @property
+    def observed_bytes(self) -> int:
+        with self._lock:
+            return self._observed_bytes
 
 
 def _tool_version() -> str:
@@ -466,6 +499,8 @@ def _git_command(git_executable: FrozenExecutable, workspace: Path, *arguments: 
             "core.hooksPath=/dev/null",
             "-c",
             "submodule.recurse=false",
+            "-c",
+            "diff.ignoreSubmodules=none",
             *arguments,
         ],
         stdin=subprocess.DEVNULL,
@@ -496,19 +531,48 @@ def _repository_slug(value: str) -> str | None:
     return path.removesuffix(".git") or None
 
 
-def _git_credential_risks(config_bytes: bytes) -> tuple[str, ...]:
-    risks: set[str] = set()
-    for record in config_bytes.split(b"\0"):
-        if not record:
-            continue
-        key_bytes, separator, value_bytes = record.partition(b"\n")
+def _git_config_records(config_bytes: bytes) -> list[tuple[str, str, str, str]]:
+    """Parse ``--show-scope --show-origin --null --list`` without values leaking."""
+
+    fields = [field for field in config_bytes.split(b"\0") if field]
+    records: list[tuple[str, str, str, str]] = []
+    for offset in range(0, len(fields) - 2, 3):
+        scope = fields[offset].decode("utf-8", "replace")
+        origin = fields[offset + 1].decode("utf-8", "replace")
+        key_bytes, separator, value_bytes = fields[offset + 2].partition(b"\n")
         key = key_bytes.decode("utf-8", "replace").lower()
         value = value_bytes.decode("utf-8", "replace") if separator else ""
+        records.append((scope, origin, key, value))
+    return records
+
+
+def _git_config_source_category(scope: str, origin: str) -> str:
+    if scope == "worktree":
+        return "WORKTREE"
+    if scope == "local":
+        return "REPOSITORY"
+    if origin.startswith("command line:"):
+        return "COMMAND"
+    return scope.upper() or "UNKNOWN"
+
+
+def _git_credential_risks(config_bytes: bytes) -> tuple[str, ...]:
+    risks: set[str] = set()
+    for _scope, _origin, key, value in _git_config_records(config_bytes):
         if key.startswith("http.") and key.endswith(".extraheader"):
             risks.add("HTTP_EXTRAHEADER")
+        elif key == "http.proxy" or key.startswith("http.") and key.endswith(".proxy"):
+            risks.add("HTTP_PROXY_CONFIGURATION")
+        elif key == "http.cookiefile" or key.startswith("http.") and key.endswith(".cookiefile"):
+            risks.add("HTTP_COOKIE_FILE")
+        elif key in {"http.sslkey", "http.sslcert"} or key.startswith("http.") and key.rsplit(".", 1)[-1] in {
+            "sslkey",
+            "sslcert",
+        }:
+            risks.add("HTTP_CLIENT_CREDENTIAL_FILE")
         elif key == "credential.helper" or key.startswith("credential."):
             risks.add("CREDENTIAL_CONFIGURATION")
-        elif key == "core.sshcommand":
+        elif key in {"core.sshcommand", "core.askpass", "core.gitproxy"}:
             risks.add("SSH_COMMAND")
         elif key == "include.path" or key.startswith("includeif."):
             risks.add("CONFIG_INCLUDE")
@@ -518,30 +582,77 @@ def _git_credential_risks(config_bytes: bytes) -> tuple[str, ...]:
             parsed = urlsplit(value)
             if parsed.username or parsed.password:
                 risks.add("AUTHENTICATED_REMOTE_URL")
+        elif key.startswith("remote.") and key.endswith(".proxy"):
+            risks.add("REMOTE_PROXY_COMMAND")
+        elif key.startswith("filter.") and key.rsplit(".", 1)[-1] in {"clean", "smudge", "process"}:
+            risks.add("GIT_FILTER_COMMAND")
+        elif key == "diff.external" or key.startswith("diff.") and key.rsplit(".", 1)[-1] in {"command", "textconv"}:
+            risks.add("GIT_DIFF_COMMAND")
     return tuple(sorted(risks))
+
+
+def _untracked_paths(status_bytes: bytes) -> tuple[str, ...]:
+    paths: list[str] = []
+    for record in status_bytes.split(b"\0"):
+        if record.startswith(b"?? "):
+            paths.append(record[3:].decode("utf-8", "surrogateescape"))
+    return tuple(paths)
 
 
 def _capture_git_snapshot(
     workspace: Path | None,
     expected_repository: str,
     git_executable: FrozenExecutable | None,
+    *,
+    allowed_untracked_paths: frozenset[Path] = frozenset(),
 ) -> GitSnapshot:
     if workspace is None:
-        return GitSnapshot(False, None, None, None, None, None, None, None, None, ())
+        return GitSnapshot()
     if git_executable is None or not _executable_unchanged(git_executable):
         raise ActionGateError("TRUSTED_GIT_EXECUTABLE_CHANGED", "The frozen Git executable is unavailable or changed.")
     inside = _git_command(git_executable, workspace, "rev-parse", "--is-inside-work-tree")
     if inside.returncode != 0 or inside.stdout.strip() != b"true":
-        return GitSnapshot(False, None, None, None, None, None, None, None, None, ())
-    head = _git_command(git_executable, workspace, "rev-parse", "HEAD")
+        return GitSnapshot()
+    config = _git_command(git_executable, workspace, "config", "--includes", "--show-origin", "--show-scope", "--null", "--list")
+    extensions = _git_command(git_executable, workspace, "config", "--local", "--bool", "--get", "extensions.worktreeConfig")
+    worktree_enabled = extensions.returncode == 0 and extensions.stdout.strip() == b"true"
+    worktree_path = _git_command(git_executable, workspace, "rev-parse", "--path-format=absolute", "--git-path", "config.worktree")
+    worktree_file_exists = worktree_path.returncode == 0 and Path(worktree_path.stdout.decode("utf-8", "surrogateescape").strip()).is_file()
+    worktree_config = (
+        _git_command(git_executable, workspace, "config", "--worktree", "--show-origin", "--show-scope", "--null", "--list")
+        if worktree_enabled and worktree_file_exists
+        else subprocess.CompletedProcess([], 0, b"", b"")
+    )
+    if config.returncode != 0 or worktree_config.returncode != 0 or extensions.returncode not in {0, 1}:
+        raise ActionGateError("GIT_STATE_UNAVAILABLE", "The effective repository and worktree configuration could not be read.")
+    config_bytes = config.stdout + worktree_config.stdout
+    credential_risks = _git_credential_risks(config_bytes)
+    head = _git_command(git_executable, workspace, "rev-parse", "--verify", "HEAD^{commit}")
+    head_tree = _git_command(git_executable, workspace, "rev-parse", "--verify", "HEAD^{tree}")
+    index_tree = _git_command(git_executable, workspace, "write-tree")
     symbolic = _git_command(git_executable, workspace, "symbolic-ref", "-q", "HEAD")
-    config = _git_command(git_executable, workspace, "config", "--local", "--null", "--list")
     remote = _git_command(git_executable, workspace, "remote", "get-url", "origin")
     index_result = _git_command(git_executable, workspace, "ls-files", "--stage", "-z")
-    worktree_diff = _git_command(git_executable, workspace, "diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--")
-    status_result = _git_command(git_executable, workspace, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-    if any(result.returncode != 0 for result in (head, config, index_result, worktree_diff, status_result)):
+    if credential_risks:
+        staged_diff = subprocess.CompletedProcess([], 1, b"", b"")
+        worktree_clean = subprocess.CompletedProcess([], 1, b"", b"")
+        worktree_diff = subprocess.CompletedProcess([], 0, b"", b"")
+        submodule_result = subprocess.CompletedProcess([], 0, b"", b"")
+        status_result = subprocess.CompletedProcess([], 0, b"", b"")
+    else:
+        staged_diff = _git_command(git_executable, workspace, "diff", "--cached", "--quiet", "--no-ext-diff", "--no-textconv", "HEAD", "--")
+        worktree_clean = _git_command(git_executable, workspace, "diff", "--quiet", "--no-ext-diff", "--no-textconv", "--")
+        worktree_diff = _git_command(git_executable, workspace, "diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", "--")
+        submodule_result = _git_command(git_executable, workspace, "submodule", "status", "--recursive")
+        status_result = _git_command(git_executable, workspace, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    required = (head, head_tree, index_tree, config, worktree_config, index_result, worktree_diff, submodule_result, status_result)
+    if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
         raise ActionGateError("GIT_STATE_UNAVAILABLE", "The repository HEAD, index, worktree, or local configuration could not be read.")
+    config_records = _git_config_records(config_bytes)
+    source_categories = tuple(sorted({_git_config_source_category(scope, origin) for scope, origin, _key, _value in config_records}))
+    unexpected_untracked = tuple(
+        path for path in _untracked_paths(status_result.stdout) if (workspace / path).absolute() not in allowed_untracked_paths
+    )
     observed_repository = _repository_slug(remote.stdout.decode("utf-8", "replace")) if remote.returncode == 0 else None
     worktree_diff_sha256 = hashlib.sha256(worktree_diff.stdout).hexdigest()
     status_sha256 = hashlib.sha256(status_result.stdout).hexdigest()
@@ -549,7 +660,10 @@ def _capture_git_snapshot(
     state_sha256 = sha256_json(
         {
             "head_sha": head.stdout.decode("ascii", "replace").strip(),
+            "head_tree_sha": head_tree.stdout.decode("ascii", "replace").strip(),
+            "index_tree_sha": index_tree.stdout.decode("ascii", "replace").strip(),
             "symbolic_head": symbolic.stdout.decode("utf-8", "replace").strip() if symbolic.returncode == 0 else None,
+            "effective_config_sha256": hashlib.sha256(config_bytes).hexdigest(),
             "index_sha256": index_sha256,
             "worktree_diff_sha256": worktree_diff_sha256,
             "status_sha256": status_sha256,
@@ -558,14 +672,22 @@ def _capture_git_snapshot(
     return GitSnapshot(
         available=True,
         head_sha=head.stdout.decode("ascii", "replace").strip(),
+        head_tree_sha=head_tree.stdout.decode("ascii", "replace").strip(),
+        index_tree_sha=index_tree.stdout.decode("ascii", "replace").strip(),
         symbolic_head=symbolic.stdout.decode("utf-8", "replace").strip() if symbolic.returncode == 0 else None,
         repository_identity_matches=observed_repository == expected_repository,
-        local_config_sha256=hashlib.sha256(config.stdout).hexdigest(),
+        tracked_index_clean=staged_diff.returncode == 0 and index_tree.stdout.strip() == head_tree.stdout.strip(),
+        tracked_worktree_clean=worktree_clean.returncode == 0,
+        submodules_clean=all(not line.startswith((b"+", b"-", b"U")) for line in submodule_result.stdout.splitlines()),
+        unexpected_untracked_count=len(unexpected_untracked),
+        local_config_sha256=hashlib.sha256(config_bytes).hexdigest(),
+        effective_config_sha256=hashlib.sha256(config_bytes).hexdigest(),
+        config_source_categories=source_categories,
         index_sha256=index_sha256,
         worktree_diff_sha256=worktree_diff_sha256,
         status_sha256=status_sha256,
         state_sha256=state_sha256,
-        credential_risks=_git_credential_risks(config.stdout),
+        credential_risks=credential_risks,
     )
 
 
@@ -574,14 +696,16 @@ def _git_post_checks(
     workspace: Path | None,
     expected_repository: str,
     git_executable: FrozenExecutable | None,
+    *,
+    allowed_untracked_paths: frozenset[Path] = frozenset(),
 ) -> list[dict[str, Any]]:
     if not before.available:
         return []
-    after = _capture_git_snapshot(workspace, expected_repository, git_executable)
+    after = _capture_git_snapshot(workspace, expected_repository, git_executable, allowed_untracked_paths=allowed_untracked_paths)
     return [
         _check("CURRENT_HEAD_CHANGED_DURING_TEST", after.available and after.head_sha == before.head_sha),
         _check("GIT_SYMBOLIC_HEAD_UNCHANGED", after.available and after.symbolic_head == before.symbolic_head),
-        _check("GIT_LOCAL_CONFIG_UNCHANGED", after.available and after.local_config_sha256 == before.local_config_sha256),
+        _check("GIT_SECURITY_CONFIGURATION_MUTATED_DURING_TEST", after.available and after.effective_config_sha256 == before.effective_config_sha256),
         _check("GIT_INDEX_UNCHANGED_DURING_TEST", after.available and after.index_sha256 == before.index_sha256),
         _check("GIT_WORKTREE_UNCHANGED_DURING_TEST", after.available and after.worktree_diff_sha256 == before.worktree_diff_sha256),
         _check("GIT_STATUS_UNCHANGED_DURING_TEST", after.available and after.status_sha256 == before.status_sha256),
@@ -602,6 +726,20 @@ def _execution_preflight_checks(environment: Mapping[str, str], context: PullReq
             [
                 _check("GIT_WORKTREE_AVAILABLE", git_snapshot.available),
                 _check("ACTUAL_HEAD_SHA_MATCH", git_snapshot.available and git_snapshot.head_sha == context.head_sha),
+                _check(
+                    "HEAD_EXECUTION_BASELINE_MISMATCH",
+                    git_snapshot.available
+                    and git_snapshot.head_sha == context.head_sha
+                    and git_snapshot.head_tree_sha == git_snapshot.index_tree_sha,
+                ),
+                _check(
+                    "DIRTY_TRACKED_EXECUTION_BASELINE",
+                    git_snapshot.available
+                    and git_snapshot.tracked_index_clean
+                    and git_snapshot.tracked_worktree_clean
+                    and git_snapshot.submodules_clean,
+                ),
+                _check("UNDECLARED_UNTRACKED_EXECUTION_INPUTS", git_snapshot.unexpected_untracked_count == 0),
                 _check("ACTUAL_REPOSITORY_IDENTITY_MATCH", git_snapshot.repository_identity_matches is True),
             ]
         )
@@ -762,44 +900,51 @@ def _terminate_process_group(process: subprocess.Popen[bytes]) -> bool:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
         return True
+    except OSError:
+        return False
     deadline = time.monotonic() + 1.0
     while time.monotonic() < deadline:
         try:
             os.killpg(process.pid, 0)
         except ProcessLookupError:
             return True
+        except OSError:
+            return False
         time.sleep(0.01)
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         return True
+    except OSError:
+        return False
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
         try:
             os.killpg(process.pid, 0)
         except ProcessLookupError:
             return True
+        except OSError:
+            return False
         time.sleep(0.01)
     return False
 
 
-def _observe_stream(stream: BinaryIO, exceeded: threading.Event) -> _StreamObservation:
+def _observe_stream(stream: BinaryIO, exceeded: threading.Event, budget: _SharedOutputBudget) -> _StreamObservation:
     digest = hashlib.sha256()
     observed_bytes = 0
+    limit_exceeded = False
     while True:
-        remaining = TEST_OUTPUT_LIMIT_BYTES + 1 - observed_bytes
-        if remaining <= 0:
-            exceeded.set()
-            break
-        chunk = stream.read(min(64 * 1024, remaining))
+        chunk = stream.read(64 * 1024)
         if not chunk:
             break
-        digest.update(chunk)
-        observed_bytes += len(chunk)
-        if observed_bytes > TEST_OUTPUT_LIMIT_BYTES:
+        accepted, claim_exceeded = budget.claim(chunk)
+        digest.update(accepted)
+        observed_bytes += len(accepted)
+        if claim_exceeded:
+            limit_exceeded = True
             exceeded.set()
             break
-    return _StreamObservation(digest.hexdigest(), observed_bytes, observed_bytes > TEST_OUTPUT_LIMIT_BYTES)
+    return _StreamObservation(digest.hexdigest(), observed_bytes, limit_exceeded)
 
 
 def _run_test(
@@ -819,6 +964,8 @@ def _run_test(
             "duration_ms": 0,
             "stdout_bytes": 0,
             "stderr_bytes": 0,
+            "combined_output_bytes": 0,
+            "max_total_output_bytes": MAX_TOTAL_TEST_OUTPUT_BYTES,
             "output_limit_exceeded": False,
             "timed_out": False,
             "process_group_cleanup": "NOT_STARTED",
@@ -834,13 +981,14 @@ def _run_test(
     started = time.monotonic()
     timed_out = False
     output_limit_event = threading.Event()
+    output_budget = _SharedOutputBudget(MAX_TOTAL_TEST_OUTPUT_BYTES)
     cleanup = "NOT_STARTED"
     exit_code = 127
     observations: dict[str, _StreamObservation] = {}
     threads: list[threading.Thread] = []
 
     def observe(name: str, stream: BinaryIO) -> None:
-        observations[name] = _observe_stream(stream, output_limit_event)
+        observations[name] = _observe_stream(stream, output_limit_event, output_budget)
 
     with tempfile.TemporaryDirectory(prefix="titmas-test-environment-", ignore_cleanup_errors=True) as directory:
         temporary_root = Path(directory)
@@ -887,10 +1035,14 @@ def _run_test(
                     exit_code = process.wait(timeout=3)
                 except subprocess.TimeoutExpired:
                     exit_code = 124
-            cleanup = "COMPLETE" if process.poll() is not None and _terminate_process_group(process) else "FAILED"
+            cleaned = process.poll() is not None and _terminate_process_group(process)
+            cleanup = "COMPLETE" if cleaned else "FAILED"
         except OSError:
-            cleanup = "NOT_STARTED"
-            exit_code = 127
+            if process is None:
+                cleanup = "NOT_STARTED"
+                exit_code = 127
+            else:
+                cleanup = "FAILED"
         finally:
             for thread in threads:
                 thread.join(timeout=2)
@@ -898,13 +1050,13 @@ def _run_test(
                 cleanup = "FAILED"
             if process is not None:
                 if process.poll() is None:
-                    _terminate_process_group(process)
+                    group_cleaned = _terminate_process_group(process)
                     try:
                         process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
                         process.kill()
                         process.wait(timeout=3)
-                    cleanup = "COMPLETE" if process.poll() is not None else "FAILED"
+                    cleanup = "COMPLETE" if group_cleaned and process.poll() is not None else "FAILED"
                 if process.stdout is not None:
                     process.stdout.close()
                 if process.stderr is not None:
@@ -926,6 +1078,8 @@ def _run_test(
         "duration_ms": int((time.monotonic() - started) * 1000),
         "stdout_bytes": stdout_observation.observed_bytes,
         "stderr_bytes": stderr_observation.observed_bytes,
+        "combined_output_bytes": output_budget.observed_bytes,
+        "max_total_output_bytes": MAX_TOTAL_TEST_OUTPUT_BYTES,
         "output_limit_exceeded": output_limit_exceeded,
         "timed_out": timed_out,
         "process_group_cleanup": cleanup,
@@ -962,9 +1116,16 @@ def _public_projection(
         return "FAIL", ["TEST_OUTPUT_LIMIT_EXCEEDED"]
     reason_priority = [
         "CURRENT_HEAD_CHANGED_DURING_TEST",
+        "RESERVED_OUTPUT_CONTENT_MUTATED",
+        "RESERVED_OUTPUT_IDENTITY_CHANGED",
         "GATE_OUTPUT_PATH_MUTATED_DURING_TEST",
         "GATE_OUTPUT_PATH_PREEXISTED",
+        "PERSISTED_GIT_CREDENTIAL_DETECTED",
+        "GIT_SECURITY_CONFIGURATION_MUTATED_DURING_TEST",
         "GIT_STATE_CHANGED_DURING_TEST",
+        "DIRTY_TRACKED_EXECUTION_BASELINE",
+        "UNDECLARED_UNTRACKED_EXECUTION_INPUTS",
+        "HEAD_EXECUTION_BASELINE_MISMATCH",
         "GATE_INPUT_MUTATED_DURING_TEST",
         "ACTION_CONFIGURATION_REQUIRED",
         "ACTION_CONFIGURATION_ROOT_REQUIRED",
@@ -973,7 +1134,6 @@ def _public_projection(
         "ACTION_CONFIGURATION_INVALID",
         "INPUT_SYMLINK_NOT_ALLOWED",
         "INPUT_PATH_OUT_OF_SCOPE",
-        "PERSISTED_GIT_CREDENTIAL_DETECTED",
         "UNTRUSTED_EVENT_TYPE",
         "UNSAFE_TEST_CREDENTIAL_CONTEXT",
     ]
@@ -1059,7 +1219,8 @@ def _evaluate_pull_request(
     action_configuration_path: str | Path | None = None,
     action_configuration_root: str | Path | None = None,
     output_preflight_safe: bool = True,
-    output_integrity_check: Callable[[], bool] | None = None,
+    output_integrity_check: Callable[[], str] | None = None,
+    declared_output_paths: tuple[Path, ...] = (),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     env = dict(environment if environment is not None else os.environ)
     started_at = utc_now()
@@ -1104,8 +1265,9 @@ def _evaluate_pull_request(
     post_input_observations: dict[str, dict[str, Any]] = {}
     frozen_action_configuration = FrozenActionConfiguration(None, None, None, None, None, None)
     post_action_configuration = {"sha256": None, "identity_changed": False, "mutated": False}
-    git_snapshot = GitSnapshot(False, None, None, None, None, None, None, None, None, ())
+    git_snapshot = GitSnapshot()
     git_executable: FrozenExecutable | None = None
+    allowed_untracked_paths: frozenset[Path] = frozenset()
 
     try:
         if workspace_error is not None or github_mode and workspace_path is None:
@@ -1151,13 +1313,21 @@ def _evaluate_pull_request(
         )
 
         request = task.payload()
+        allowed_untracked_paths = frozenset(
+            value.path.absolute() for value in frozen_inputs.values() if value.path is not None
+        ) | frozenset(path.absolute() for path in declared_output_paths)
         command = shlex.split(test_command)
         if not command:
             raise ActionGateError("TEST_COMMAND_EMPTY", "The task-bound test command is empty.")
         runtime_checks = _validate_runtime_binding(request, context, command)
         if workspace_path is not None:
             git_executable = _freeze_executable("git", env)
-        git_snapshot = _capture_git_snapshot(workspace_path, context.repository, git_executable)
+        git_snapshot = _capture_git_snapshot(
+            workspace_path,
+            context.repository,
+            git_executable,
+            allowed_untracked_paths=allowed_untracked_paths,
+        )
         runtime_checks.extend(_execution_preflight_checks(env, context, git_snapshot))
         runtime_checks.append(_check("GATE_OUTPUT_PATH_PREEXISTED", output_preflight_safe))
         task_valid = bool(runtime_checks) and runtime_checks[0]["passed"]
@@ -1177,12 +1347,21 @@ def _evaluate_pull_request(
                 post_action_configuration = _post_action_configuration_observation(frozen_action_configuration)
                 mutated = any(item["mutated"] for item in post_input_observations.values()) or post_action_configuration["mutated"]
                 runtime_checks.append(_check("GATE_INPUT_MUTATED_DURING_TEST", not mutated))
-                runtime_checks.extend(_git_post_checks(git_snapshot, workspace_path, context.repository, git_executable))
-                runtime_checks.append(
-                    _check(
-                        "GATE_OUTPUT_PATH_MUTATED_DURING_TEST",
-                        output_integrity_check is None or output_integrity_check(),
+                runtime_checks.extend(
+                    _git_post_checks(
+                        git_snapshot,
+                        workspace_path,
+                        context.repository,
+                        git_executable,
+                        allowed_untracked_paths=allowed_untracked_paths,
                     )
+                )
+                output_state = output_integrity_check() if output_integrity_check is not None else "PRISTINE"
+                runtime_checks.extend(
+                    [
+                        _check("RESERVED_OUTPUT_IDENTITY_CHANGED", output_state != "IDENTITY_CHANGED"),
+                        _check("RESERVED_OUTPUT_CONTENT_MUTATED", output_state != "CONTENT_MUTATED"),
+                    ]
                 )
             if not all(item["passed"] for item in runtime_checks) or test_result["exit_code"] != 0:
                 policy_evaluation = deepcopy(policy_evaluation)
@@ -1294,6 +1473,14 @@ def _evaluate_pull_request(
             "head_matches_context": git_snapshot.head_sha == context.head_sha if git_snapshot.available else None,
             "repository_identity_matches": git_snapshot.repository_identity_matches,
             "local_config_sha256": git_snapshot.local_config_sha256,
+            "effective_config_sha256": git_snapshot.effective_config_sha256,
+            "config_source_categories": list(git_snapshot.config_source_categories),
+            "head_tree_sha": git_snapshot.head_tree_sha,
+            "index_tree_sha": git_snapshot.index_tree_sha,
+            "tracked_index_clean": git_snapshot.tracked_index_clean,
+            "tracked_worktree_clean": git_snapshot.tracked_worktree_clean,
+            "submodules_clean": git_snapshot.submodules_clean,
+            "unexpected_untracked_count": git_snapshot.unexpected_untracked_count,
             "index_sha256": git_snapshot.index_sha256,
             "worktree_diff_sha256": git_snapshot.worktree_diff_sha256,
             "status_sha256": git_snapshot.status_sha256,
@@ -1370,8 +1557,19 @@ def verify_pull_request(
 
     assert receipt_output is not None and summary_output is not None
 
-    def output_integrity_check() -> bool:
-        return receipt_output._path_is_reserved_inode() and summary_output._path_is_reserved_inode()
+    def output_integrity_state() -> str:
+        if not receipt_output._path_is_reserved_inode() or not summary_output._path_is_reserved_inode():
+            return "IDENTITY_CHANGED"
+        if not receipt_output.pristine() or not summary_output.pristine():
+            return "CONTENT_MUTATED"
+        return "PRISTINE"
+
+    observed_output_state = "PRISTINE"
+
+    def output_integrity_check() -> str:
+        nonlocal observed_output_state
+        observed_output_state = output_integrity_state()
+        return observed_output_state
 
     receipt, result = _evaluate_pull_request(
         task_path=task_path,
@@ -1389,9 +1587,12 @@ def verify_pull_request(
         action_configuration_root=action_configuration_root,
         output_preflight_safe=output_preflight_safe,
         output_integrity_check=output_integrity_check,
+        declared_output_paths=(receipt_output.path, summary_output.path),
     )
-    output_relocated = not output_integrity_check()
+    output_state = observed_output_state
+    output_relocated = output_state != "PRISTINE"
     if output_relocated:
+        reason = "RESERVED_OUTPUT_IDENTITY_CHANGED" if output_state == "IDENTITY_CHANGED" else "RESERVED_OUTPUT_CONTENT_MUTATED"
         abort_reserved(receipt_output)
         abort_reserved(summary_output)
         output = Path(tempfile.mkdtemp(prefix="titmas-gate-output-", dir=os.environ.get("RUNNER_TEMP")))
@@ -1400,6 +1601,7 @@ def verify_pull_request(
         "requested_reference": requested_output.name,
         "preflight_safe": output_preflight_safe,
         "mutated_during_test": output_relocated,
+        "mutation_reason": None if not output_relocated else reason,
         "relocated_to_private_directory": output != requested_output,
     }
     summary_output.write_text(_receipt_summary(receipt))

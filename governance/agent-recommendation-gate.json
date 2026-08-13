@@ -1,29 +1,45 @@
 {
-  "gate_version": "2.6.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260813-016",
-  "evaluated_at": "2026-08-13T12:42:11+08:00",
+  "gate_version": "2.7.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260813-017",
+  "evaluated_at": "2026-08-13T14:35:48+08:00",
   "evaluator_class": "AI_AGENT",
   "development_context": {
-    "task_scope": "PR_24_FINAL_TWO_P1_SECURITY_FINDINGS",
-    "branch": "codex/merge-blocking-product",
-    "base_commit": "906b0d47fe8c26e940243cb15dd0a6daa12bda53",
-    "request_source": "DIRECT_USER_PR_24_TWO_P1_REMEDIATION_AUTHORIZATION_20260813",
-    "request_sha256": "929ed8883ccc5f0ceb723e16071724b8cd0d8c9af7428c4fd5051f9e699eaece",
-    "implementation_boundary": "FREEZE_GATE_INPUTS_BEFORE_UNTRUSTED_TEST_AND_RUN_TEST_WITH_MINIMAL_NON_CREDENTIAL_ENVIRONMENT_ONLY",
+    "task_scope": "PR_24_POST_MERGE_SECURITY_CLOSURE_RC1_RC2_RC3",
+    "branch": "codex/close-merge-gate-post-merge-security-findings",
+    "base_commit": "40a76fe1ca221c0e8c23192c3044a67340e7060e",
+    "request_source": "DIRECT_USER_POST_MERGE_FIX_FORWARD_SECURITY_PR_AUTHORIZATION_20260813",
+    "request_sha256": "2fe38e78ed81135b5a3be8a36c1b07840d789de1767b2542336face36b0b4732",
+    "implementation_boundary": "EXACT_HEAD_TRACKED_BASELINE_EFFECTIVE_GIT_CREDENTIAL_CONFIG_RESERVED_OUTPUT_CONTENT_INTEGRITY_AND_SHARED_TEST_OUTPUT_BUDGET",
     "external_read_authorized": true,
     "external_write_authorized": true,
-    "external_write_executed": true,
+    "external_write_executed": false,
     "prior_iam_provisioning_external_write_executed": true,
-    "authorized_external_writes": ["ONE_FOCUSED_BRANCH_PUSH_TO_PR_24", "PR_24_REVIEW_THREAD_REPLY_AFTER_DUAL_CI_PASS", "PR_24_REVIEW_THREAD_RESOLUTION_AFTER_DUAL_CI_PASS", "ONE_FINAL_CODEX_REVIEW_REQUEST"],
-    "prohibited_external_writes": ["FORCE_PUSH", "PULL_REQUEST_MERGE", "FROZEN_EVIDENCE_REWRITE", "VIDEO_RERECORD", "GOAI_MATERIAL_CHANGE", "TAG", "RELEASE", "DEPLOYMENT", "REAL_ALIBABA_CLOUD_QUERY", "GOAI_SUBMISSION", "CREDENTIAL_CHANGE"]
+    "authorized_external_writes": ["ONE_FOCUSED_SECURITY_FIX_BRANCH_PUSH", "ONE_NON_DRAFT_SECURITY_FIX_PULL_REQUEST", "ONE_FINAL_CODEX_REVIEW_REQUEST_AFTER_DUAL_CI_PASS"],
+    "prohibited_external_writes": ["FORCE_PUSH", "PR_24_REVERT", "PR_24_HISTORY_REWRITE", "SECURITY_FIX_PULL_REQUEST_MERGE", "FROZEN_EVIDENCE_REWRITE", "VIDEO_RERECORD", "GOAI_MATERIAL_CHANGE", "TAG", "RELEASE", "DEPLOYMENT", "REAL_GITHUB_PROVIDER_WRITE", "REAL_ALIBABA_CLOUD_QUERY", "GOAI_SUBMISSION", "CREDENTIAL_CHANGE"]
   },
-  "customer_need": "Freeze every authorization input before untrusted pull-request tests run, and prevent those tests from inheriting credentials or external-action capabilities.",
+  "customer_need": "Execute untrusted pull-request tests only from an exact clean HEAD, without persisted Git credentials, trusted-output contamination, or split output budgets.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "The 8/8 functional acceptance proof remains retained, but the exact PR head has two unresolved P1 findings: untrusted tests run before policy, evidence and approval inputs are frozen, and the test subprocess inherits a denylist-filtered parent environment rather than a minimal allowlist. Current product use and the preliminary submission candidate are not recommended until input mutation, head drift, persisted Git credentials, untrusted events and credential-capability inheritance fail closed with direct regression evidence, dual CI passes and a final review without P0-P2 findings."
+    "reason": "PR #24 is merged at 40a76fe1 and the 8/8 functional proof remains retained, but four post-review findings remain reproducible: a preexisting dirty tracked baseline can execute, worktree Git credential configuration is omitted, reserved output inodes can be contaminated in place, and stdout plus stderr do not share one 1 MiB budget. Current product use and the preliminary submission candidate remain not recommended until one fix-forward PR closes all three root causes with direct regressions, dual CI and a final exact-HEAD review without P0-P2 findings."
   },
   "advisory_agent_reviews": [
+    {
+      "agent": "Codex customer recommendation subagent",
+      "executed": true,
+      "scope": "PR_24_POST_MERGE_RC1_RC2_RC3_CUSTOMER_RECOMMENDATION",
+      "result": "CURRENT_PRODUCT_NOT_RECOMMENDED_BOUNDED_FIX_FORWARD_REMEDIATION_RECOMMENDED_WITH_DIRECT_REGRESSIONS_DUAL_CI_AND_EXACT_HEAD_FINAL_REVIEW",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Codex adversarial security design subagent",
+      "executed": true,
+      "scope": "EXACT_HEAD_EFFECTIVE_GIT_CONFIG_RESERVED_OUTPUT_CONTENT_AND_SHARED_OUTPUT_BUDGET",
+      "result": "THREE_ROOT_CAUSES_CONFIRMED_WITH_FAIL_CLOSED_IMPLEMENTATION_AND_EQUIVALENT_BYPASS_TEST_REQUIREMENTS",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
     {
       "agent": "Codex customer recommendation review",
       "executed": true,
@@ -208,14 +224,19 @@
   ],
   "non_recommendation_reasons": [
     {
-      "id": "NR-P1-INPUT-FREEZE",
-      "reason": "The untrusted test command runs before policy, evidence and approval are loaded; task and policy digests are also recalculated from mutable paths after the test.",
-      "required_fix": "Validate and freeze canonical in-memory gate inputs and their SHA-256 digests before the test, consume only those snapshots, and fail closed if an input, exact HEAD or relevant Git state changes during the test."
+      "id": "NR-RC1-GIT-EXECUTION-ADMISSION",
+      "reason": "The merged baseline freezes a preexisting dirty tracked checkout as its comparison baseline and scans only repository-local Git configuration, omitting worktree and included credential or command configuration.",
+      "required_fix": "Before test execution require tracked index and worktree bytes to equal the bound HEAD, bound declared untracked inputs and outputs, inspect effective repository/worktree configuration without retaining values, and recheck all fields after the test."
     },
     {
-      "id": "NR-P1-CREDENTIAL-ISOLATION",
-      "reason": "The test subprocess inherits a denylist-filtered parent environment and may retain GitHub command files, OIDC, SSH, cloud, package-registry or persisted Git credential capabilities.",
-      "required_fix": "Use a minimal environment allowlist with fresh HOME and TMPDIR, reject pull_request_target and persisted Git authentication, and terminate the isolated process group without logging credential values."
+      "id": "NR-RC2-RESERVED-OUTPUT-INTEGRITY",
+      "reason": "The merged baseline checks only reserved output inode identity, so same-inode in-place writes can contaminate trusted receipt or summary bytes.",
+      "required_fix": "Verify regular-file identity, metadata, link count and empty content after the test; relocate on mutation; truncate, write, fsync and verify the retained descriptor before returning trusted digests."
+    },
+    {
+      "id": "NR-RC3-SHARED-OUTPUT-BUDGET",
+      "reason": "The merged baseline gives stdout and stderr separate 1 MiB allowances instead of one aggregate server-owned limit.",
+      "required_fix": "Use an atomic shared 1048576-byte budget, retain at most limit plus one sentinel byte, terminate the process group on overflow, and preserve trusted failure outputs."
     },
     {
       "id": "NR-001",
@@ -314,9 +335,9 @@
     ,"MERGE_BLOCKING_PRODUCT_P0_ACCEPTANCE_8_OF_8"
   ],
   "remaining_gaps": [
-    "PR_24_LOCAL_SECURITY_REMEDIATION_AWAITS_DUAL_CI_AND_THREAD_CLOSURE",
-    "PR_24_FINAL_CODEX_REVIEW_NOT_YET_OBSERVED_ON_NEW_EXACT_HEAD",
-    "PRELIMINARY_SUBMISSION_CANDIDATE_NOT_READY_WHILE_TWO_P1_FINDINGS_REMAIN",
+    "POST_MERGE_SECURITY_FIX_AWAITS_COMPLETE_LOCAL_VALIDATION_AND_DUAL_CI",
+    "POST_MERGE_SECURITY_FIX_FINAL_CODEX_REVIEW_NOT_YET_OBSERVED_ON_EXACT_HEAD",
+    "PRELIMINARY_SUBMISSION_CANDIDATE_NOT_READY_UNTIL_FIX_PR_IS_HUMAN_MERGED_AND_MAIN_REVALIDATED",
     "DBA_PORTFOLIO_DECISION",
     "CLEAN_AUTONOMOUS_NATIVE_AGENTTEAMS_TRACE",
     "ENFORCED_PER_WORKER_MCP_TOOL_ACL",
