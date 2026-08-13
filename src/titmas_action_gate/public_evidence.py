@@ -218,26 +218,8 @@ def _security_chain_issues(events: list[dict[str, Any]]) -> list[str]:
     return issues
 
 
-def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
-    """Return deterministic issue codes; an empty list is the only valid state."""
-
-    root = root.resolve()
-    issues = _schema_issues(root, evidence)
-    if issues:
-        return issues
-
-    try:
-        validate_action_request(evidence["action_request"])
-        historical = evidence.get("schema_version") == "0.1.0"
-        validate_contract("cloud_context_result_v01" if historical else "cloud_context_result", evidence["cloud_context"])
-        validate_contract("evidence_result", evidence["agent_evidence_receipt"])
-        validate_contract(
-            "alibabacloud_ram_policy_observation_v01" if historical else "alibabacloud_ram_policy_observation",
-            evidence["permission_observation"],
-        )
-    except Exception as exc:
-        issues.append(f"CONTRACT:{type(exc).__name__}")
-
+def _provenance_issues(root: Path, evidence: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
     expected_provenance = workspace_content_provenance(root)
     if evidence.get("schema_version") == "0.2.0":
         expected_provenance.update(
@@ -292,13 +274,11 @@ def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
     if evidence["cloud_context"]["skill"]["source_lock_sha256"] != expected_provenance["source_lock_sha256"]:
         issues.append("SOURCE_LOCK_CLOUD_CONTEXT_MISMATCH")
 
-    record_issues = _record_chain_issues(evidence["record_chain"]["records"])
-    if record_issues or evidence["record_chain"]["issues"]:
-        issues.extend(record_issues or ["RECORD_CHAIN_DECLARED_ISSUES_NONEMPTY"])
-    security_issues = _security_chain_issues(evidence["security_chain"]["events"])
-    if security_issues or evidence["security_chain"]["issues"]:
-        issues.extend(security_issues or ["SECURITY_CHAIN_DECLARED_ISSUES_NONEMPTY"])
+    return issues
 
+
+def _event_chain_issues(evidence: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
     try:
         envelopes = [EvidenceEnvelope.model_validate(item) for item in evidence["agent_evidence_event_chain"]["events"]]
         event_issues = verify_agent_evidence_chain(envelopes)
@@ -306,7 +286,11 @@ def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
         event_issues = [f"AGENT_EVIDENCE_EVENT_MODEL:{type(exc).__name__}"]
     if event_issues or evidence["agent_evidence_event_chain"]["issues"]:
         issues.extend(f"AGENT_EVIDENCE_EVENT_CHAIN:{item}" for item in (event_issues or ["DECLARED_ISSUES_NONEMPTY"]))
+    return issues
 
+
+def _receipt_replay_issues(evidence: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
     receipt = evidence["agent_evidence_receipt"]
     try:
         verified_at = datetime.fromisoformat(receipt["verified_at"].replace("Z", "+00:00"))
@@ -324,5 +308,44 @@ def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
             issues.append("AGENT_EVIDENCE_RECEIPT_REPLAY_MISMATCH")
     except Exception as exc:
         issues.append(f"AGENT_EVIDENCE_RECEIPT_REPLAY:{type(exc).__name__}")
+    return issues
+
+
+def _contract_issues(evidence: dict[str, Any]) -> list[str]:
+    issues: list[str] = []
+    try:
+        validate_action_request(evidence["action_request"])
+        historical = evidence.get("schema_version") == "0.1.0"
+        validate_contract("cloud_context_result_v01" if historical else "cloud_context_result", evidence["cloud_context"])
+        validate_contract("evidence_result", evidence["agent_evidence_receipt"])
+        validate_contract(
+            "alibabacloud_ram_policy_observation_v01" if historical else "alibabacloud_ram_policy_observation",
+            evidence["permission_observation"],
+        )
+    except Exception as exc:
+        issues.append(f"CONTRACT:{type(exc).__name__}")
+    return issues
+
+
+def validate_public_evidence(root: Path, evidence: dict[str, Any]) -> list[str]:
+    """Return deterministic issue codes; an empty list is the only valid state."""
+
+    root = root.resolve()
+    issues = _schema_issues(root, evidence)
+    if issues:
+        return issues
+
+    issues.extend(_contract_issues(evidence))
+    issues.extend(_provenance_issues(root, evidence))
+
+    record_issues = _record_chain_issues(evidence["record_chain"]["records"])
+    if record_issues or evidence["record_chain"]["issues"]:
+        issues.extend(record_issues or ["RECORD_CHAIN_DECLARED_ISSUES_NONEMPTY"])
+    security_issues = _security_chain_issues(evidence["security_chain"]["events"])
+    if security_issues or evidence["security_chain"]["issues"]:
+        issues.extend(security_issues or ["SECURITY_CHAIN_DECLARED_ISSUES_NONEMPTY"])
+
+    issues.extend(_event_chain_issues(evidence))
+    issues.extend(_receipt_replay_issues(evidence))
 
     return issues
