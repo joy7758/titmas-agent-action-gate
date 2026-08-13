@@ -12,6 +12,52 @@ from typing import Any
 import rfc8785
 
 
+class UnsafePathError(RuntimeError):
+    """Stable fail-closed error for a path that cannot be walked without links."""
+
+    code = "SYMLINK_ANCESTOR_NOT_ALLOWED"
+
+
+def _open_directory_no_follow(path: Path, *, create: bool) -> tuple[int, tuple[tuple[str, int, int], ...]]:
+    """Open an absolute directory one component at a time without following links."""
+
+    candidate = path.expanduser()
+    if not candidate.is_absolute() or not str(candidate) or any(part in {"", ".", ".."} for part in candidate.parts[1:]):
+        raise UnsafePathError("PATH_ESCAPES_TRUSTED_ROOT")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(candidate.anchor, flags)
+    except OSError as exc:
+        raise UnsafePathError("PATH_COMPONENT_NOT_TRUSTED_DIRECTORY") from exc
+    identities: list[tuple[str, int, int]] = []
+    current = Path(candidate.anchor)
+    try:
+        root_observation = os.fstat(descriptor)
+        identities.append((str(current), root_observation.st_dev, root_observation.st_ino))
+        for part in candidate.parts[1:]:
+            current = current / part
+            try:
+                child = os.open(part, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                os.mkdir(part, mode=0o700, dir_fd=descriptor)
+                child = os.open(part, flags, dir_fd=descriptor)
+            except OSError as exc:
+                raise UnsafePathError("SYMLINK_ANCESTOR_NOT_ALLOWED") from exc
+            observation = os.fstat(child)
+            if not stat.S_ISDIR(observation.st_mode):
+                os.close(child)
+                raise UnsafePathError("PATH_COMPONENT_NOT_TRUSTED_DIRECTORY")
+            os.close(descriptor)
+            descriptor = child
+            identities.append((str(current), observation.st_dev, observation.st_ino))
+        return descriptor, tuple(identities)
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
 class ExclusiveOutput:
     """Reserve one regular output inode before effects and write it exactly once.
 
@@ -19,28 +65,45 @@ class ExclusiveOutput:
     replacement or symlink cannot redirect the final write to existing data.
     """
 
-    def __init__(self, path: str | Path, *, mode: int = 0o600):
-        requested = Path(path).expanduser().absolute()
-        requested.parent.mkdir(parents=True, exist_ok=True)
-        parent = requested.parent.resolve(strict=True)
-        self.path = parent / requested.name
-        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        self._parent_fd = os.open(parent, directory_flags)
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        mode: int = 0o600,
+        expected_ancestor_identities: tuple[tuple[str, int, int], ...] | None = None,
+    ):
+        raw = Path(path).expanduser()
+        if not str(raw) or any(part in {".", ".."} for part in raw.parts):
+            raise UnsafePathError("PATH_ESCAPES_TRUSTED_ROOT")
+        requested = raw if raw.is_absolute() else Path.cwd() / raw
+        self.path = requested
+        self._parent_path = requested.parent
+        self._parent_fd, self._ancestor_identities = _open_directory_no_follow(self._parent_path, create=True)
+        if expected_ancestor_identities is not None and self._ancestor_identities != expected_ancestor_identities:
+            os.close(self._parent_fd)
+            self._parent_fd = -1
+            raise UnsafePathError("PATH_ANCESTOR_IDENTITY_CHANGED")
         parent_observation = os.fstat(self._parent_fd)
         if not stat.S_ISDIR(parent_observation.st_mode):
             os.close(self._parent_fd)
             self._parent_fd = -1
             raise RuntimeError("EXCLUSIVE_OUTPUT_PARENT_NOT_DIRECTORY")
-        self._parent_path = parent
         self._parent_identity = (parent_observation.st_dev, parent_observation.st_ino)
-        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
         try:
             self._fd = os.open(self.path.name, flags, mode, dir_fd=self._parent_fd)
         except Exception:
             os.close(self._parent_fd)
             self._parent_fd = -1
             raise
-        os.fchmod(self._fd, mode)
+        try:
+            os.fchmod(self._fd, mode)
+        except Exception:
+            os.close(self._fd)
+            self._fd = -1
+            os.close(self._parent_fd)
+            self._parent_fd = -1
+            raise
         created = os.fstat(self._fd)
         if not stat.S_ISREG(created.st_mode):
             os.close(self._fd)
@@ -68,14 +131,16 @@ class ExclusiveOutput:
             path_observation = self._parent_path.lstat()
         except (FileNotFoundError, OSError):
             return False
-        current = Path(self._parent_path.anchor)
-        for part in self._parent_path.parts[1:]:
-            current = current / part
+        for path_text, expected_device, expected_inode in self._ancestor_identities:
             try:
-                component = current.lstat()
+                component = Path(path_text).lstat()
             except (FileNotFoundError, OSError):
                 return False
-            if stat.S_ISLNK(component.st_mode):
+            if (
+                stat.S_ISLNK(component.st_mode)
+                or not stat.S_ISDIR(component.st_mode)
+                or (component.st_dev, component.st_ino) != (expected_device, expected_inode)
+            ):
                 return False
         return bool(
             stat.S_ISDIR(descriptor_observation.st_mode)
@@ -162,7 +227,7 @@ class ExclusiveOutput:
             os.close(self._fd)
             self._fd = -1
         if not self._committed:
-            if self._directory_entry_is_reserved_inode():
+            if self._parent_fd >= 0 and self._directory_entry_is_reserved_inode():
                 os.unlink(self.path.name, dir_fd=self._parent_fd)
             if self._parent_fd >= 0:
                 os.close(self._parent_fd)

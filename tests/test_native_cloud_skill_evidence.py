@@ -162,14 +162,14 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
 
     def test_native_runner_refuses_to_overwrite_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            output = Path(tempdir) / "existing.json"
+            output = Path(tempdir).resolve(strict=True) / "existing.json"
             output.write_text("retained", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "EVIDENCE_OUTPUT_ALREADY_EXISTS"):
                 require_new_evidence_output(output)
 
     def test_public_runner_reserves_output_before_capture(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            output = Path(tempdir) / "existing.json"
+            output = Path(tempdir).resolve(strict=True) / "existing.json"
             output.write_text("retained", encoding="utf-8")
             with (
                 patch("scripts.run_alibabacloud_skill_evaluation._run_reserved") as delegated,
@@ -187,7 +187,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
 
     def test_capture_cli_reserves_output_before_provider_reads(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            output = Path(tempdir) / "existing.json"
+            output = Path(tempdir).resolve(strict=True) / "existing.json"
             output.write_text("retained", encoding="utf-8")
             argv = [
                 "capture",
@@ -213,16 +213,17 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
 
     def test_exclusive_output_blocks_concurrent_or_symlink_replacement(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            output = Path(tempdir) / "evidence.json"
+            physical_tempdir = Path(tempdir).resolve(strict=True)
+            output = physical_tempdir / "evidence.json"
             with ExclusiveOutput(output) as reserved:
                 with self.assertRaises(FileExistsError):
                     ExclusiveOutput(output)
                 reserved.write_text("first")
             self.assertEqual(output.read_text(encoding="utf-8"), "first")
 
-            victim = Path(tempdir) / "victim.json"
+            victim = physical_tempdir / "victim.json"
             victim.write_text("preserve", encoding="utf-8")
-            replacement = Path(tempdir) / "replacement.json"
+            replacement = physical_tempdir / "replacement.json"
             with (
                 self.assertRaisesRegex(RuntimeError, "EXCLUSIVE_OUTPUT_PATH_REPLACED"),
                 ExclusiveOutput(replacement) as reserved,
