@@ -1,0 +1,128 @@
+{
+  "format_version": "0.1.0",
+  "evidence_id": "TITMAS-MERGE-BLOCKING-PUBLIC-PROOF-20260812",
+  "observed_at": "2026-08-12T23:04:28+08:00",
+  "scope": "BOUNDED_PUBLIC_GITHUB_REQUIRED_CHECK_AND_RECORDING_PROOF",
+  "product_source": {
+    "repository": "joy7758/titmas-agent-action-gate",
+    "branch": "codex/merge-blocking-product",
+    "implementation_commit": "decb83d5a31d4b42ac5e4c1ebe65d6cf30bd7b34",
+    "pull_request": 24,
+    "pull_request_url": "https://github.com/joy7758/titmas-agent-action-gate/pull/24",
+    "pull_request_state": "OPEN_DRAFT_NOT_MERGED",
+    "push_and_pull_request_contract_checks": "PASS"
+  },
+  "public_sandbox": {
+    "repository": "joy7758/titmas-action-gate-demo-sandbox",
+    "visibility": "PUBLIC",
+    "pull_request": 4,
+    "pull_request_url": "https://github.com/joy7758/titmas-action-gate-demo-sandbox/pull/4",
+    "pull_request_head": "6d2c01493ba8891446f877057c71ab0cd0df9ae6",
+    "pull_request_state_at_freeze": "OPEN_NOT_MERGED",
+    "required_check": {
+      "context": "TITMAS Evidence Gate",
+      "strict": true,
+      "github_app_id": 15368,
+      "enforce_admins": true,
+      "allow_force_pushes": false,
+      "allow_deletions": false
+    }
+  },
+  "ordinary_ci_blind_spot": {
+    "evidence_subject_commit_a": "a2c9f998dec1b5d6f1e82eb87db273eaef3670b9",
+    "pull_request_head_commit_b": "6d2c01493ba8891446f877057c71ab0cd0df9ae6",
+    "workflow_run": 31602933748,
+    "failed_attempt": {
+      "attempt": 1,
+      "url": "https://github.com/joy7758/titmas-action-gate-demo-sandbox/actions/runs/31602933748/attempts/1",
+      "ordinary_ci": {
+        "job_id": 94134585600,
+        "conclusion": "SUCCESS"
+      },
+      "titmas_evidence_gate": {
+        "job_id": 94134585578,
+        "conclusion": "FAILURE",
+        "public_state": "FAIL",
+        "stable_reason_code": "EVIDENCE_SUBJECT_MISMATCH",
+        "internal_decision": "BLOCK",
+        "process_exit_code": 1
+      },
+      "merge_state_observed_before_correction": "BLOCKED",
+      "artifact": {
+        "id": 9143879252,
+        "name": "titmas-evidence-gate-1",
+        "expires_at": "2026-09-11T13:44:14Z",
+        "receipt_sha256": "daa7d99fb96637ce770604c4ab3f33b198a244d815b97d6977dfd8d7e9899560",
+        "summary_sha256": "fa605994616789095d4e095ea0afea7ef523f75502bbceb63597edf98a088a0a"
+      }
+    },
+    "corrected_attempt": {
+      "attempt": 2,
+      "url": "https://github.com/joy7758/titmas-action-gate-demo-sandbox/actions/runs/31602933748",
+      "correction": "PUBLIC_NONSECRET_EVIDENCE_SUBJECT_UPDATED_TO_EXACT_HEAD_B",
+      "ordinary_ci": {
+        "job_id": 94134976230,
+        "conclusion": "SUCCESS"
+      },
+      "titmas_evidence_gate": {
+        "job_id": 94134974644,
+        "conclusion": "SUCCESS",
+        "public_state": "PASS",
+        "stable_reason_code": "ALL_BOUNDARIES_SATISFIED",
+        "internal_decision": "ALLOW",
+        "process_exit_code": 0
+      },
+      "merge_state_at_freeze": "CLEAN",
+      "artifact": {
+        "id": 9143939296,
+        "name": "titmas-evidence-gate-2",
+        "expires_at": "2026-09-11T13:45:53Z",
+        "receipt_sha256": "fc7aea6266d2a0270bbc8675b3f690ed16ecc85e96b777541e46bbf3cfb9bf77",
+        "summary_sha256": "a9481598425f78b48a6df35f7801b23f81cbce3c7a6cc2d71675ddf8d1805d2b"
+      }
+    }
+  },
+  "recording": {
+    "comment_url": "https://github.com/joy7758/titmas-action-gate-demo-sandbox/pull/4#issuecomment-5268603238",
+    "public_attachment_url": "https://github.com/user-attachments/assets/342b670b-cf2f-44fb-a209-392c6edba886",
+    "filename": "TITMAS-merge-gate-demo-90s-20260812.mov",
+    "capture_target_seconds": 90,
+    "encoded_duration_seconds": 89.986667,
+    "size_bytes": 37238569,
+    "sha256": "73bc0a5441ca79530b393dea60b0c9adf38abf975d5fe3bc997f117df246c624",
+    "public_range_get_observation": "HTTP_206_VIDEO_QUICKTIME",
+    "uninterrupted": true,
+    "content_check": {
+      "repository_and_pull_request": true,
+      "ordinary_ci_result": true,
+      "titmas_result": true,
+      "blocked_merge_state": "FAILED_REQUIRED_CHECK_AND_BLOCKING_SUMMARY_SHOWN",
+      "machine_receipt": true,
+      "human_readable_summary": true,
+      "correction_followed_by_rerun": true,
+      "final_allowed_state": true
+    }
+  },
+  "acceptance": {
+    "install_path": "PASS",
+    "public_required_check_repository": "PASS",
+    "four_reproducible_public_states_and_approved_rerun": "PASS",
+    "actual_merge_enforcement": "PASS",
+    "receipts": "PASS",
+    "clean_environment_replay": "PASS",
+    "ninety_second_uninterrupted_demo": "PASS",
+    "ordinary_ci_blind_spot": "PASS",
+    "progress": "8/8",
+    "product_status": "PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT"
+  },
+  "non_claims": [
+    "NO_PULL_REQUEST_MERGE",
+    "NO_TAG_OR_RELEASE",
+    "NO_DEPLOYMENT",
+    "NO_GOAI_SUBMISSION",
+    "NO_PRODUCTION_READINESS",
+    "NO_CERTIFICATION_OR_COMPLIANCE",
+    "NO_LARGE_SCALE_CONCURRENCY_PROOF",
+    "NO_COMPLETE_M4_AUTONOMY"
+  ]
+}

@@ -24,6 +24,7 @@ def main() -> int:
     declaration = load_json("governance/project-declaration.json")
     grant = load_json("governance/dba-management-grant.json")
     recommendation = load_json("governance/agent-recommendation-gate.json")
+    merge_proof = load_json("demo/evidence/merge-blocking-public-proof-20260812.json")
 
     if index.get("project_id") != "TITMAS-AGENT-ACTION-GATE":
         failures.append("agent-index project_id mismatch")
@@ -39,8 +40,20 @@ def main() -> int:
 
     if declaration["dba_request"].get("portfolio_admitted") is not False:
         failures.append("portfolio admission must remain false until DBA decision")
-    if declaration["project"].get("implementation_status") != "REFERENCE_IMPLEMENTATION_WITH_REAL_GITHUB_SANDBOX_AND_PARTIAL_NATIVE_AGENTTEAMS_SMOKE_EVIDENCE":
+    if declaration["project"].get("implementation_status") != "MERGE_BLOCKING_PRODUCT_P0_PUBLICLY_REPRODUCED":
         failures.append("implementation status does not match the retained reference evidence boundary")
+    merge_product = index.get("merge_blocking_product", {})
+    if index.get("maturity") != "PUBLICLY_REPRODUCIBLE_MERGE_BLOCKING_PRODUCT":
+        failures.append("bounded merge-blocking product status is not retained")
+    if merge_product.get("acceptance_progress") != "8/8":
+        failures.append("merge-blocking acceptance progress is not 8/8")
+    for proof_flag in ("required_check_proven", "public_blind_spot_demo_proven", "demo_recording_retained"):
+        if merge_product.get(proof_flag) is not True:
+            failures.append(f"merge-blocking proof flag is not true: {proof_flag}")
+    if merge_proof.get("acceptance", {}).get("progress") != "8/8":
+        failures.append("retained merge-blocking proof does not bind 8/8 acceptance")
+    if merge_proof.get("recording", {}).get("uninterrupted") is not True:
+        failures.append("retained merge-blocking proof does not bind the uninterrupted recording")
     if declaration.get("dba_report_reference", {}).get("state") != "MERGED":
         failures.append("DBA existence report merge observation is missing")
     if declaration["dba_request"].get("admission_decision_recorded") is not False:
@@ -63,6 +76,8 @@ def main() -> int:
     print("RUNTIME_PERMISSION_CREATED=false")
     print("PRODUCT_RECOMMENDED=false")
     print("REFERENCE_IMPLEMENTATION_RECORDED=true")
+    print("MERGE_BLOCKING_ACCEPTANCE_PROGRESS=8/8")
+    print("PUBLIC_REQUIRED_CHECK_PROOF_RETAINED=true")
     return 0
 
 

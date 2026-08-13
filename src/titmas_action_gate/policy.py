@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sysconfig
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -30,9 +31,19 @@ def default_policy_path() -> Path:
 
 
 class PolicyEngine:
-    def __init__(self, policy_path: str | Path | None = None):
-        self.path = Path(policy_path) if policy_path else default_policy_path()
-        self.policy = json.loads(self.path.read_text(encoding="utf-8"))
+    def __init__(self, policy_path: str | Path | None = None, *, policy: dict[str, Any] | None = None):
+        if policy_path is not None and policy is not None:
+            raise ValueError("POLICY_SOURCE_AMBIGUOUS")
+        self.path = Path(policy_path) if policy_path else None
+        if policy is None:
+            self.path = self.path or default_policy_path()
+            policy = json.loads(self.path.read_text(encoding="utf-8"))
+        if not isinstance(policy, dict):
+            raise ValueError("POLICY_ROOT_NOT_OBJECT")
+        # A private copy lets callers evaluate an already frozen policy object
+        # without reopening a path that untrusted code may later mutate.
+        self.policy = deepcopy(policy)
+        validate_contract("github_merge_gate_policy", self.policy)
         self.ruleset_sha256 = sha256_json(self.policy)
         self._rules = {rule["action"]: rule for rule in self.policy["rules"]}
 

@@ -1,29 +1,61 @@
 {
-  "gate_version": "2.2.0",
-  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260812-013",
-  "evaluated_at": "2026-08-12T20:41:07+08:00",
+  "gate_version": "2.6.0",
+  "gate_id": "TITMAS-AAG-PREDEV-AGENT-RECOMMENDATION-20260813-016",
+  "evaluated_at": "2026-08-13T12:42:11+08:00",
   "evaluator_class": "AI_AGENT",
   "development_context": {
-    "task_scope": "GITHUB_INBOX_TRIAGE_SECURITY_TEST_AND_CI_REPAIR",
-    "branch": "fix-hardcoded-token-runtime-mcp-17419630340775653067",
-    "base_commit": "f7a4e7b1c2874a346edf9d613c6c29deef361f72",
-    "request_source": "DIRECT_USER_AUTHORIZATION_20260812_CHECK_EXECUTE_AND_REPAIR_GITHUB_INBOX",
-    "request_sha256": "8ca1050bbcc0ec9fdde2a2dba1c5f88254ba3b9569746c29be9443951bad2b06",
-    "implementation_boundary": "REVIEW_CURRENT_INBOX_PRESERVE_HISTORICAL_EVIDENCE_FIX_PR_BRANCH_CONFLICTS_RUN_FULL_CONTRACT_CHECKS_AND_MERGE_ONLY_EXACT_VERIFIED_LOW_RISK_PULL_REQUESTS",
+    "task_scope": "PR_24_FINAL_TWO_P1_SECURITY_FINDINGS",
+    "branch": "codex/merge-blocking-product",
+    "base_commit": "906b0d47fe8c26e940243cb15dd0a6daa12bda53",
+    "request_source": "DIRECT_USER_PR_24_TWO_P1_REMEDIATION_AUTHORIZATION_20260813",
+    "request_sha256": "929ed8883ccc5f0ceb723e16071724b8cd0d8c9af7428c4fd5051f9e699eaece",
+    "implementation_boundary": "FREEZE_GATE_INPUTS_BEFORE_UNTRUSTED_TEST_AND_RUN_TEST_WITH_MINIMAL_NON_CREDENTIAL_ENVIRONMENT_ONLY",
     "external_read_authorized": true,
     "external_write_authorized": true,
     "external_write_executed": true,
     "prior_iam_provisioning_external_write_executed": true,
-    "authorized_external_writes": ["GIT_BRANCH_PUSH", "PULL_REQUEST_MERGE", "GITHUB_PR_COMMENT_OR_CLOSE", "GITHUB_NOTIFICATION_MARK_READ"],
-    "prohibited_external_writes": ["FORCE_PUSH", "RELEASE", "DEPLOYMENT", "GOAI_SUBMISSION", "CREDENTIAL_CHANGE"]
+    "authorized_external_writes": ["ONE_FOCUSED_BRANCH_PUSH_TO_PR_24", "PR_24_REVIEW_THREAD_REPLY_AFTER_DUAL_CI_PASS", "PR_24_REVIEW_THREAD_RESOLUTION_AFTER_DUAL_CI_PASS", "ONE_FINAL_CODEX_REVIEW_REQUEST"],
+    "prohibited_external_writes": ["FORCE_PUSH", "PULL_REQUEST_MERGE", "FROZEN_EVIDENCE_REWRITE", "VIDEO_RERECORD", "GOAI_MATERIAL_CHANGE", "TAG", "RELEASE", "DEPLOYMENT", "REAL_ALIBABA_CLOUD_QUERY", "GOAI_SUBMISSION", "CREDENTIAL_CHANGE"]
   },
-  "customer_need": "Prevent an agent in a competition dialogue or delegated workflow from crossing an explicit action boundary without an auditable decision and authorization reference.",
+  "customer_need": "Freeze every authorization input before untrusted pull-request tests run, and prevent those tests from inheriting credentials or external-action capabilities.",
   "recommendation": {
     "current_product_use": "NOT_RECOMMENDED",
     "bounded_project_development": "RECOMMENDED",
-    "reason": "Bounded repository maintenance is recommended because the selected changes remove a bearer-token handling defect, add deterministic tests, preserve historical evidence digests, and are subject to full contract validation before merge. Current product use remains not recommended because this maintenance does not establish a persistent deployment, broader autonomous M4 completion, production credential lifecycle controls, or independent security review."
+    "reason": "The 8/8 functional acceptance proof remains retained, but the exact PR head has two unresolved P1 findings: untrusted tests run before policy, evidence and approval inputs are frozen, and the test subprocess inherits a denylist-filtered parent environment rather than a minimal allowlist. Current product use and the preliminary submission candidate are not recommended until input mutation, head drift, persisted Git credentials, untrusted events and credential-capability inheritance fail closed with direct regression evidence, dual CI passes and a final review without P0-P2 findings."
   },
   "advisory_agent_reviews": [
+    {
+      "agent": "Codex customer recommendation review",
+      "executed": true,
+      "scope": "PR_24_INPUT_FREEZE_AND_TEST_CREDENTIAL_ISOLATION",
+      "result": "NOT_RECOMMENDED_FOR_CURRENT_CUSTOMER_USE_BOUNDED_SECURITY_REMEDIATION_RECOMMENDED_WITH_TWO_P1_BLOCKERS",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "GitHub Codex review",
+      "executed": true,
+      "scope": "PR_24_EXACT_HEAD_906B0D47_FINAL_P0_P2_REVIEW",
+      "result": "TWO_UNRESOLVED_P1_FINDINGS_INPUTS_LOADED_AFTER_TEST_AND_CREDENTIAL_CAPABILITIES_INHERITED_BY_TEST_SUBPROCESS",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Codex local implementation validation",
+      "executed": true,
+      "scope": "VERIFY_PR_ACTION_FOUR_STATE_RECEIPTS_AND_CLEAN_REPLAY",
+      "result": "178_OF_178_TESTS_RUFF_GOVERNANCE_MILESTONE_EVIDENCE_VALIDATORS_AND_SIX_SCENARIO_CLEAN_REPLAY_PASS_PUBLIC_REQUIRED_CHECK_BLIND_SPOT_AND_RECORDING_RETAINED_8_OF_8",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
+    {
+      "agent": "Codex product recommendation review",
+      "executed": true,
+      "scope": "PUBLIC_REPRODUCIBLE_MERGE_BLOCKING_EVIDENCE_GATE_P0",
+      "result": "NOT_RECOMMENDED_FOR_CUSTOMER_USE_UNTIL_EXACT_HEAD_BINDING_REQUIRED_CHECK_AND_REPRODUCIBLE_RECEIPTS_ARE_PROVEN_RECOMMENDED_FOR_BOUNDED_IMPLEMENTATION",
+      "authorization_effect": "NONE",
+      "independent_security_review": false
+    },
     {
       "agent": "GitHub Codex review",
       "executed": true,
@@ -176,6 +208,16 @@
   ],
   "non_recommendation_reasons": [
     {
+      "id": "NR-P1-INPUT-FREEZE",
+      "reason": "The untrusted test command runs before policy, evidence and approval are loaded; task and policy digests are also recalculated from mutable paths after the test.",
+      "required_fix": "Validate and freeze canonical in-memory gate inputs and their SHA-256 digests before the test, consume only those snapshots, and fail closed if an input, exact HEAD or relevant Git state changes during the test."
+    },
+    {
+      "id": "NR-P1-CREDENTIAL-ISOLATION",
+      "reason": "The test subprocess inherits a denylist-filtered parent environment and may retain GitHub command files, OIDC, SSH, cloud, package-registry or persisted Git credential capabilities.",
+      "required_fix": "Use a minimal environment allowlist with fresh HOME and TMPDIR, reject pull_request_target and persisted Git authentication, and terminate the isolated process group without logging credential values."
+    },
+    {
       "id": "NR-001",
       "reason": "The MCP server and Action Gate exist as a local experimental reference, but there is no hardened authenticated network deployment or production key management.",
       "required_fix": "Replace demo HMAC material, define key rotation and recovery, harden transport authentication, and independently review the deployed boundary."
@@ -261,8 +303,20 @@
     ,"READ_ONLY_POLICY_VERIFICATION_ENFORCED_BEFORE_PROVIDER_INVOCATION"
     ,"POLICY_OBSERVATION_NONNULL_TIMEZONE_AWARE_TIMESTAMP_ENFORCED_BEFORE_PROVIDER_INVOCATION"
     ,"SERVER_OWNED_900_SECOND_POLICY_OBSERVATION_FRESHNESS_CEILING_ENFORCED_AT_CONSTRUCTION_AND_INVOCATION"
+    ,"VERIFY_PR_CLI_AND_REUSABLE_ACTION_IMPLEMENTED"
+    ,"FOUR_PUBLIC_STATE_REGRESSION_MATRIX_PASSED"
+    ,"EXACT_PR_HEAD_EVIDENCE_SUBJECT_BINDING_REGRESSION_PASSED"
+    ,"EVERY_RUN_MACHINE_RECEIPT_AND_HUMAN_SUMMARY_IMPLEMENTED"
+    ,"CLEAN_ENVIRONMENT_SIX_SCENARIO_REPLAY_PASSED"
+    ,"PUBLIC_REQUIRED_CHECK_MERGE_BLOCKING_PROOF_RETAINED"
+    ,"PUBLIC_ORDINARY_CI_BLIND_SPOT_DEMONSTRATED"
+    ,"PUBLIC_NINETY_SECOND_UNINTERRUPTED_DEMO_RECORDING_RETAINED"
+    ,"MERGE_BLOCKING_PRODUCT_P0_ACCEPTANCE_8_OF_8"
   ],
   "remaining_gaps": [
+    "PR_24_LOCAL_SECURITY_REMEDIATION_AWAITS_DUAL_CI_AND_THREAD_CLOSURE",
+    "PR_24_FINAL_CODEX_REVIEW_NOT_YET_OBSERVED_ON_NEW_EXACT_HEAD",
+    "PRELIMINARY_SUBMISSION_CANDIDATE_NOT_READY_WHILE_TWO_P1_FINDINGS_REMAIN",
     "DBA_PORTFOLIO_DECISION",
     "CLEAN_AUTONOMOUS_NATIVE_AGENTTEAMS_TRACE",
     "ENFORCED_PER_WORKER_MCP_TOOL_ACL",
@@ -280,6 +334,11 @@
     ,"UPSTREAM_SKILL_LICENSE_CLARIFICATION"
   ],
   "stop_conditions": [
+    "GATE_INPUT_OR_EXACT_HEAD_CANNOT_BE_FROZEN_AND_RECHECKED",
+    "PERSISTED_GIT_CREDENTIAL_OR_UNTRUSTED_PULL_REQUEST_TARGET_EVENT_DETECTED",
+    "TEST_SUBPROCESS_RECEIVES_CREDENTIAL_OR_GITHUB_COMMAND_FILE_CAPABILITY",
+    "CREDENTIAL_VALUE_APPEARS_IN_LOG_RECEIPT_SUMMARY_OR_EXCEPTION",
+    "FINAL_REVIEW_REPORTS_NEW_P0_P1_OR_P2",
     "ACTION_EXECUTION_REQUESTED_OUTSIDE_EXPLICIT_USER_OR_PROVIDER_AUTHORIZATION",
     "AUTHORITY_IDENTITY_UNKNOWN_OR_CONFLICTED",
     "REQUEST_SCOPE_EXCEEDS_AUTHORIZATION_SCOPE",
@@ -304,5 +363,5 @@
     ,"OFFICIAL_SKILL_SOURCE_HASH_OR_RUNTIME_LOAD_MISMATCH"
   ],
   "new_human_decision_required": true,
-  "next_decision": "REVIEW_CREDENTIAL_LIFECYCLE_AND_BROADER_AUTONOMOUS_M4_GAPS_SEPARATELY"
+  "next_decision": "INDEPENDENT_OPERATIONAL_REVIEW_REQUIRED_BEFORE_CUSTOMER_USE_PRODUCTION_DEPLOYMENT_OR_SECURITY_CLAIMS"
 }

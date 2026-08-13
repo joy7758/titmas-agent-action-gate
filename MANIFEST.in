@@ -4,6 +4,7 @@ include NOTICE
 include README.md
 include SECURITY.md
 include STATUS.md
+include action.yml
 recursive-include agents *.json
 recursive-include architecture *.md
 recursive-include demo *.json

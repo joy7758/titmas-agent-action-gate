@@ -16,6 +16,7 @@ from .contracts import schema_directory
 from .evidence import AGENT_EVIDENCE_OAP_SCHEMA_SHA256, AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256
 from .gate import ActionGate
 from .mcp_server import main as mcp_main
+from .pr_gate import DEFAULT_OUTPUT_DIRECTORY, verify_pull_request
 from .service import ActionGateService
 from .workflow import AgentTeamsWorkflow, validate_agentteams_template, write_demo_report
 
@@ -86,6 +87,20 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("evaluate-fixtures", help="Evaluate the four versioned contract fixtures.")
     subparsers.add_parser("validate-install", help="Validate source pins and callable contracts.")
     subparsers.add_parser("mcp", help="Run the MCP server using environment configuration.")
+    verify_pr = subparsers.add_parser("verify-pr", help="Verify one exact pull-request head and emit merge-check receipts.")
+    verify_pr.add_argument("--task", required=True, help="Existing action-request JSON bound to the pull-request head.")
+    verify_pr.add_argument("--evidence", required=True, help="agent-evidence profile to verify.")
+    verify_pr.add_argument("--policy", required=True, help="Versioned deterministic policy file.")
+    verify_pr.add_argument("--test-command", required=True, help="Exact task-bound command; executed directly without a shell.")
+    verify_pr.add_argument("--approval", help="Optional existing scoped human-approval JSON.")
+    verify_pr.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIRECTORY))
+    verify_pr.add_argument("--repository", help="Current repository; defaults to the bounded CI environment.")
+    verify_pr.add_argument("--pull-request", type=int, help="Current pull-request number; defaults to the bounded CI environment.")
+    verify_pr.add_argument("--head-sha", help="Current pull-request head SHA; defaults to the bounded CI environment.")
+    verify_pr.add_argument("--execution-identity", help="Current execution identity reference; defaults to the bounded CI environment.")
+    verify_pr.add_argument("--workspace", help="Trusted repository workspace used to bound gate inputs and Git state.")
+    verify_pr.add_argument("--action-configuration", help="Relevant composite Action YAML to freeze before the test.")
+    verify_pr.add_argument("--action-root", help="Trusted installed Action root containing the frozen action.yml.")
     return parser
 
 
@@ -94,7 +109,23 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "mcp":
         mcp_main()
         return
-    if args.command == "evaluate-fixtures":
+    if args.command == "verify-pr":
+        result = verify_pull_request(
+            task_path=args.task,
+            evidence_path=args.evidence,
+            policy_path=args.policy,
+            test_command=args.test_command,
+            approval_path=args.approval,
+            output_directory=args.output_dir,
+            repository=args.repository,
+            pull_request=args.pull_request,
+            head_sha=args.head_sha,
+            execution_identity=args.execution_identity,
+            workspace=args.workspace,
+            action_configuration_path=args.action_configuration,
+            action_configuration_root=args.action_root,
+        )
+    elif args.command == "evaluate-fixtures":
         result = evaluate_fixtures()
     elif args.command == "validate-install":
         result = validate_install()
@@ -104,6 +135,8 @@ def main(argv: list[str] | None = None) -> None:
         write_demo_report(result, args.output)
         result = {"ok": True, "report": str(Path(args.output).resolve()), "summary": result}
     print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    if args.command == "verify-pr":
+        raise SystemExit(result["exit_code"])
     if not result.get("ok", True):
         raise SystemExit(1)
 

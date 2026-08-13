@@ -61,6 +61,8 @@ jobs:
           HOME: ${{ runner.temp }}
           TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH: ${{ runner.temp }}/.local/share/titmas-agent-action-gate/external-skills/alibabacloud-resourcecenter-search
         run: python -W error::ResourceWarning -m unittest discover -s tests -v
+      - name: Replay merge-blocking public-state matrix
+        run: python scripts/replay_merge_gate_scenarios.py
       - name: Build source and wheel artifacts
         run: python -m build
       - name: Verify official Skill bytes are excluded from distributions

@@ -1,0 +1,127 @@
+name: TITMAS Evidence Gate
+description: Block a pull-request merge unless tests, exact-head evidence, policy, and approval boundaries pass.
+author: joy7758
+
+inputs:
+  task:
+    description: Existing TITMAS action-request JSON bound to the exact pull-request head.
+    required: true
+  evidence:
+    description: agent-evidence profile for the exact action request.
+    required: true
+  policy:
+    description: Versioned deterministic policy JSON controlled by the repository.
+    required: true
+  test-command:
+    description: Exact command already bound into task.parameters.test_command.
+    required: true
+  approval:
+    description: Optional scoped human-approval JSON.
+    required: false
+    default: ""
+  execution-identity:
+    description: Non-secret CI execution identity reference bound into the task.
+    required: true
+  output-directory:
+    description: Preferred receipt directory; unsafe or preempted paths fail closed and relocate to a private directory.
+    required: false
+    default: artifacts/titmas
+
+outputs:
+  state:
+    description: PASS, FAIL, INCOMPLETE, or REVIEW_REQUIRED.
+    value: ${{ steps.verify.outputs.state }}
+  receipt:
+    description: Machine-readable receipt path.
+    value: ${{ steps.verify.outputs.receipt }}
+  summary:
+    description: Human-readable summary path.
+    value: ${{ steps.verify.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install source-pinned TITMAS Action Gate
+      shell: bash
+      run: python -m pip install "$GITHUB_ACTION_PATH"
+
+    - name: Verify exact pull-request head
+      id: verify
+      shell: bash
+      env:
+        TITMAS_INPUT_TASK: ${{ inputs.task }}
+        TITMAS_INPUT_EVIDENCE: ${{ inputs.evidence }}
+        TITMAS_INPUT_POLICY: ${{ inputs.policy }}
+        TITMAS_INPUT_TEST_COMMAND: ${{ inputs.test-command }}
+        TITMAS_INPUT_APPROVAL: ${{ inputs.approval }}
+        TITMAS_INPUT_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+        TITMAS_CURRENT_REPOSITORY: ${{ github.repository }}
+        TITMAS_CURRENT_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        TITMAS_CURRENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        TITMAS_EXECUTION_IDENTITY: ${{ inputs.execution-identity }}
+        TITMAS_CURRENT_EVENT_NAME: ${{ github.event_name }}
+        TITMAS_WORKSPACE: ${{ github.workspace }}
+        TITMAS_ACTION_CONFIG_PATH: ${{ github.action_path }}/action.yml
+        TITMAS_ACTION_ROOT: ${{ github.action_path }}
+      run: |
+        set +e
+        args=(
+          --task "$TITMAS_INPUT_TASK"
+          --evidence "$TITMAS_INPUT_EVIDENCE"
+          --policy "$TITMAS_INPUT_POLICY"
+          --test-command "$TITMAS_INPUT_TEST_COMMAND"
+          --output-dir "$TITMAS_INPUT_OUTPUT_DIRECTORY"
+          --workspace "$TITMAS_WORKSPACE"
+          --action-configuration "$TITMAS_ACTION_CONFIG_PATH"
+          --action-root "$TITMAS_ACTION_ROOT"
+        )
+        if [[ -n "$TITMAS_INPUT_APPROVAL" ]]; then
+          args+=(--approval "$TITMAS_INPUT_APPROVAL")
+        fi
+        result_json=$(titmas-action-gate verify-pr "${args[@]}")
+        status=$?
+        result_file=$(mktemp "${RUNNER_TEMP:?}/titmas-gate-result.XXXXXX")
+        printf '%s\n' "$result_json" > "$result_file"
+        if python - "$result_file" "$TITMAS_INPUT_OUTPUT_DIRECTORY" "${RUNNER_TEMP:?}" <<'PY'
+        import hashlib
+        import json
+        import os
+        import stat
+        import sys
+
+        result_path, requested_output, runner_temp = sys.argv[1:]
+        with open(result_path, encoding="utf-8") as handle:
+            value = json.load(handle)
+        required = ("state", "receipt", "summary", "receipt_sha256", "summary_sha256", "output_integrity")
+        assert all(isinstance(value.get(key), str) for key in required)
+        assert value["state"] in {"PASS", "FAIL", "INCOMPLETE", "REVIEW_REQUIRED"}
+        assert value["output_integrity"] == "TRUSTED_CREATE_ONLY"
+        allowed_roots = (os.path.realpath(requested_output), os.path.realpath(runner_temp))
+        for role in ("receipt", "summary"):
+            path = os.path.abspath(value[role])
+            observed = os.lstat(path)
+            assert stat.S_ISREG(observed.st_mode) and not stat.S_ISLNK(observed.st_mode)
+            assert any(os.path.commonpath((path, root)) == root for root in allowed_roots)
+            with open(path, "rb") as handle:
+                assert hashlib.sha256(handle.read()).hexdigest() == value[f"{role}_sha256"]
+        with open(value["receipt"], encoding="utf-8") as handle:
+            receipt = json.load(handle)
+        assert receipt["final_state"] == value["state"]
+        PY
+        then
+          state=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["state"])' "$result_file")
+          receipt=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["receipt"])' "$result_file")
+          summary=$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["summary"])' "$result_file")
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "receipt=$receipt" >> "$GITHUB_OUTPUT"
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+        else
+          status=1
+        fi
+        rm -f "$result_file"
+        exit "$status"
+
+branding:
+  icon: shield
+  color: blue
