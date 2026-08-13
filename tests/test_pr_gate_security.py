@@ -28,6 +28,12 @@ HEAD = "a" * 40
 IDENTITY = "github-actions:titmas-evidence-gate"
 EVIDENCE_TYPES = ["SOURCE_PIN", "DIFF", "TEST_RESULT", "PULL_REQUEST_STATE"]
 APPROVAL_KEY = "security-regression-approval-key-0001"
+FIXTURE_GIT_IDENTITY = (
+    "-c",
+    "user.name=TITMAS-Test-Fixture",
+    "-c",
+    "user.email=titmas-test-fixture@example.invalid",
+)
 
 
 class PullRequestGateSecurityTests(unittest.TestCase):
@@ -37,6 +43,34 @@ class PullRequestGateSecurityTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    @staticmethod
+    def commit_fixture(repository: Path, *arguments: str) -> None:
+        subprocess.run(
+            ["git", *FIXTURE_GIT_IDENTITY, "-C", repository, "commit", *arguments],
+            check=True,
+        )
+        identity = subprocess.check_output(
+            ["git", "-C", repository, "show", "-s", "--format=%an <%ae>%n%cn <%ce>", "HEAD"],
+            text=True,
+        ).splitlines()
+        expected = [
+            "TITMAS-Test-Fixture <titmas-test-fixture@example.invalid>",
+            "TITMAS-Test-Fixture <titmas-test-fixture@example.invalid>",
+        ]
+        if identity != expected:
+            raise AssertionError((repository, identity))
+
+    def assert_fixture_identity_not_persisted(self, repository: Path) -> None:
+        for key in ("user.name", "user.email"):
+            observed = subprocess.run(
+                ["git", "-C", repository, "config", "--local", "--get", key],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(observed.returncode, 1, (repository, key, observed.stdout, observed.stderr))
+            self.assertEqual(observed.stdout, "")
 
     @staticmethod
     def request(head: str, command: list[str]) -> dict:
@@ -403,17 +437,16 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         workspace = self.root / name
         workspace.mkdir()
         subprocess.run(["git", "init", "-q", workspace], check=True)
-        subprocess.run(["git", "-C", workspace, "config", "user.name", "TITMAS test"], check=True)
-        subprocess.run(["git", "-C", workspace, "config", "user.email", "test@example.invalid"], check=True)
         subprocess.run(["git", "-C", workspace, "remote", "add", "origin", f"https://github.com/{REPOSITORY}.git"], check=True)
         tracked = workspace / "tracked.txt"
         tracked.write_text("one\n", encoding="utf-8")
         subprocess.run(["git", "-C", workspace, "add", "tracked.txt"], check=True)
-        subprocess.run(["git", "-C", workspace, "commit", "-qm", "one"], check=True)
+        self.commit_fixture(workspace, "-qm", "one")
         first = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
         tracked.write_text("two\n", encoding="utf-8")
-        subprocess.run(["git", "-C", workspace, "commit", "-qam", "two"], check=True)
+        self.commit_fixture(workspace, "-qam", "two")
         second = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
+        self.assert_fixture_identity_not_persisted(workspace)
         return workspace, first, second
 
     @staticmethod
@@ -805,11 +838,10 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         source = self.root / (f"source-{workspace.name}-" + relative_path.replace("/", "-"))
         source.mkdir(parents=True)
         subprocess.run(["git", "init", "-q", source], check=True)
-        subprocess.run(["git", "-C", source, "config", "user.name", "TITMAS test"], check=True)
-        subprocess.run(["git", "-C", source, "config", "user.email", "test@example.invalid"], check=True)
         (source / "submodule.txt").write_text("clean\n", encoding="utf-8")
         subprocess.run(["git", "-C", source, "add", "submodule.txt"], check=True)
-        subprocess.run(["git", "-C", source, "commit", "-qm", "submodule"], check=True)
+        self.commit_fixture(source, "-qm", "submodule")
+        self.assert_fixture_identity_not_persisted(source)
         subprocess.run(
             [
                 "git",
@@ -825,7 +857,8 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             ],
             check=True,
         )
-        subprocess.run(["git", "-C", workspace, "commit", "-qam", f"add {relative_path}"], check=True)
+        self.commit_fixture(workspace, "-qam", f"add {relative_path}")
+        self.assert_fixture_identity_not_persisted(workspace)
         return workspace / relative_path
 
     def _run_submodule_risk(self, key: str, value: str, expected_category: str, output_name: str) -> None:
@@ -926,18 +959,19 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         nested_source = self.root / "nested-uninitialized-source"
         nested_source.mkdir()
         subprocess.run(["git", "init", "-q", nested_source], check=True)
-        subprocess.run(["git", "-C", nested_source, "config", "user.name", "TITMAS test"], check=True)
-        subprocess.run(["git", "-C", nested_source, "config", "user.email", "test@example.invalid"], check=True)
         (nested_source / "nested.txt").write_text("nested\n", encoding="utf-8")
         subprocess.run(["git", "-C", nested_source, "add", "nested.txt"], check=True)
-        subprocess.run(["git", "-C", nested_source, "commit", "-qm", "nested"], check=True)
+        self.commit_fixture(nested_source, "-qm", "nested")
+        self.assert_fixture_identity_not_persisted(nested_source)
         subprocess.run(
             ["git", "-c", "protocol.file.allow=always", "-C", parent, "submodule", "add", "-q", str(nested_source), "nested"],
             check=True,
         )
-        subprocess.run(["git", "-C", parent, "commit", "-qam", "nested"], check=True)
+        self.commit_fixture(parent, "-qam", "nested")
+        self.assert_fixture_identity_not_persisted(parent)
         subprocess.run(["git", "-C", workspace, "add", "vendor/submodule"], check=True)
-        subprocess.run(["git", "-C", workspace, "commit", "-qm", "bind nested"], check=True)
+        self.commit_fixture(workspace, "-qm", "bind nested")
+        self.assert_fixture_identity_not_persisted(workspace)
         (parent / "nested/.git").unlink()
         head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
         marker = workspace / "executed"
@@ -962,19 +996,20 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         nested_source = self.root / "nested-source"
         nested_source.mkdir()
         subprocess.run(["git", "init", "-q", nested_source], check=True)
-        subprocess.run(["git", "-C", nested_source, "config", "user.name", "TITMAS test"], check=True)
-        subprocess.run(["git", "-C", nested_source, "config", "user.email", "test@example.invalid"], check=True)
         (nested_source / "nested.txt").write_text("nested\n", encoding="utf-8")
         subprocess.run(["git", "-C", nested_source, "add", "nested.txt"], check=True)
-        subprocess.run(["git", "-C", nested_source, "commit", "-qm", "nested"], check=True)
+        self.commit_fixture(nested_source, "-qm", "nested")
+        self.assert_fixture_identity_not_persisted(nested_source)
         subprocess.run(
             ["git", "-c", "protocol.file.allow=always", "-C", parent, "submodule", "add", "-q", str(nested_source), "nested"],
             check=True,
         )
-        subprocess.run(["git", "-C", parent, "commit", "-qam", "add nested"], check=True)
+        self.commit_fixture(parent, "-qam", "add nested")
+        self.assert_fixture_identity_not_persisted(parent)
         subprocess.run(["git", "-C", parent / "nested", "config", "credential.helper", "secret-nested-helper"], check=True)
         subprocess.run(["git", "-C", workspace, "add", "vendor/submodule"], check=True)
-        subprocess.run(["git", "-C", workspace, "commit", "-qm", "advance parent"], check=True)
+        self.commit_fixture(workspace, "-qm", "advance parent")
+        self.assert_fixture_identity_not_persisted(workspace)
         head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
         command = [sys.executable, "-c", "raise SystemExit(0)"]
         prepared = self.prepare(command, directory=workspace, head=head)
@@ -1103,16 +1138,16 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         source = self.root / "submodule-source"
         source.mkdir()
         subprocess.run(["git", "init", "-q", source], check=True)
-        subprocess.run(["git", "-C", source, "config", "user.name", "TITMAS test"], check=True)
-        subprocess.run(["git", "-C", source, "config", "user.email", "test@example.invalid"], check=True)
         (source / "submodule.txt").write_text("clean\n", encoding="utf-8")
         subprocess.run(["git", "-C", source, "add", "submodule.txt"], check=True)
-        subprocess.run(["git", "-C", source, "commit", "-qm", "submodule"], check=True)
+        self.commit_fixture(source, "-qm", "submodule")
+        self.assert_fixture_identity_not_persisted(source)
         subprocess.run(
             ["git", "-c", "protocol.file.allow=always", "-C", workspace, "submodule", "add", "-q", str(source), "vendor/submodule"],
             check=True,
         )
-        subprocess.run(["git", "-C", workspace, "commit", "-qam", "add submodule"], check=True)
+        self.commit_fixture(workspace, "-qam", "add submodule")
+        self.assert_fixture_identity_not_persisted(workspace)
         head = subprocess.check_output(["git", "-C", workspace, "rev-parse", "HEAD"], text=True).strip()
         (workspace / "vendor/submodule/submodule.txt").write_text("dirty\n", encoding="utf-8")
         marker = workspace / "executed"
