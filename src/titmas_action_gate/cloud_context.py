@@ -891,7 +891,11 @@ class CloudContextInspector:
             )
 
         operation = query["operation"]
-        boundary_ok = operation == ALLOWED_OPERATION and not any(marker in operation.lower() for marker in WRITE_OPERATION_MARKERS)
+        if operation == ALLOWED_OPERATION:
+            op_lower = operation.lower()
+            boundary_ok = not any(marker in op_lower for marker in WRITE_OPERATION_MARKERS)
+        else:
+            boundary_ok = False
         if not boundary_ok or query["include_deleted_resources"]:
             return self._base_result(
                 request_id,
