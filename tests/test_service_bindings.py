@@ -11,7 +11,7 @@ from pathlib import Path
 from titmas_action_gate.canonical import sha256_json
 from titmas_action_gate.errors import AuthenticationError, ConflictError
 from titmas_action_gate.provider import InMemoryGitHubProvider
-from titmas_action_gate.service import ActionGateService
+from titmas_action_gate.service import ActionGateService, ExecuteAllowedRequest
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKED_AT = datetime(2026, 8, 2, 0, 0, tzinfo=UTC)
@@ -63,12 +63,14 @@ class ServiceBindingTests(unittest.TestCase):
         provider = InMemoryGitHubProvider()
         with self.assertRaises(ConflictError) as context:
             self.service.execute_allowed(
-                decision_a["decision_id"],
-                request_b["request_id"],
-                provider,
-                actor="github-operator",
-                caller_token=CALLER_TOKEN,
-                consumed_at=CHECKED_AT,
+                ExecuteAllowedRequest(
+                    decision_id=decision_a["decision_id"],
+                    request_id=request_b["request_id"],
+                    provider=provider,
+                    actor="github-operator",
+                    caller_token=CALLER_TOKEN,
+                    consumed_at=CHECKED_AT,
+                )
             )
         self.assertEqual(context.exception.code, "DECISION_REQUEST_MISMATCH")
         self.assertEqual(provider.pull_requests, {})
@@ -115,12 +117,14 @@ class ServiceBindingTests(unittest.TestCase):
         provider = InMemoryGitHubProvider()
         with self.assertRaises(AuthenticationError) as context:
             self.service.execute_allowed(
-                decision["decision_id"],
-                request["request_id"],
-                provider,
-                actor="github-operator",
-                caller_token=CALLER_TOKEN,
-                consumed_at=CHECKED_AT,
+                ExecuteAllowedRequest(
+                    decision_id=decision["decision_id"],
+                    request_id=request["request_id"],
+                    provider=provider,
+                    actor="github-operator",
+                    caller_token=CALLER_TOKEN,
+                    consumed_at=CHECKED_AT,
+                )
             )
         self.assertEqual(context.exception.code, "STATE_INTEGRITY_INVALID")
         self.assertEqual(provider.pull_requests, {})

@@ -103,6 +103,8 @@ class WheelInstallTests(unittest.TestCase):
             env["TITMAS_ACTION_GATE_CALLER_TOKEN"] = "titmas-demo-caller-token"
             env["TITMAS_ACTION_GATE_APPROVER_TOKEN"] = "titmas-demo-approver-token"
             env["TITMAS_ACTION_GATE_DEMO_MODE"] = "true"
+            env["TITMAS_APPROVAL_KEY"] = "dummy_approval_key_for_testing"
+            env["TITMAS_RECORD_SIGNING_KEY"] = "dummy_record_key_for_testing"
             probe = subprocess.run(
                 [str(python), "-c", script],
                 cwd=runtime_dir,

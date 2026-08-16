@@ -874,7 +874,7 @@ class CloudContextEvidencePathTests(unittest.TestCase):
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(request["request_id"], confirmed_query(), credential())
         with tempfile.TemporaryDirectory(prefix="titmas-cloud-evidence-") as state_dir:
-            service = ActionGateService.demo(state_dir)
+            service = ActionGateService.demo(state_dir, approval_key=b"1" * 32, record_signing_key=b"2" * 32)
             service.submit_action_request(request, caller_token="titmas-demo-caller-token", actor="release-steward")
             retained = service.record_cloud_context_preflight(
                 request["request_id"],

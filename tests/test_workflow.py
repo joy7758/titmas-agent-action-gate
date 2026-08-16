@@ -1,8 +1,9 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from titmas_action_gate.workflow import validate_agentteams_template
+from titmas_action_gate.workflow import validate_agentteams_template, write_demo_report
 
 
 class TestValidateAgentteamsTemplate(unittest.TestCase):
@@ -64,3 +65,37 @@ spec:
         self.file_path.write_text(self.valid_content.replace("team_leader", "member"))
         with self.assertRaisesRegex(ValueError, "exactly one team_leader"):
             validate_agentteams_template(self.file_path)
+
+
+class TestWriteDemoReport(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_write_demo_report(self):
+        report_data = {"key": "value", "demo": True}
+        output_file = Path(self.temp_dir.name) / "report.json"
+
+        result_path = write_demo_report(report_data, output_file)
+
+        self.assertEqual(result_path, output_file)
+        self.assertTrue(output_file.exists())
+
+        with open(output_file, encoding="utf-8") as f:
+            content = json.load(f)
+
+        self.assertEqual(content, report_data)
+
+    def test_write_demo_report_creates_directories(self):
+        report_data = {"nested": "test"}
+        output_file = Path(self.temp_dir.name) / "nested" / "dir" / "report.json"
+
+        write_demo_report(report_data, output_file)
+
+        self.assertTrue(output_file.exists())
+        with open(output_file, encoding="utf-8") as f:
+            content = json.load(f)
+
+        self.assertEqual(content, report_data)

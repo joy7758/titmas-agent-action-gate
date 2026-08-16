@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,16 @@ from .policy import PolicyEngine
 from .provider import GitHubProvider
 from .signing import HmacRecordSigner
 from .store import AppendOnlyStore
+
+
+@dataclass(frozen=True)
+class ExecuteAllowedRequest:
+    decision_id: str
+    request_id: str
+    provider: GitHubProvider
+    actor: str
+    caller_token: str
+    consumed_at: datetime | None = None
 
 
 class ActionGateService:
@@ -55,13 +66,27 @@ class ActionGateService:
         *,
         caller_token: str = "titmas-demo-caller-token",
         approver_token: str = "titmas-demo-approver-token",
+        approval_key: bytes | None = None,
+        record_signing_key: bytes | None = None,
     ) -> ActionGateService:
+        import os
+
+        if approval_key is None:
+            if "TITMAS_APPROVAL_KEY" in os.environ:
+                approval_key = hashlib.sha256(os.environ["TITMAS_APPROVAL_KEY"].encode()).digest()
+            else:
+                raise ValueError("Explicit approval_key or TITMAS_APPROVAL_KEY environment variable is required.")
+        if record_signing_key is None:
+            if "TITMAS_RECORD_SIGNING_KEY" in os.environ:
+                record_signing_key = hashlib.sha256(os.environ["TITMAS_RECORD_SIGNING_KEY"].encode()).digest()
+            else:
+                raise ValueError("Explicit record_signing_key or TITMAS_RECORD_SIGNING_KEY environment variable is required.")
         return cls(
             state_dir,
             caller_token=caller_token,
             approver_token=approver_token,
-            approval_key=hashlib.sha256(b"TITMAS_DEMO_APPROVAL_KEY_NOT_FOR_PRODUCTION").digest(),
-            record_signing_key=hashlib.sha256(b"TITMAS_DEMO_RECORD_KEY_NOT_FOR_PRODUCTION").digest(),
+            approval_key=approval_key,
+            record_signing_key=record_signing_key,
         )
 
     def authenticate(self, caller_token: str) -> None:
@@ -496,16 +521,10 @@ class ActionGateService:
 
     def execute_allowed(
         self,
-        decision_id: str,
-        request_id: str,
-        provider: GitHubProvider,
-        *,
-        actor: str,
-        caller_token: str,
-        consumed_at: datetime | None = None,
+        req: ExecuteAllowedRequest,
     ) -> dict[str, Any]:
-        self.authenticate(caller_token)
-        decision_record = self.store.get_record(decision_id)
+        self.authenticate(req.caller_token)
+        decision_record = self.store.get_record(req.decision_id)
         decision_envelope = decision_record["payload"]
         decision = decision_envelope["payload"]
         if not self.signer.verify(decision, decision_envelope["signature"]):
@@ -514,29 +533,29 @@ class ActionGateService:
             raise AuthenticationError("STATE_INTEGRITY_INVALID", "Append-only action state failed integrity verification.")
         if decision_record["record_type"] != "decision":
             raise ConflictError("DECISION_RECORD_TYPE_INVALID", "Referenced record is not an Action Gate decision.")
-        if decision_record["request_id"] != request_id or decision.get("request_id") != request_id:
+        if decision_record["request_id"] != req.request_id or decision.get("request_id") != req.request_id:
             raise ConflictError("DECISION_REQUEST_MISMATCH", "Decision is not bound to the requested action record.")
-        request = self._request(request_id)
+        request = self._request(req.request_id)
         expected_binding = request_binding(request)
         if decision.get("request_binding") != expected_binding:
             raise ConflictError("DECISION_REQUEST_MISMATCH", "Decision binding does not match the current request.")
         if sha256_json(request["parameters"]) != expected_binding["parameters_sha256"]:
             raise ConflictError("INVOCATION_DIGEST_MISMATCH", "Current request parameters do not match their bound digest.")
         invocation = {
-            "decision_id": decision_id,
+            "decision_id": req.decision_id,
             **expected_binding,
             "parameters": request["parameters"],
         }
-        consumption = self.store.consume_decision(decision, invocation, actor=actor, consumed_at=consumed_at)
+        consumption = self.store.consume_decision(decision, invocation, actor=req.actor, consumed_at=req.consumed_at)
         try:
-            provider_result = provider.execute(invocation)
+            provider_result = req.provider.execute(invocation)
             status = "SUCCEEDED"
         except Exception as exc:
             provider_result = {"error_type": type(exc).__name__, "message": str(exc)}
             status = "FAILED_OR_UNKNOWN"
         receipt = {
-            "request_id": request_id,
-            "decision_id": decision_id,
+            "request_id": req.request_id,
+            "decision_id": req.decision_id,
             "consumption_record_hash": consumption["record_hash"],
             "status": status,
             "provider_result": provider_result,
@@ -544,15 +563,15 @@ class ActionGateService:
         self.store.append_record(
             record_type="execution_result",
             record_id=f"execution-{sha256_json(receipt)[:32]}",
-            request_id=request_id,
+            request_id=req.request_id,
             payload={"payload": receipt, "signature": self.signer.sign(receipt)},
         )
         self.evidence.record_event(
-            actor=actor,
+            actor=req.actor,
             event_type="provider.execution_attempted",
-            inputs={"decision_id": decision_id, "invocation_sha256": sha256_json(invocation)},
+            inputs={"decision_id": req.decision_id, "invocation_sha256": sha256_json(invocation)},
             outputs={"status": status, "provider_result_sha256": sha256_json(provider_result)},
-            request_id=request_id,
+            request_id=req.request_id,
         )
         return receipt
 
