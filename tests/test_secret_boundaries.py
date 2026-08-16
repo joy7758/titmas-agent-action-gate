@@ -50,9 +50,7 @@ class SecretBoundaryTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_known_secret_history_scan_receipt_is_sanitized_and_passed(self) -> None:
-        receipt = json.loads(
-            (ROOT / "demo/evidence/known-secret-git-history-scan-20260802.json").read_text(encoding="utf-8")
-        )
+        receipt = json.loads((ROOT / "demo/evidence/known-secret-git-history-scan-20260802.json").read_text(encoding="utf-8"))
         self.assertEqual(receipt["status"], "VALID_NO_KNOWN_SECRET_MATCH")
         self.assertGreater(receipt["known_secret_source_count"], 0)
         self.assertGreater(receipt["git_history_commit_count"], 0)

@@ -17,10 +17,7 @@ class GateRuntimeTests(unittest.TestCase):
         self.authority = ApprovalAuthority(b"runtime-test-approval-key-material-at-least-32-bytes")
         self.gate = ActionGate(self.authority)
         registry = json.loads((ROOT / "evaluations/case-registry.json").read_text(encoding="utf-8"))
-        self.cases = {
-            item["id"]: json.loads((ROOT / "evaluations" / item["path"]).read_text(encoding="utf-8"))
-            for item in registry["cases"]
-        }
+        self.cases = {item["id"]: json.loads((ROOT / "evaluations" / item["path"]).read_text(encoding="utf-8")) for item in registry["cases"]}
 
     def evaluate(self, case_name: str, approval: dict | None = None) -> dict:
         case = self.cases[case_name]
@@ -41,9 +38,7 @@ class GateRuntimeTests(unittest.TestCase):
 
     def test_decision_id_is_deterministic_across_evaluation_time(self) -> None:
         case = self.cases["valid-execution"]
-        first = self.gate.evaluate(
-            case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT
-        )
+        first = self.gate.evaluate(case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT)
         second = self.gate.evaluate(
             case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT + timedelta(seconds=20)
         )
@@ -79,18 +74,14 @@ class GateRuntimeTests(unittest.TestCase):
     def test_parameters_mutation_fails_closed(self) -> None:
         case = json.loads(json.dumps(self.cases["valid-execution"]))
         case["action_request"]["parameters"]["title"] = "Expanded scope"
-        decision = self.gate.evaluate(
-            case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT
-        )
+        decision = self.gate.evaluate(case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT)
         self.assertEqual(decision["outcome"], "BLOCK")
         self.assertEqual(decision["reason_codes"], ["INPUT_MISMATCH"])
 
     def test_policy_deny_precedes_missing_evidence(self) -> None:
         case = json.loads(json.dumps(self.cases["missing-evidence"]))
         case["policy_evaluation"]["effect"] = "DENY"
-        decision = self.gate.evaluate(
-            case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT
-        )
+        decision = self.gate.evaluate(case["action_request"], case["policy_evaluation"], case["evidence_verification_result"], decided_at=CHECKED_AT)
         self.assertEqual(decision["reason_codes"], ["POLICY_DENY"])
 
 

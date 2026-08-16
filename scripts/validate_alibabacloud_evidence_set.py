@@ -99,10 +99,7 @@ def validate_evidence_set(root: Path, freeze: dict[str, Any]) -> list[str]:
         issues.append("NATIVE_WORKER_CLASSIFICATION_INVALID")
     if public["authority"]["decision_record_count"] != 0 or native["authority"]["worker_decision_record_count"] != 0:
         issues.append("DECISION_AUTHORITY_INCONSISTENT")
-    if (
-        public["external_effects"]["resourcecenter_write_api_calls"] != 0
-        or native["effects"]["resourcecenter_write_api_calls"] != 0
-    ):
+    if public["external_effects"]["resourcecenter_write_api_calls"] != 0 or native["effects"]["resourcecenter_write_api_calls"] != 0:
         issues.append("RESOURCECENTER_WRITE_INCONSISTENT")
     if freeze.get("submilestone_status") != "COMPLETE" or freeze.get("full_m4_complete") is not False:
         issues.append("TRUTH_SURFACE_STATUS_INVALID")
