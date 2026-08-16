@@ -17,7 +17,7 @@ from .contracts import validate_action_request
 from .errors import ActionGateError, AuthenticationError
 from .provider import InMemoryGitHubProvider
 from .runtime import RuntimeAdmission, RuntimePrincipal, RuntimePrincipalRegistry
-from .service import ActionGateService
+from .service import ActionGateService, ExecuteAllowedRequest
 
 _ALLOWED_MCP_BIND_HOSTS = {"127.0.0.1", "0.0.0.0", "::1"}
 
@@ -347,11 +347,13 @@ class NativeRuntimeMcp:
                 scope = self.admission.admit_request(principal, "execute_in_memory_github_action", runtime_scope, request_id)
                 provider = self.providers.setdefault(scope["run_id"], InMemoryGitHubProvider())
                 result = self.service.execute_allowed(
-                    decision_id,
-                    request_id,
-                    provider,
-                    actor=principal.principal_id,
-                    caller_token=self.caller_token,
+                    ExecuteAllowedRequest(
+                        decision_id=decision_id,
+                        request_id=request_id,
+                        provider=provider,
+                        actor=principal.principal_id,
+                        caller_token=self.caller_token,
+                    )
                 )
                 if result["provider_result"].get("provider_mode") != "IN_MEMORY_NO_EXTERNAL_WRITE":
                     raise RuntimeError("native runtime selected a non-disposable provider")
