@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,8 @@ SPECIALIST_RUNTIME = "openclaw"
 OFFICIAL_CLOUD_SKILL = "alibabacloud-resourcecenter-search"
 OFFICIAL_CLOUD_SOURCE_LOCK = "governance/alibabacloud-resourcecenter-search-source-lock.json"
 LOCAL_RUNTIME_ONLY = "LOCAL_RUNTIME_ONLY"
+
+_VALID_SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}\Z")
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
@@ -331,7 +334,7 @@ def _verify_package_attestation(
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit does not match the requested source commit.")
     if expected_model is not None and model != expected_model:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package model does not match the requested model.")
-    if not isinstance(source_commit, str) or len(source_commit) != 40 or any(value not in "0123456789abcdef" for value in source_commit):
+    if not isinstance(source_commit, str) or not _VALID_SOURCE_COMMIT.fullmatch(source_commit):
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit is not exact.")
     if not isinstance(model, str) or not model or "preview" in model.lower() or attestation.get("runtime") != runtime:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package runtime or model contract is invalid.")

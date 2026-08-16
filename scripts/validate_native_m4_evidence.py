@@ -61,13 +61,9 @@ def semantic_issues(evidence: dict[str, Any]) -> list[str]:
         if workers != EXPECTED_WORKERS:
             issues.append("PASS_WITHOUT_EXACT_WORKER_PRINCIPALS")
         skill_workers = {item["worker_id"] for item in evidence["skills"]}
-        if skill_workers != EXPECTED_WORKERS or not all(
-            item["source_hash_verified"] and item["runtime_loaded"] for item in evidence["skills"]
-        ):
+        if skill_workers != EXPECTED_WORKERS or not all(item["source_hash_verified"] and item["runtime_loaded"] for item in evidence["skills"]):
             issues.append("PASS_WITHOUT_MATERIALIZED_VERIFIED_SKILLS")
-        if {item["case_id"] for item in evidence["adversarial_cases"]} != EXPECTED_CASES or not all(
-            item["passed"] for item in evidence["adversarial_cases"]
-        ):
+        if {item["case_id"] for item in evidence["adversarial_cases"]} != EXPECTED_CASES or not all(item["passed"] for item in evidence["adversarial_cases"]):
             issues.append("PASS_WITHOUT_ALL_ADVERSARIAL_CASES")
         if [item["stage"] for item in evidence["workflow_stages"]] != EXPECTED_STAGES:
             issues.append("PASS_WITHOUT_EXACT_NATIVE_STAGE_SEQUENCE")
