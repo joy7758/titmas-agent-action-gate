@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from titmas_action_gate.skill_materialization import build_worker_packages, verify_worker_package
+from titmas_action_gate.skill_materialization import PackageConfig, build_worker_packages, verify_worker_package
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,9 +38,11 @@ def main() -> None:
         result = build_worker_packages(
             ROOT,
             output_dir,
-            source_commit=args.source_commit,
-            model=args.model,
-            distribution_scope=args.distribution_scope,
+            config=PackageConfig(
+                source_commit=args.source_commit,
+                model=args.model,
+                distribution_scope=args.distribution_scope,
+            ),
         )
     print(json.dumps(result, indent=2, sort_keys=True))
 

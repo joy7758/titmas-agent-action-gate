@@ -22,7 +22,7 @@ from titmas_action_gate.cloud_context import credential_from_policy_observation
 from titmas_action_gate.contracts import validate_action_request, validate_contract
 from titmas_action_gate.evidence import AgentEvidenceAdapter
 from titmas_action_gate.public_evidence import _record_chain_issues, _security_chain_issues
-from titmas_action_gate.skill_materialization import build_worker_packages, verify_worker_package
+from titmas_action_gate.skill_materialization import PackageConfig, build_worker_packages, verify_worker_package
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_LOCK = ROOT / "governance/alibabacloud-resourcecenter-search-source-lock.json"
@@ -234,19 +234,19 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
     except ValueError:
         issues.append("PACKAGE_APPLY_TIMESTAMP_INVALID")
     package_tempdir: tempfile.TemporaryDirectory[str] | None = None
-    historical_schema_names = {
-        Path(item).name for item in package_members if item.startswith("schemas/")
-    }
+    historical_schema_names = {Path(item).name for item in package_members if item.startswith("schemas/")}
     try:
         if worker_package is None:
             package_tempdir = tempfile.TemporaryDirectory(prefix="titmas-native-cloud-package-rebuild-")
             build_worker_packages(
                 ROOT,
                 package_tempdir.name,
-                source_commit=evidence["source"]["repository_base_commit"],
-                model=evidence["native_runtime"]["worker"]["model"],
-                verify_external_skill_source=False,
-                schema_names=historical_schema_names,
+                config=PackageConfig(
+                    source_commit=evidence["source"]["repository_base_commit"],
+                    model=evidence["native_runtime"]["worker"]["model"],
+                    verify_external_skill_source=False,
+                    schema_names=historical_schema_names,
+                ),
             )
             worker_package = Path(package_tempdir.name) / "cloud-context-inspector.zip"
         if sha256_file(worker_package) != evidence["package_boundary"]["package_sha256"]:
@@ -331,16 +331,12 @@ def validate(evidence: dict[str, Any], worker_package: Path | None = None) -> li
     ):
         issues.append("MATRIX_TURN_TRACE_INVALID")
     response_projection = [
-        {key: item[key] for key in ("event_id", "sender", "room_id", "origin_server_ts")}
-        for item in evidence["native_runtime"]["response_events"]
+        {key: item[key] for key in ("event_id", "sender", "room_id", "origin_server_ts")} for item in evidence["native_runtime"]["response_events"]
     ]
     observed_worker_events = [item for item in observed_events if item["sender"] == worker_id]
     if response_projection != observed_worker_events:
         issues.append("WORKER_MATRIX_RESPONSE_TRACE_MISMATCH")
-    observed_followups = sum(
-        item["sender"] != worker_id and item["event_id"] != matrix_trace["initial_prompt_event_id"]
-        for item in observed_events
-    )
+    observed_followups = sum(item["sender"] != worker_id and item["event_id"] != matrix_trace["initial_prompt_event_id"] for item in observed_events)
     if observed_followups != evidence["native_runtime"]["operator_followup_prompt_count"]:
         issues.append("OPERATOR_FOLLOWUP_COUNT_MISMATCH")
     if any(re.search(r"(?<![A-Z_])(ALLOW|BLOCK|REQUIRE_APPROVAL)(?![A-Z_])", body) for body in worker_bodies):
