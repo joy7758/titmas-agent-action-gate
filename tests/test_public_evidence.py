@@ -67,5 +67,6 @@ class TestWorkspaceContentProvenance(unittest.TestCase):
         ]
         mock_sha256_json.assert_called_once_with(expected_manifest)
 
+
 if __name__ == "__main__":
     unittest.main()

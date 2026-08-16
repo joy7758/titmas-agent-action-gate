@@ -163,17 +163,25 @@ class GhCliProvider:
         elif action == "github.pull_request.create":
             payload = self._run(
                 [
-                    "--method", "POST", f"repos/{repository}/pulls",
-                    "-f", f"title={parameters['title']}",
-                    "-f", f"head={parameters['head']}",
-                    "-f", f"base={parameters['base']}",
+                    "--method",
+                    "POST",
+                    f"repos/{repository}/pulls",
+                    "-f",
+                    f"title={parameters['title']}",
+                    "-f",
+                    f"head={parameters['head']}",
+                    "-f",
+                    f"base={parameters['base']}",
                 ]
             )
         elif action == "github.pull_request.merge":
             payload = self._run(
                 [
-                    "--method", "PUT", f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
-                    "-f", f"merge_method={parameters['merge_method']}",
+                    "--method",
+                    "PUT",
+                    f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
+                    "-f",
+                    f"merge_method={parameters['merge_method']}",
                 ]
             )
         else:

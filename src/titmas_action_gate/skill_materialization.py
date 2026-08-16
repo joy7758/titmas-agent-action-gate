@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -226,27 +227,38 @@ Be concise, preserve exact machine identifiers, report uncertainty, fail closed,
     return text.encode("utf-8")
 
 
+@dataclass
+class PackageConfig:
+    source_commit: str
+    model: str
+    distribution_scope: str = LOCAL_RUNTIME_ONLY
+    verify_external_skill_source: bool = True
+    schema_names: set[str] | None = None
+
+
+def _build_worker_archive(package_path: Path, contents: dict[str, bytes]) -> None:
+    with zipfile.ZipFile(package_path, "w") as archive:
+        for name in sorted(contents):
+            archive.writestr(_zip_info(name), contents[name])
+
+
 def build_worker_packages(
     root: str | Path,
     output_dir: str | Path,
     *,
-    source_commit: str,
-    model: str,
-    distribution_scope: str = LOCAL_RUNTIME_ONLY,
-    verify_external_skill_source: bool = True,
-    schema_names: set[str] | None = None,
+    config: PackageConfig,
 ) -> dict[str, Any]:
     repository_root = Path(root).resolve()
     destination = Path(output_dir).resolve()
     destination.mkdir(parents=True, exist_ok=True)
-    if distribution_scope != LOCAL_RUNTIME_ONLY:
+    if config.distribution_scope != LOCAL_RUNTIME_ONLY:
         raise ActionGateError(
             "LICENSE_CLEARANCE_REQUIRED",
             "Official Alibaba Cloud Skill bytes may only be packaged for local runtime until upstream redistribution permission is established.",
         )
-    if len(source_commit) != 40 or any(character not in "0123456789abcdef" for character in source_commit):
+    if len(config.source_commit) != 40 or any(character not in "0123456789abcdef" for character in config.source_commit):
         raise ValueError("source_commit must be an exact lowercase 40-character Git commit")
-    if "preview" in model.lower():
+    if "preview" in config.model.lower():
         raise ValueError("M4 Worker packages require a non-preview model identifier")
     registry = json.loads((repository_root / "agents/registry.json").read_text(encoding="utf-8"))
     receipts: list[dict[str, Any]] = []
@@ -255,15 +267,15 @@ def build_worker_packages(
         skill_version, source_files, contents = _source_inventory(
             repository_root,
             worker,
-            verify_external_skill_source=verify_external_skill_source,
-            schema_names=schema_names,
+            verify_external_skill_source=config.verify_external_skill_source,
+            schema_names=config.schema_names,
         )
         runtime = LEADER_RUNTIME if worker["id"] == "workflow-lead" else SPECIALIST_RUNTIME
-        package_manifest = _package_manifest(worker, source_commit=source_commit, model=model, runtime=runtime)
+        package_manifest = _package_manifest(worker, source_commit=config.source_commit, model=config.model, runtime=runtime)
         attestation = _attestation(
             worker,
-            source_commit=source_commit,
-            model=model,
+            source_commit=config.source_commit,
+            model=config.model,
             runtime=runtime,
             skill_version=skill_version,
             source_files=source_files,
@@ -273,23 +285,21 @@ def build_worker_packages(
         contents["config/AGENTS.md"] = _agents_markdown(worker, skill_name)
         contents["config/SOUL.md"] = _soul_markdown(worker)
         package_path = destination / f"{worker['id']}.zip"
-        with zipfile.ZipFile(package_path, "w") as archive:
-            for name in sorted(contents):
-                archive.writestr(_zip_info(name), contents[name])
+        _build_worker_archive(package_path, contents)
         receipt = verify_worker_package(
             package_path,
             repository_root,
             expected_worker=worker["id"],
-            expected_source_commit=source_commit,
-            expected_model=model,
-            verify_external_skill_source=verify_external_skill_source,
-            schema_names=schema_names,
+            expected_source_commit=config.source_commit,
+            expected_model=config.model,
+            verify_external_skill_source=config.verify_external_skill_source,
+            schema_names=config.schema_names,
         )
         receipts.append(receipt)
     index = {
         "schema_version": PACKAGE_SCHEMA_VERSION,
-        "source_commit": source_commit,
-        "model": model,
+        "source_commit": config.source_commit,
+        "model": config.model,
         "agentteams": "v1.2.0@793db242257a569d911b1aa59c1cd554af78511f",
         "distribution_scope": LOCAL_RUNTIME_ONLY,
         "public_distribution_allowed": False,

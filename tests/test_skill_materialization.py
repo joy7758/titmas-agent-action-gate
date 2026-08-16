@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from titmas_action_gate.errors import ActionGateError
-from titmas_action_gate.skill_materialization import build_worker_packages, verify_worker_package
+from titmas_action_gate.skill_materialization import PackageConfig, build_worker_packages, verify_worker_package
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTERNAL_SKILL_ROOT = Path(
@@ -46,8 +46,8 @@ class SkillMaterializationTests(unittest.TestCase):
             tempfile.TemporaryDirectory(prefix="titmas-skill-packages-a-") as first_dir,
             tempfile.TemporaryDirectory(prefix="titmas-skill-packages-b-") as second_dir,
         ):
-            first = build_worker_packages(ROOT, first_dir, source_commit="a" * 40, model="qwen3.7-max")
-            second = build_worker_packages(ROOT, second_dir, source_commit="a" * 40, model="qwen3.7-max")
+            first = build_worker_packages(ROOT, first_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
+            second = build_worker_packages(ROOT, second_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
             self.assertEqual(len(first["workers"]), 6)
             self.assertEqual(
                 {item["worker_id"]: item["package_sha256"] for item in first["workers"]},
@@ -67,7 +67,7 @@ class SkillMaterializationTests(unittest.TestCase):
 
     def test_missing_skill_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="titmas-skill-missing-") as output_dir:
-            build_worker_packages(ROOT, output_dir, source_commit="a" * 40, model="qwen3.7-max")
+            build_worker_packages(ROOT, output_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
             package = Path(output_dir) / "request-analyst.zip"
             rewrite_zip(package, drop="skills/analyze-action-request/SKILL.md")
             with self.assertRaises(ActionGateError) as context:
@@ -82,15 +82,17 @@ class SkillMaterializationTests(unittest.TestCase):
             build_worker_packages(
                 ROOT,
                 output_dir,
-                source_commit="a" * 40,
-                model="qwen3.7-max",
-                distribution_scope="PUBLIC_DISTRIBUTION",
+                config=PackageConfig(
+                    source_commit="a" * 40,
+                    model="qwen3.7-max",
+                    distribution_scope="PUBLIC_DISTRIBUTION",
+                ),
             )
         self.assertEqual(context.exception.code, "LICENSE_CLEARANCE_REQUIRED")
 
     def test_modified_skill_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="titmas-skill-modified-") as output_dir:
-            build_worker_packages(ROOT, output_dir, source_commit="a" * 40, model="qwen3.7-max")
+            build_worker_packages(ROOT, output_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
             package = Path(output_dir) / "github-operator.zip"
             rewrite_zip(package, modify="skills/execute-github-action/SKILL.md")
             with self.assertRaises(ActionGateError) as context:
@@ -110,12 +112,12 @@ class SkillMaterializationTests(unittest.TestCase):
                 patch.dict(os.environ, {"TITMAS_OFFICIAL_ALIBABA_CLOUD_SKILL_PATH": str(external)}),
                 self.assertRaises(ActionGateError) as context,
             ):
-                build_worker_packages(ROOT, output_dir, source_commit="a" * 40, model="qwen3.7-max")
+                build_worker_packages(ROOT, output_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
             self.assertEqual(context.exception.code, "SKILL_DIGEST_MISMATCH")
 
     def test_unattested_extra_package_member_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="titmas-skill-extra-") as output_dir:
-            build_worker_packages(ROOT, output_dir, source_commit="a" * 40, model="qwen3.7-max")
+            build_worker_packages(ROOT, output_dir, config=PackageConfig(source_commit="a" * 40, model="qwen3.7-max"))
             package = Path(output_dir) / "request-analyst.zip"
             with zipfile.ZipFile(package, "a") as archive:
                 archive.writestr("skills/unattested/SKILL.md", "unexpected")
