@@ -18,7 +18,7 @@ from titmas_action_gate.canonical import sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _test_environment, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -370,6 +370,40 @@ class PullRequestGateTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, PUBLIC_EXIT_CODES["FAIL"])
         self.assertTrue((output / "receipt.json").is_file())
         self.assertTrue((output / "summary.md").is_file())
+
+    def test__test_environment_filtering(self) -> None:
+        home = Path("/home/mock_user")
+        temporary_directory = Path("/tmp/mock_dir")
+        environment = {
+            "PATH": "/usr/bin",
+            "LANG": "en_US.UTF-8",
+            "UNALLOWED_VAR": "secret_value",
+            "LC_ALL": "en_US.UTF-8",
+        }
+        child, metadata = _test_environment(environment, home=home, temporary_directory=temporary_directory)
+
+        # Assert that allowed vars are present and unallowed var is filtered out
+        self.assertEqual(child["PATH"], "/usr/bin")
+        self.assertEqual(child["LANG"], "en_US.UTF-8")
+        self.assertEqual(child["LC_ALL"], "en_US.UTF-8")
+        self.assertNotIn("UNALLOWED_VAR", child)
+
+        # Assert that fixed additions are correctly set
+        self.assertEqual(child["CI"], "true")
+        self.assertEqual(child["HOME"], "/home/mock_user")
+        self.assertEqual(child["TMPDIR"], "/tmp/mock_dir")
+        self.assertEqual(child["XDG_CONFIG_HOME"], "/home/mock_user/.config")
+        self.assertEqual(child["GIT_TERMINAL_PROMPT"], "0")
+        self.assertEqual(child["GIT_CONFIG_NOSYSTEM"], "1")
+        self.assertEqual(child["GIT_CONFIG_GLOBAL"], os.devnull)
+
+        # Assert correct metadata
+        self.assertEqual(metadata["policy_version"], "minimal-v1")
+        self.assertEqual(metadata["allowed_parent_names"], ["PATH", "LANG", "LC_ALL"])
+        self.assertEqual(metadata["removed_names"], ["UNALLOWED_VAR"])
+        self.assertEqual(metadata["removed_count"], 1)
+        self.assertTrue(metadata["fresh_home"])
+        self.assertTrue(metadata["fresh_tmpdir"])
 
 
 if __name__ == "__main__":
