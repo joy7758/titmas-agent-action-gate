@@ -1,8 +1,9 @@
 import unittest
-from unittest.mock import MagicMock, patch
+import subprocess
+from unittest.mock import patch, MagicMock
 
 from titmas_action_gate.provider import GhCliProvider
-
+from titmas_action_gate.errors import ActionGateError
 
 class ProviderSecurityTests(unittest.TestCase):
     @patch("subprocess.run")
@@ -21,7 +22,7 @@ class ProviderSecurityTests(unittest.TestCase):
             "parameters": {
                 "branch": "main",
                 "commit": "0" * 40,
-            },
+            }
         }
 
         provider.execute(invocation)
@@ -32,10 +33,9 @@ class ProviderSecurityTests(unittest.TestCase):
         self.assertIn("--", args)
 
         dash_index = args.index("--")
-        refspec_index = args.index(f"{'0' * 40}:refs/heads/main")
+        refspec_index = args.index(f"{'0'*40}:refs/heads/main")
 
         self.assertEqual(dash_index + 1, refspec_index, "The '--' separator must appear immediately before the refspec")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,7 @@ from typing import Any
 from .canonical import format_datetime, sha256_json
 from .contracts import validate_action_request
 from .provider import GitHubProvider
-from .service import ActionGateService
+from .service import ActionGateService, ExecuteAllowedRequest
 
 
 @dataclass(frozen=True)
@@ -107,12 +107,14 @@ class GitHubOperator:
         consumed_at: datetime,
     ) -> dict[str, Any]:
         return service.execute_allowed(
-            decision_id,
-            request_id,
-            provider,
-            actor=self.agent_id,
-            caller_token=caller_token,
-            consumed_at=consumed_at,
+            ExecuteAllowedRequest(
+                decision_id=decision_id,
+                request_id=request_id,
+                provider=provider,
+                actor=self.agent_id,
+                caller_token=caller_token,
+                consumed_at=consumed_at,
+            )
         )
 
 
