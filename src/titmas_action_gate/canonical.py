@@ -208,11 +208,7 @@ class ExclusiveOutput:
             if not chunk:
                 break
             observed += chunk
-        if (
-            observed != payload
-            or hashlib.sha256(observed).digest() != hashlib.sha256(payload).digest()
-            or os.fstat(self._fd).st_size != len(payload)
-        ):
+        if observed != payload or hashlib.sha256(observed).digest() != hashlib.sha256(payload).digest() or os.fstat(self._fd).st_size != len(payload):
             raise RuntimeError("EXCLUSIVE_OUTPUT_WRITE_VERIFICATION_FAILED")
         os.close(self._fd)
         self._fd = -1

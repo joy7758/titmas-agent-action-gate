@@ -91,12 +91,8 @@ def build_sanitized_observation(
         raise ValueError("ROLE_ATTACHMENTS_INVALID")
     system_count = sum(item.get("PolicyType") == "System" for item in attachments)
     custom_count = sum(item.get("PolicyType") == "Custom" for item in attachments)
-    matching_count = sum(
-        item.get("PolicyType") == "System" and item.get("PolicyName") == POLICY_NAME for item in attachments
-    )
-    unexpected_count = sum(
-        not (item.get("PolicyType") == "System" and item.get("PolicyName") == POLICY_NAME) for item in attachments
-    )
+    matching_count = sum(item.get("PolicyType") == "System" and item.get("PolicyName") == POLICY_NAME for item in attachments)
+    unexpected_count = sum(not (item.get("PolicyType") == "System" and item.get("PolicyName") == POLICY_NAME) for item in attachments)
 
     arn = identity_payload.get("Arn")
     identity_type = identity_payload.get("IdentityType")
@@ -111,10 +107,7 @@ def build_sanitized_observation(
         raise ValueError("ASSUMED_ROLE_NAME_MISMATCH")
 
     sorted_actions = sorted(allow_actions)
-    write_marker_count = sum(
-        any(action.rsplit(":", 1)[-1].lower().startswith(prefix) for prefix in WRITE_ACTION_PREFIXES)
-        for action in sorted_actions
-    )
+    write_marker_count = sum(any(action.rsplit(":", 1)[-1].lower().startswith(prefix) for prefix in WRITE_ACTION_PREFIXES) for action in sorted_actions)
     observation = {
         "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.2.schema.json",
         "schema_version": "0.2.0",
@@ -262,9 +255,7 @@ def capture(control_profile: str, query_profile: str, role_name: str, run_id: st
         )
     finally:
         if enabled:
-            disabled = subprocess.run(
-                [binary, "configure", "ai-mode", "disable"], check=False, capture_output=True, text=True, timeout=30
-            )
+            disabled = subprocess.run([binary, "configure", "ai-mode", "disable"], check=False, capture_output=True, text=True, timeout=30)
             if disabled.returncode != 0:
                 raise RuntimeError("AI_MODE_DISABLE_FAILED")
 

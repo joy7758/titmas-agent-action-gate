@@ -139,9 +139,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         request = self.request(head, command)
         task = self.write_json(directory / "task.json", request)
         evidence = self.write_evidence(directory, request)
-        policy_source = ROOT / "policies" / (
-            "github-demo-policy.v0.2.json" if high_risk else "github-merge-gate-low-risk-demo.v0.1.json"
-        )
+        policy_source = ROOT / "policies" / ("github-demo-policy.v0.2.json" if high_risk else "github-merge-gate-low-risk-demo.v0.1.json")
         policy = directory / "policy.json"
         policy.write_bytes(policy_source.read_bytes())
         approval_path = None
@@ -212,9 +210,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         paths = [prepared[role]]
         if multiple:
             paths.extend([prepared["evidence"], prepared["policy"]])
-        script = "from pathlib import Path; " + "; ".join(
-            f"Path({str(path)!r}).write_text('{{}}', encoding='utf-8')" for path in paths
-        )
+        script = "from pathlib import Path; " + "; ".join(f"Path({str(path)!r}).write_text('{{}}', encoding='utf-8')" for path in paths)
         mutation_command = [sys.executable, "-c", script]
         prepared["request"]["parameters"]["test_command"] = mutation_command
         prepared["request"]["parameters_sha256"] = sha256_json(prepared["request"]["parameters"])
@@ -526,9 +522,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
                 return subprocess.CompletedProcess([], 1, b"", b"")
             return original(executable, repository, *arguments)
 
-        with patch("titmas_action_gate.pr_gate._git_command", side_effect=unreadable_worktree_config), self.assertRaises(
-            ActionGateError
-        ) as observed:
+        with patch("titmas_action_gate.pr_gate._git_command", side_effect=unreadable_worktree_config), self.assertRaises(ActionGateError) as observed:
             self.capture_git_config(workspace)
         self.assertEqual(observed.exception.code, "GIT_CONFIG_AUDIT_UNAVAILABLE")
 
@@ -596,20 +590,25 @@ class PullRequestGateSecurityTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 opened.clear()
                 closed.clear()
-                with patch("titmas_action_gate.canonical.os.open", side_effect=tracking_open), patch(
-                    "titmas_action_gate.canonical.os.close", side_effect=tracking_close
-                ), patch("titmas_action_gate.pr_gate.os.open", side_effect=tracking_open), patch(
-                    "titmas_action_gate.pr_gate.os.close", side_effect=tracking_close
+                with (
+                    patch("titmas_action_gate.canonical.os.open", side_effect=tracking_open),
+                    patch("titmas_action_gate.canonical.os.close", side_effect=tracking_close),
+                    patch("titmas_action_gate.pr_gate.os.open", side_effect=tracking_open),
+                    patch("titmas_action_gate.pr_gate.os.close", side_effect=tracking_close),
                 ):
                     _read_regular_bytes(path, workspace=None, enforce_workspace=False, allow_missing=allow_missing)
                 self.assertEqual(sorted(closed), sorted(opened))
 
     def test_read_regular_bytes_required_missing_closes_parent_once(self) -> None:
         parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        with patch(
-            "titmas_action_gate.pr_gate._open_directory_no_follow",
-            return_value=(parent_descriptor, ()),
-        ), patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer, self.assertRaises(ActionGateError) as observed:
+        with (
+            patch(
+                "titmas_action_gate.pr_gate._open_directory_no_follow",
+                return_value=(parent_descriptor, ()),
+            ),
+            patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer,
+            self.assertRaises(ActionGateError) as observed,
+        ):
             _read_regular_bytes(
                 self.root / "required-missing.json",
                 workspace=None,
@@ -621,12 +620,15 @@ class PullRequestGateSecurityTests(unittest.TestCase):
 
     def test_read_regular_bytes_open_error_closes_parent_once(self) -> None:
         parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        with patch(
-            "titmas_action_gate.pr_gate._open_directory_no_follow",
-            return_value=(parent_descriptor, ()),
-        ), patch("titmas_action_gate.pr_gate.os.open", side_effect=PermissionError), patch(
-            "titmas_action_gate.pr_gate.os.close", wraps=os.close
-        ) as closer, self.assertRaises(ActionGateError) as observed:
+        with (
+            patch(
+                "titmas_action_gate.pr_gate._open_directory_no_follow",
+                return_value=(parent_descriptor, ()),
+            ),
+            patch("titmas_action_gate.pr_gate.os.open", side_effect=PermissionError),
+            patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer,
+            self.assertRaises(ActionGateError) as observed,
+        ):
             _read_regular_bytes(
                 self.root / "permission-denied.json",
                 workspace=None,
@@ -639,12 +641,15 @@ class PullRequestGateSecurityTests(unittest.TestCase):
     def test_read_regular_bytes_nonregular_closes_child_then_parent_once(self) -> None:
         parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         child_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-        with patch(
-            "titmas_action_gate.pr_gate._open_directory_no_follow",
-            return_value=(parent_descriptor, ()),
-        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
-            "titmas_action_gate.pr_gate.os.close", wraps=os.close
-        ) as closer, self.assertRaises(ActionGateError) as observed:
+        with (
+            patch(
+                "titmas_action_gate.pr_gate._open_directory_no_follow",
+                return_value=(parent_descriptor, ()),
+            ),
+            patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor),
+            patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer,
+            self.assertRaises(ActionGateError) as observed,
+        ):
             _read_regular_bytes(
                 self.root / "synthetic-directory",
                 workspace=None,
@@ -657,14 +662,16 @@ class PullRequestGateSecurityTests(unittest.TestCase):
     def test_read_regular_bytes_read_error_closes_child_then_parent_once(self) -> None:
         parent_descriptor = os.open(self.root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
         child_descriptor = os.open(__file__, os.O_RDONLY)
-        with patch(
-            "titmas_action_gate.pr_gate._open_directory_no_follow",
-            return_value=(parent_descriptor, ()),
-        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
-            "titmas_action_gate.pr_gate.os.read", side_effect=OSError("read failed")
-        ), patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer, self.assertRaises(
-            ActionGateError
-        ) as observed:
+        with (
+            patch(
+                "titmas_action_gate.pr_gate._open_directory_no_follow",
+                return_value=(parent_descriptor, ()),
+            ),
+            patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor),
+            patch("titmas_action_gate.pr_gate.os.read", side_effect=OSError("read failed")),
+            patch("titmas_action_gate.pr_gate.os.close", wraps=os.close) as closer,
+            self.assertRaises(ActionGateError) as observed,
+        ):
             _read_regular_bytes(
                 self.root / "synthetic-readable.json",
                 workspace=None,
@@ -677,15 +684,23 @@ class PullRequestGateSecurityTests(unittest.TestCase):
     def test_read_regular_bytes_cleanup_failure_fails_closed_without_retry(self) -> None:
         parent_descriptor = 9001
         child_descriptor = 9002
-        with patch(
-            "titmas_action_gate.pr_gate._open_directory_no_follow",
-            return_value=(parent_descriptor, ()),
-        ), patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor), patch(
-            "titmas_action_gate.pr_gate.os.fstat", return_value=os.stat(self.root / "task.json") if (self.root / "task.json").exists() else os.stat(__file__)
-        ), patch("titmas_action_gate.pr_gate.os.read", return_value=b""), patch(
-            "titmas_action_gate.pr_gate._close_owned_input_descriptor",
-            side_effect=[ActionGateError("INPUT_PATH_RESOURCE_CLEANUP_FAILED", "cleanup failed"), None],
-        ) as closer, self.assertRaises(ActionGateError) as observed:
+        with (
+            patch(
+                "titmas_action_gate.pr_gate._open_directory_no_follow",
+                return_value=(parent_descriptor, ()),
+            ),
+            patch("titmas_action_gate.pr_gate.os.open", return_value=child_descriptor),
+            patch(
+                "titmas_action_gate.pr_gate.os.fstat",
+                return_value=os.stat(self.root / "task.json") if (self.root / "task.json").exists() else os.stat(__file__),
+            ),
+            patch("titmas_action_gate.pr_gate.os.read", return_value=b""),
+            patch(
+                "titmas_action_gate.pr_gate._close_owned_input_descriptor",
+                side_effect=[ActionGateError("INPUT_PATH_RESOURCE_CLEANUP_FAILED", "cleanup failed"), None],
+            ) as closer,
+            self.assertRaises(ActionGateError) as observed,
+        ):
             _read_regular_bytes(
                 self.root / "synthetic.json",
                 workspace=None,
@@ -696,9 +711,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self.assertEqual(closer.call_args_list, [call(child_descriptor), call(parent_descriptor)])
 
     def test_close_owned_input_descriptor_maps_close_failure(self) -> None:
-        with patch(
-            "titmas_action_gate.pr_gate.os.close", side_effect=OSError("close failed")
-        ) as closer, self.assertRaises(ActionGateError) as observed:
+        with patch("titmas_action_gate.pr_gate.os.close", side_effect=OSError("close failed")) as closer, self.assertRaises(ActionGateError) as observed:
             _close_owned_input_descriptor(123)
         self.assertEqual(observed.exception.code, "INPUT_PATH_RESOURCE_CLEANUP_FAILED")
         closer.assert_called_once_with(123)
@@ -765,9 +778,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         after_invalid = len(list(descriptor_root.iterdir()))
         valid = self.root / "digest-input.json"
         valid.write_text("{}\n", encoding="utf-8")
-        with patch("titmas_action_gate.pr_gate.hashlib.sha256", side_effect=RuntimeError("digest failed")), self.assertRaises(
-            RuntimeError
-        ):
+        with patch("titmas_action_gate.pr_gate.hashlib.sha256", side_effect=RuntimeError("digest failed")), self.assertRaises(RuntimeError):
             _freeze_json_input(
                 "task",
                 valid,
@@ -1216,9 +1227,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self.assertEqual(result["reason_codes"], ["SUBMODULE_GIT_CREDENTIAL_DETECTED"])
         self.assertEqual(receipt["decision"]["outcome"], "BLOCK")
         self.assertFalse(receipt["test_result"]["executed"])
-        self.assertTrue(
-            any(category.endswith(f":{expected_category}") for category in receipt["git_binding"]["submodule_credential_risk_categories"])
-        )
+        self.assertTrue(any(category.endswith(f":{expected_category}") for category in receipt["git_binding"]["submodule_credential_risk_categories"]))
         self.assertFalse(marker.exists())
         self.assertNotIn(value, text)
 
@@ -1435,9 +1444,7 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         return receipt
 
     def test_preexisting_unstaged_tracked_change_fails_before_test(self) -> None:
-        self._assert_preexisting_tracked_state_blocked(
-            lambda workspace: (workspace / "tracked.txt").write_text("dirty\n"), "dirty-unstaged"
-        )
+        self._assert_preexisting_tracked_state_blocked(lambda workspace: (workspace / "tracked.txt").write_text("dirty\n"), "dirty-unstaged")
 
     def test_preexisting_staged_tracked_change_fails_before_test(self) -> None:
         def mutate(workspace: Path) -> None:
@@ -1450,15 +1457,11 @@ class PullRequestGateSecurityTests(unittest.TestCase):
         self._assert_preexisting_tracked_state_blocked(lambda workspace: (workspace / "tracked.txt").unlink(), "dirty-delete")
 
     def test_preexisting_tracked_rename_fails_before_test(self) -> None:
-        self._assert_preexisting_tracked_state_blocked(
-            lambda workspace: (workspace / "tracked.txt").rename(workspace / "renamed.txt"), "dirty-rename"
-        )
+        self._assert_preexisting_tracked_state_blocked(lambda workspace: (workspace / "tracked.txt").rename(workspace / "renamed.txt"), "dirty-rename")
 
     @unittest.skipIf(os.name == "nt", "POSIX executable mode is required")
     def test_preexisting_tracked_type_or_mode_change_fails_before_test(self) -> None:
-        self._assert_preexisting_tracked_state_blocked(
-            lambda workspace: (workspace / "tracked.txt").chmod(0o755), "dirty-mode-change"
-        )
+        self._assert_preexisting_tracked_state_blocked(lambda workspace: (workspace / "tracked.txt").chmod(0o755), "dirty-mode-change")
 
     def test_dirty_submodule_fails_before_test(self) -> None:
         workspace, _, _ = self.initialize_git_workspace()

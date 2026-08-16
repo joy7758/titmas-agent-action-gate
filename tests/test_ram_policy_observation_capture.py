@@ -27,17 +27,11 @@ class RamPolicyObservationCaptureTests(unittest.TestCase):
         actions = sorted(EXPECTED_READ_ONLY_POLICY_ACTIONS)
         policy = {"Policy": {"DefaultVersion": "v2"}, "RequestId": "policy-request"}
         version = {
-            "PolicyVersion": {
-                "PolicyDocument": json.dumps(
-                    {"Version": "1", "Statement": [{"Effect": "Allow", "Action": actions, "Resource": "*"}]}
-                )
-            },
+            "PolicyVersion": {"PolicyDocument": json.dumps({"Version": "1", "Statement": [{"Effect": "Allow", "Action": actions, "Resource": "*"}]})},
             "RequestId": "version-request",
         }
         attachments = {
-            "Policies": {
-                "Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]
-            },
+            "Policies": {"Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]},
             "RequestId": "attachment-request",
         }
         identity = {
@@ -77,6 +71,7 @@ class RamPolicyObservationCaptureTests(unittest.TestCase):
                 attachments_payload=attachments,
                 identity_payload=identity,
             )
+
 
 if __name__ == "__main__":
     unittest.main()

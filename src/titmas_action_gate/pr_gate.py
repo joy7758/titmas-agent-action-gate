@@ -446,10 +446,7 @@ def _freeze_action_configuration(
         and isinstance(verify_step, dict)
         and isinstance(verify_step.get("env"), dict)
         and required_environment.issubset(verify_step["env"])
-        and all(
-            flag in verify_run
-            for flag in ("--task", "--evidence", "--policy", "--test-command", "--workspace", "--action-configuration", "--action-root")
-        )
+        and all(flag in verify_run for flag in ("--task", "--evidence", "--policy", "--test-command", "--workspace", "--action-configuration", "--action-root"))
     )
     if not structurally_valid:
         raise ActionGateError("ACTION_CONFIGURATION_INVALID", "The Action configuration does not match the bounded composite Action.")
@@ -486,11 +483,7 @@ def _ancestor_identities_unchanged(identities: tuple[tuple[str, int, int], ...])
             observed = Path(path_text).lstat()
         except OSError:
             return False
-        if (
-            stat.S_ISLNK(observed.st_mode)
-            or not stat.S_ISDIR(observed.st_mode)
-            or (observed.st_dev, observed.st_ino) != (expected_device, expected_inode)
-        ):
+        if stat.S_ISLNK(observed.st_mode) or not stat.S_ISDIR(observed.st_mode) or (observed.st_dev, observed.st_ino) != (expected_device, expected_inode):
             return False
     return True
 
@@ -511,8 +504,7 @@ def _post_input_observation(frozen: FrozenJsonInput) -> dict[str, Any]:
     )
     identity_changed = bool(
         ancestors_changed
-        or
-        frozen.missing != (raw_bytes is None)
+        or frozen.missing != (raw_bytes is None)
         or observed is not None
         and (observed.st_dev, observed.st_ino) != (frozen.device, frozen.inode)
     )
@@ -673,10 +665,15 @@ def _git_credential_risks(config_bytes: bytes) -> tuple[str, ...]:
             risks.add("HTTP_PROXY_CONFIGURATION")
         elif key == "http.cookiefile" or key.startswith("http.") and key.endswith(".cookiefile"):
             risks.add("HTTP_COOKIE_FILE")
-        elif key in {"http.sslkey", "http.sslcert"} or key.startswith("http.") and key.rsplit(".", 1)[-1] in {
-            "sslkey",
-            "sslcert",
-        }:
+        elif (
+            key in {"http.sslkey", "http.sslcert"}
+            or key.startswith("http.")
+            and key.rsplit(".", 1)[-1]
+            in {
+                "sslkey",
+                "sslcert",
+            }
+        ):
             risks.add("HTTP_CLIENT_CREDENTIAL_FILE")
         elif key == "credential.helper" or key.startswith("credential."):
             risks.add("CREDENTIAL_CONFIGURATION")
@@ -792,9 +789,7 @@ def _capture_effective_git_config(
     records = _git_config_records(config_bytes)
     return _EffectiveGitConfig(
         sha256=hashlib.sha256(config_bytes).hexdigest(),
-        source_categories=tuple(
-            sorted({_git_config_source_category(scope, origin) for scope, origin, _key, _value in records})
-        ),
+        source_categories=tuple(sorted({_git_config_source_category(scope, origin) for scope, origin, _key, _value in records})),
         risk_categories=_git_credential_risks(config_bytes),
     )
 
@@ -875,9 +870,7 @@ def _capture_initialized_submodules(
             ) from None
         except OSError as exc:
             raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory was unavailable.") from exc
-        if stat.S_ISLNK(git_marker_observation.st_mode) or not (
-            stat.S_ISREG(git_marker_observation.st_mode) or stat.S_ISDIR(git_marker_observation.st_mode)
-        ):
+        if stat.S_ISLNK(git_marker_observation.st_mode) or not (stat.S_ISREG(git_marker_observation.st_mode) or stat.S_ISDIR(git_marker_observation.st_mode)):
             raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory binding was unsafe.")
         top_level = _git_command(git_executable, submodule_path, "rev-parse", "--show-toplevel")
         if top_level.returncode != 0:
@@ -1039,9 +1032,7 @@ def _capture_git_snapshot(
         raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was invalid.") from exc
     if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
         raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was incomplete.")
-    unexpected_untracked = tuple(
-        path for path in _untracked_paths(status_result.stdout) if (workspace / path).absolute() not in allowed_untracked_paths
-    )
+    unexpected_untracked = tuple(path for path in _untracked_paths(status_result.stdout) if (workspace / path).absolute() not in allowed_untracked_paths)
     observed_repository = _repository_slug(remote.stdout.decode("utf-8", "replace")) if remote.returncode == 0 else None
     worktree_diff_sha256 = hashlib.sha256(worktree_diff.stdout).hexdigest()
     status_sha256 = hashlib.sha256(status_result.stdout).hexdigest()
@@ -1058,20 +1049,8 @@ def _capture_git_snapshot(
     ]
     submodule_config_sha256 = sha256_json(submodule_config_projection)
     submodule_state_sha256 = sha256_json(list(submodule_records))
-    submodule_risks = tuple(
-        sorted(
-            f"{record['path']}:{risk}"
-            for record in submodule_records
-            for risk in record.get("credential_risk_categories", [])
-        )
-    )
-    submodule_sources = tuple(
-        sorted(
-            f"{record['path']}:{source}"
-            for record in submodule_records
-            for source in record.get("config_source_categories", [])
-        )
-    )
+    submodule_risks = tuple(sorted(f"{record['path']}:{risk}" for record in submodule_records for risk in record.get("credential_risk_categories", [])))
+    submodule_sources = tuple(sorted(f"{record['path']}:{source}" for record in submodule_records for source in record.get("config_source_categories", [])))
     state_sha256 = sha256_json(
         {
             "head_sha": head_sha,
@@ -1135,9 +1114,7 @@ def _git_post_checks(
         ),
         _check(
             "SUBMODULE_STATE_CHANGED_DURING_TEST",
-            after.available
-            and after.submodule_paths == before.submodule_paths
-            and after.submodule_state_sha256 == before.submodule_state_sha256,
+            after.available and after.submodule_paths == before.submodule_paths and after.submodule_state_sha256 == before.submodule_state_sha256,
         ),
         _check("GIT_INDEX_UNCHANGED_DURING_TEST", after.available and after.index_sha256 == before.index_sha256),
         _check("GIT_WORKTREE_UNCHANGED_DURING_TEST", after.available and after.worktree_diff_sha256 == before.worktree_diff_sha256),
@@ -1166,16 +1143,11 @@ def _execution_preflight_checks(environment: Mapping[str, str], context: PullReq
                 _check("ACTUAL_HEAD_SHA_MATCH", git_snapshot.available and git_snapshot.head_sha == context.head_sha),
                 _check(
                     "HEAD_EXECUTION_BASELINE_MISMATCH",
-                    git_snapshot.available
-                    and git_snapshot.head_sha == context.head_sha
-                    and git_snapshot.head_tree_sha == git_snapshot.index_tree_sha,
+                    git_snapshot.available and git_snapshot.head_sha == context.head_sha and git_snapshot.head_tree_sha == git_snapshot.index_tree_sha,
                 ),
                 _check(
                     "DIRTY_TRACKED_EXECUTION_BASELINE",
-                    git_snapshot.available
-                    and git_snapshot.tracked_index_clean
-                    and git_snapshot.tracked_worktree_clean
-                    and git_snapshot.submodules_clean,
+                    git_snapshot.available and git_snapshot.tracked_index_clean and git_snapshot.tracked_worktree_clean and git_snapshot.submodules_clean,
                 ),
                 _check("UNDECLARED_UNTRACKED_EXECUTION_INPUTS", git_snapshot.unexpected_untracked_count == 0),
                 _check("ACTUAL_REPOSITORY_IDENTITY_MATCH", git_snapshot.repository_identity_matches is True),
@@ -1224,11 +1196,7 @@ def _validate_runtime_binding(
     current_pull_number_valid = isinstance(context.pull_request, int) and not isinstance(context.pull_request, bool) and context.pull_request > 0
     head_sha_valid = isinstance(task_head_sha, str) and _SHA_PATTERN.fullmatch(task_head_sha) is not None
     current_head_sha_valid = isinstance(context.head_sha, str) and _SHA_PATTERN.fullmatch(context.head_sha) is not None
-    command_valid = (
-        isinstance(task_command, list)
-        and bool(task_command)
-        and all(isinstance(item, str) and bool(item) for item in task_command)
-    )
+    command_valid = isinstance(task_command, list) and bool(task_command) and all(isinstance(item, str) and bool(item) for item in task_command)
     expected_ref = f"refs/pull/{task_pull_request}/head@{task_head_sha}" if pull_number_valid and head_sha_valid else None
     checks.extend(
         [
@@ -1616,11 +1584,7 @@ def _public_projection(
         return "PASS", list(decision["reason_codes"])
     if decision["outcome"] == "REQUIRE_APPROVAL":
         return "REVIEW_REQUIRED", list(decision["reason_codes"])
-    if (
-        evidence_result is not None
-        and evidence_result["status"] == "MISSING"
-        and decision["reason_codes"] == ["EVIDENCE_MISSING"]
-    ):
+    if evidence_result is not None and evidence_result["status"] == "MISSING" and decision["reason_codes"] == ["EVIDENCE_MISSING"]:
         return "INCOMPLETE", ["EVIDENCE_MISSING"]
     evidence_checks = {item["check_id"] for item in (evidence_result or {}).get("checks", []) if not item["passed"]}
     if {"SUBJECT_ID", "SUBJECT_LOCATOR", "SUBJECT_DIGEST"} & evidence_checks:
@@ -1674,12 +1638,7 @@ def _private_output_directory() -> tuple[Path, tuple[tuple[str, int, int], ...]]
                     os.mkdir(name, mode=0o700, dir_fd=descriptor)
                 except FileExistsError:
                     continue
-                flags = (
-                    os.O_RDONLY
-                    | getattr(os, "O_DIRECTORY", 0)
-                    | getattr(os, "O_NOFOLLOW", 0)
-                    | getattr(os, "O_CLOEXEC", 0)
-                )
+                flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
                 child = os.open(name, flags, dir_fd=descriptor)
                 try:
                     observation = os.fstat(child)
@@ -1748,9 +1707,7 @@ def _evaluate_pull_request(
         except (OSError, ActionGateError) as exc:
             workspace_error = exc
     github_mode = (
-        env.get("GITHUB_ACTIONS", "").lower() == "true"
-        or env.get("TITMAS_CURRENT_EVENT_NAME") is not None
-        or env.get("GITHUB_EVENT_NAME") is not None
+        env.get("GITHUB_ACTIONS", "").lower() == "true" or env.get("TITMAS_CURRENT_EVENT_NAME") is not None or env.get("GITHUB_EVENT_NAME") is not None
     )
     context = resolve_pull_request_context(
         repository=repository,
@@ -1830,9 +1787,9 @@ def _evaluate_pull_request(
         )
 
         request = task.payload()
-        allowed_untracked_paths = frozenset(
-            value.path.absolute() for value in frozen_inputs.values() if value.path is not None
-        ) | frozenset(path.absolute() for path in declared_output_paths)
+        allowed_untracked_paths = frozenset(value.path.absolute() for value in frozen_inputs.values() if value.path is not None) | frozenset(
+            path.absolute() for path in declared_output_paths
+        )
         command = shlex.split(test_command)
         if not command:
             raise ActionGateError("TEST_COMMAND_EMPTY", "The task-bound test command is empty.")
@@ -1860,27 +1817,18 @@ def _evaluate_pull_request(
             test_result = _run_test(command, execute=preflight_passed, environment=env, workspace=workspace_path)
             if test_result["executed"]:
                 try:
-                    runtime_checks.append(
-                        _check("TEST_PROCESS_GROUP_CLEANUP", test_result["process_group_cleanup"] == "COMPLETE")
-                    )
-                    post_input_observations = {
-                        role: _post_input_observation(value) for role, value in frozen_inputs.items()
-                    }
+                    runtime_checks.append(_check("TEST_PROCESS_GROUP_CLEANUP", test_result["process_group_cleanup"] == "COMPLETE"))
+                    post_input_observations = {role: _post_input_observation(value) for role, value in frozen_inputs.items()}
                     post_action_configuration = _post_action_configuration_observation(frozen_action_configuration)
                     for role, observation in post_input_observations.items():
-                        runtime_checks.append(
-                            _check(_input_ancestor_check_id(role), not observation["identity_changed"])
-                        )
+                        runtime_checks.append(_check(_input_ancestor_check_id(role), not observation["identity_changed"]))
                     runtime_checks.append(
                         _check(
                             "ACTION_CONFIGURATION_PATH_ANCESTOR_MUTATED_DURING_TEST",
                             not post_action_configuration["identity_changed"],
                         )
                     )
-                    mutated = (
-                        any(item["mutated"] for item in post_input_observations.values())
-                        or post_action_configuration["mutated"]
-                    )
+                    mutated = any(item["mutated"] for item in post_input_observations.values()) or post_action_configuration["mutated"]
                     runtime_checks.append(_check("GATE_INPUT_MUTATED_DURING_TEST", not mutated))
                     runtime_checks.extend(
                         _git_post_checks(
@@ -1891,9 +1839,7 @@ def _evaluate_pull_request(
                             allowed_untracked_paths=allowed_untracked_paths,
                         )
                     )
-                    git_executable_unchanged_after_test = (
-                        _executable_unchanged(git_executable) if git_executable is not None else None
-                    )
+                    git_executable_unchanged_after_test = _executable_unchanged(git_executable) if git_executable is not None else None
                     runtime_checks.append(
                         _check(
                             "TRUSTED_GIT_EXECUTABLE_UNCHANGED_DURING_TEST",
@@ -1953,10 +1899,7 @@ def _evaluate_pull_request(
     decision = gate.evaluate(request, policy_evaluation, evidence_result or {}, approval, decided_at=decision_at)
     state, reasons = _public_projection(decision, runtime_checks, test_result, evidence_result)
     approval_verified = bool(
-        approval
-        and approval_verifier_available
-        and policy_evaluation
-        and authority.verify(approval, request, policy_evaluation, now=decision_at)
+        approval and approval_verifier_available and policy_evaluation and authority.verify(approval, request, policy_evaluation, now=decision_at)
     )
     finished_at = utc_now()
     task_digest = frozen_inputs.get("task").sha256 if frozen_inputs.get("task") else None
