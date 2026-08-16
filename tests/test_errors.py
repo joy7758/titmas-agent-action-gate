@@ -1,5 +1,6 @@
 from titmas_action_gate.errors import ActionGateError
 
+
 def test_action_gate_error_to_dict_without_details():
     error = ActionGateError(code="TEST_CODE", message="Test message")
     expected = {
