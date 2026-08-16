@@ -147,7 +147,7 @@ class GhCliProvider:
             commit = str(parameters["commit"])
             self._validate_branch_push(branch, commit)
             completed = subprocess.run(
-                ["git", "-C", str(worktree), "push", "origin", f"{commit}:refs/heads/{branch}"],
+                ["git", "-C", str(worktree), "push", "origin", "--", f"{commit}:refs/heads/{branch}"],
                 check=False,
                 capture_output=True,
                 text=True,
