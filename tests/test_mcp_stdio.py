@@ -27,6 +27,8 @@ class McpStdioIntegrationTests(unittest.TestCase):
                     "TITMAS_ACTION_GATE_CALLER_TOKEN": "titmas-demo-caller-token",
                     "TITMAS_ACTION_GATE_APPROVER_TOKEN": "titmas-demo-approver-token",
                     "TITMAS_ACTION_GATE_DEMO_MODE": "true",
+                    "TITMAS_APPROVAL_KEY": "dummy_approval_key_for_testing",
+                    "TITMAS_RECORD_SIGNING_KEY": "dummy_record_key_for_testing",
                 }
             )
             parameters = StdioServerParameters(

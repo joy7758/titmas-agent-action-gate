@@ -55,13 +55,27 @@ class ActionGateService:
         *,
         caller_token: str = "titmas-demo-caller-token",
         approver_token: str = "titmas-demo-approver-token",
+        approval_key: bytes | None = None,
+        record_signing_key: bytes | None = None,
     ) -> ActionGateService:
+        import os
+
+        if approval_key is None:
+            if "TITMAS_APPROVAL_KEY" in os.environ:
+                approval_key = hashlib.sha256(os.environ["TITMAS_APPROVAL_KEY"].encode()).digest()
+            else:
+                raise ValueError("Explicit approval_key or TITMAS_APPROVAL_KEY environment variable is required.")
+        if record_signing_key is None:
+            if "TITMAS_RECORD_SIGNING_KEY" in os.environ:
+                record_signing_key = hashlib.sha256(os.environ["TITMAS_RECORD_SIGNING_KEY"].encode()).digest()
+            else:
+                raise ValueError("Explicit record_signing_key or TITMAS_RECORD_SIGNING_KEY environment variable is required.")
         return cls(
             state_dir,
             caller_token=caller_token,
             approver_token=approver_token,
-            approval_key=hashlib.sha256(b"TITMAS_DEMO_APPROVAL_KEY_NOT_FOR_PRODUCTION").digest(),
-            record_signing_key=hashlib.sha256(b"TITMAS_DEMO_RECORD_KEY_NOT_FOR_PRODUCTION").digest(),
+            approval_key=approval_key,
+            record_signing_key=record_signing_key,
         )
 
     def authenticate(self, caller_token: str) -> None:

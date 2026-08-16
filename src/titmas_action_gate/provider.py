@@ -147,7 +147,7 @@ class GhCliProvider:
             commit = str(parameters["commit"])
             self._validate_branch_push(branch, commit)
             completed = subprocess.run(
-                ["git", "-C", str(worktree), "push", "origin", f"{commit}:refs/heads/{branch}"],
+                ["git", "-C", str(worktree), "push", "origin", "--", f"{commit}:refs/heads/{branch}"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -163,17 +163,25 @@ class GhCliProvider:
         elif action == "github.pull_request.create":
             payload = self._run(
                 [
-                    "--method", "POST", f"repos/{repository}/pulls",
-                    "-f", f"title={parameters['title']}",
-                    "-f", f"head={parameters['head']}",
-                    "-f", f"base={parameters['base']}",
+                    "--method",
+                    "POST",
+                    f"repos/{repository}/pulls",
+                    "-f",
+                    f"title={parameters['title']}",
+                    "-f",
+                    f"head={parameters['head']}",
+                    "-f",
+                    f"base={parameters['base']}",
                 ]
             )
         elif action == "github.pull_request.merge":
             payload = self._run(
                 [
-                    "--method", "PUT", f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
-                    "-f", f"merge_method={parameters['merge_method']}",
+                    "--method",
+                    "PUT",
+                    f"repos/{repository}/pulls/{int(parameters['pull_number'])}/merge",
+                    "-f",
+                    f"merge_method={parameters['merge_method']}",
                 ]
             )
         else:

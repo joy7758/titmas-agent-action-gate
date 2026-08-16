@@ -136,9 +136,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
                 "RequestId": "version-request",
             },
             attachments_payload={
-                "Policies": {
-                    "Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]
-                },
+                "Policies": {"Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]},
                 "RequestId": "attachments-request",
             },
             identity_payload={
@@ -268,16 +266,12 @@ class CloudContextBoundaryTests(unittest.TestCase):
                 self.assertEqual(result.uncertainty, ("RESOURCE_SEARCH_RESPONSE_INVALID_RESOURCES",))
 
     def test_valid_resource_identity_and_type_is_accepted(self) -> None:
-        result = self._resource_search_execution(
-            {"Resources": [{"ResourceId": "i-visible-001", "ResourceType": "ACS::ECS::Instance"}]}
-        )
+        result = self._resource_search_execution({"Resources": [{"ResourceId": "i-visible-001", "ResourceType": "ACS::ECS::Instance"}]})
         self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
         self.assertEqual(result.returned_resource_count, 1)
 
     def test_lower_camel_resource_identity_and_type_are_accepted(self) -> None:
-        result = self._resource_search_execution(
-            {"Resources": [{"resourceId": "i-visible-001", "resourceType": "ACS::ECS::Instance"}]}
-        )
+        result = self._resource_search_execution({"Resources": [{"resourceId": "i-visible-001", "resourceType": "ACS::ECS::Instance"}]})
         self.assertEqual(result.status, "CLOUD_CONTEXT_AVAILABLE")
 
     def test_invalid_canonical_resource_identity_is_not_masked_by_alias(self) -> None:
@@ -357,9 +351,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
             path = Path(tempdir) / "observation.json"
             path.write_text(json.dumps(observation), encoding="utf-8")
             for value in invalid_values:
-                with self.subTest(value=value), self.assertRaisesRegex(
-                    ValueError, "POLICY_OBSERVATION_MAXIMUM_AGE_INVALID"
-                ):
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "POLICY_OBSERVATION_MAXIMUM_AGE_INVALID"):
                     credential_from_policy_observation(
                         "runtime-profile",
                         path,
@@ -477,13 +469,9 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(executor.calls, 0)
 
     def test_historical_policy_observation_is_reviewable_but_release_ineligible(self) -> None:
-        observation = json.loads(
-            (ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8")
-        )
+        observation = json.loads((ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8"))
         validate_contract("alibabacloud_ram_policy_observation_v01", observation)
-        historical = json.loads(
-            (ROOT / "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json").read_text(encoding="utf-8")
-        )["cloud_context"]
+        historical = json.loads((ROOT / "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json").read_text(encoding="utf-8"))["cloud_context"]
         validate_contract("cloud_context_result_v01", historical)
         self.assertFalse(is_semantically_usable_cloud_context(historical))
 
@@ -569,9 +557,7 @@ class CloudContextBoundaryTests(unittest.TestCase):
         self.assertEqual(executor.calls, 0)
 
     def test_relabelled_legacy_observation_is_rejected(self) -> None:
-        observation = json.loads(
-            (ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8")
-        )
+        observation = json.loads((ROOT / "governance/alibabacloud-ram-policy-observation-20260802.json").read_text(encoding="utf-8"))
         observation.update(
             {
                 "$schema": "../schemas/alibabacloud-ram-policy-observation.v0.2.schema.json",
@@ -888,7 +874,7 @@ class CloudContextEvidencePathTests(unittest.TestCase):
         executor = FakeExecutor(available_execution())
         result = CloudContextInspector(ROOT, executor).inspect(request["request_id"], confirmed_query(), credential())
         with tempfile.TemporaryDirectory(prefix="titmas-cloud-evidence-") as state_dir:
-            service = ActionGateService.demo(state_dir)
+            service = ActionGateService.demo(state_dir, approval_key=b"1" * 32, record_signing_key=b"2" * 32)
             service.submit_action_request(request, caller_token="titmas-demo-caller-token", actor="release-steward")
             retained = service.record_cloud_context_preflight(
                 request["request_id"],

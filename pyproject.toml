@@ -13,8 +13,8 @@ authors = [{name = "zhangbin"}]
 dependencies = [
   "agent-evidence[mcp]==0.6.0",
   "jsonschema>=4.25,<5",
-  "PyYAML>=6.0,<7",
-  "rfc8785==0.1.4"
+  "pyyaml>=6.0,<7",
+  "rfc8785==0.1.4",
 ]
 
 [project.scripts]
