@@ -14,11 +14,11 @@ from pathlib import Path
 import yaml
 
 from titmas_action_gate.approval import ApprovalAuthority
-from titmas_action_gate.canonical import sha256_json, utc_now
+from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
-from titmas_action_gate.evidence import AgentEvidenceAdapter
+from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -337,6 +337,36 @@ class PullRequestGateTests(unittest.TestCase):
         self.assertFalse(marker.exists())
         self.assertEqual((output / "receipt.json").read_text(encoding="utf-8"), "do-not-overwrite\n")
 
+
+class MissingEvidenceResultTests(unittest.TestCase):
+    def test_missing_evidence_result(self) -> None:
+        request = {
+            "request_id": "test-req-123",
+            "action": "test-action",
+            "target": {"repository": "test/repo", "resource_type": "pull_request", "resource_ref": "42", "provider": "github"},
+            "parameters_sha256": "abcdef123456",
+        }
+        checked_at = utc_now()
+        result = _missing_evidence_result(request, checked_at=checked_at)
+
+        self.assertEqual(result["schema_version"], "0.1.0")
+        self.assertEqual(result["request_id"], "test-req-123")
+        self.assertEqual(result["request_binding"]["action"], "test-action")
+        self.assertEqual(result["request_binding"]["provider"], "github")
+        self.assertEqual(result["request_binding"]["repository"], "test/repo")
+        self.assertEqual(result["request_binding"]["resource_ref"], "42")
+        self.assertEqual(result["request_binding"]["parameters_sha256"], "abcdef123456")
+        self.assertEqual(result["verifier"]["name"], "agent-evidence")
+        self.assertEqual(result["verifier"]["version"], AGENT_EVIDENCE_VERSION)
+        self.assertEqual(result["verifier"]["distribution_sha256"], AGENT_EVIDENCE_WHEEL_SHA256)
+        self.assertEqual(result["status"], "MISSING")
+        self.assertIsNone(result["bundle_sha256"])
+        self.assertEqual(result["evidence_types"], [])
+        self.assertEqual(result["checks"], [])
+        self.assertEqual(result["verified_at"], format_datetime(checked_at))
+
+
+class CliTests(PullRequestGateTests):
     def test_cli_returns_public_nonzero_exit_code_and_writes_outputs(self) -> None:
         command = self.command(passes=False)
         request = self.request(HEAD_A, command)

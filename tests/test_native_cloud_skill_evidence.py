@@ -25,12 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_PATH = ROOT / "demo/evidence/agentteams-native-alibabacloud-skill-20260802.json"
 FROZEN_HASHES = {
     EVIDENCE_PATH: "9dac679c4045050ae72c6f9d59fa56d5534343e1d1a937bf7cc9e96eb074b1e6",
-    ROOT / "schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json": (
-        "e581574943e6bccbe322afefcc3dad14787b29baae925c3f71eaa6602a880c5c"
-    ),
-    ROOT / "schemas/cloud-context-result.v0.1.schema.json": (
-        "0861b7e60c4faac22f5df079c1c1ca1a153d3b8c2549841efa5c3964d561c3df"
-    ),
+    ROOT / "schemas/native-agentteams-cloud-skill-run-evidence.v0.1.schema.json": ("e581574943e6bccbe322afefcc3dad14787b29baae925c3f71eaa6602a880c5c"),
+    ROOT / "schemas/cloud-context-result.v0.1.schema.json": ("0861b7e60c4faac22f5df079c1c1ca1a153d3b8c2549841efa5c3964d561c3df"),
 }
 
 
@@ -75,9 +71,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
                 "RequestId": "version-request",
             },
             attachments_payload={
-                "Policies": {
-                    "Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]
-                },
+                "Policies": {"Policy": [{"PolicyType": "System", "PolicyName": "AliyunResourceCenterReadOnlyAccess"}]},
                 "RequestId": "attachments-request",
             },
             identity_payload={
@@ -120,9 +114,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
         self.assertIn("WORKER_CREDENTIAL_ROTATION_STATUS_MISMATCH", validate_v02_runtime_bindings(forged_rotation))
 
         unchanged = copy.deepcopy(evidence)
-        unchanged["native_runtime"]["prior_worker_credential_ref"] = unchanged["native_runtime"][
-            "current_worker_credential_ref"
-        ]
+        unchanged["native_runtime"]["prior_worker_credential_ref"] = unchanged["native_runtime"]["current_worker_credential_ref"]
         unchanged["native_runtime"]["prior_worker_credential_rotation_status"] = "VERIFIED_UNCHANGED"
         self.assertIn("WORKER_CREDENTIAL_ROTATION_NOT_VERIFIED", validate_v02_runtime_bindings(unchanged))
 
@@ -156,9 +148,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
         recombined = copy.deepcopy(evidence)
         recombined["permission_observation"]["read_trace"][3]["capture_id"] = "sha256:" + "f" * 64
         recombined["permission_observation_sha256"] = sha256_json(recombined["permission_observation"])
-        self.assertTrue(
-            any(issue.startswith("PERMISSION_OBSERVATION_BINDING:") for issue in validate_v02_runtime_bindings(recombined))
-        )
+        self.assertTrue(any(issue.startswith("PERMISSION_OBSERVATION_BINDING:") for issue in validate_v02_runtime_bindings(recombined)))
 
     def test_native_runner_refuses_to_overwrite_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -303,9 +293,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
 
     def test_trailing_text_after_final_json_fails_closed(self) -> None:
         tampered = copy.deepcopy(self.evidence)
-        tampered["native_runtime"]["response_events"][-1]["body"] += (
-            "\nFinal correction: worker_decision_record_count is 9."
-        )
+        tampered["native_runtime"]["response_events"][-1]["body"] += "\nFinal correction: worker_decision_record_count is 9."
         self.assertIn("WORKER_FINAL_REPORT_NOT_RETAINED", validate(tampered))
 
     def test_response_event_must_match_matrix_trace(self) -> None:
@@ -317,11 +305,7 @@ class NativeCloudSkillEvidenceTests(unittest.TestCase):
 
     def test_any_non_worker_followup_is_counted(self) -> None:
         tampered = copy.deepcopy(self.evidence)
-        final_timestamp = int(
-            tampered["native_runtime"]["matrix_turn_trace"]["observed_message_events_after_baseline"][-1][
-                "origin_server_ts"
-            ]
-        )
+        final_timestamp = int(tampered["native_runtime"]["matrix_turn_trace"]["observed_message_events_after_baseline"][-1]["origin_server_ts"])
         tampered["native_runtime"]["matrix_turn_trace"]["observed_message_events_after_baseline"].append(
             {
                 "event_id": "$other-human-followup",
