@@ -58,10 +58,7 @@ class AgentTeamsWorkflow:
         self.steward = ReleaseSteward()
         self.handoffs = HandoffLog()
 
-    def run(self, *, repository: str, base_time: datetime | None = None) -> dict[str, Any]:
-        observed = base_time or datetime.now(UTC)
-        provider = InMemoryGitHubProvider()
-
+    def _create_and_submit_request(self, repository: str, observed: datetime) -> dict[str, Any]:
         request = self.analyst.analyze(
             action="github.pull_request.create",
             repository=repository,
@@ -73,7 +70,9 @@ class AgentTeamsWorkflow:
         )
         self.handoffs.add("workflow-lead", "request-analyst", request["request_id"], "NORMALIZE_REQUEST", request)
         self.service.submit_action_request(request, caller_token=self.caller_token)
+        return request
 
+    def _process_pre_execution(self, request: dict[str, Any], observed: datetime) -> tuple[dict[str, Any], dict[str, Any]]:
         profile = self.service.generate_evidence_profile(
             request["request_id"],
             actor=self.analyst.agent_id,
@@ -101,15 +100,9 @@ class AgentTeamsWorkflow:
         )
         initial_decision = initial_envelope["payload"]
         self.handoffs.add("workflow-lead", "github-operator", request["request_id"], "EXECUTE_EXACT_ALLOW", initial_decision)
-        execution_receipt = self.operator.execute(
-            self.service,
-            request["request_id"],
-            initial_decision["decision_id"],
-            provider,
-            caller_token=self.caller_token,
-            consumed_at=observed + timedelta(seconds=3),
-        )
+        return evidence_result, initial_decision
 
+    def _process_post_execution(self, repository: str, execution_receipt: dict[str, Any], observed: datetime) -> tuple[dict[str, Any], dict[str, Any]]:
         pull_number = execution_receipt["provider_result"]["result"]["pull_number"]
         release_request = self.steward.build_release_request(
             self.analyst,
@@ -136,6 +129,9 @@ class AgentTeamsWorkflow:
             caller_token=self.caller_token,
         )
         post_evidence = self.verifier.verify(self.service, release_request["request_id"], caller_token=self.caller_token)
+        return release_request, post_evidence
+
+    def _process_approvals(self, release_request: dict[str, Any], observed: datetime) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         before_approval = self.lead.decide(
             self.service,
             release_request["request_id"],
@@ -158,6 +154,26 @@ class AgentTeamsWorkflow:
             caller_token=self.caller_token,
             decided_at=observed + timedelta(seconds=8),
         )["payload"]
+        return before_approval, approval, after_approval
+
+    def run(self, *, repository: str, base_time: datetime | None = None) -> dict[str, Any]:
+        observed = base_time or datetime.now(UTC)
+        provider = InMemoryGitHubProvider()
+
+        request = self._create_and_submit_request(repository, observed)
+        evidence_result, initial_decision = self._process_pre_execution(request, observed)
+
+        execution_receipt = self.operator.execute(
+            self.service,
+            request["request_id"],
+            initial_decision["decision_id"],
+            provider,
+            caller_token=self.caller_token,
+            consumed_at=observed + timedelta(seconds=3),
+        )
+
+        release_request, post_evidence = self._process_post_execution(repository, execution_receipt, observed)
+        before_approval, approval, after_approval = self._process_approvals(release_request, observed)
 
         return {
             "demo_version": "0.2.0",
