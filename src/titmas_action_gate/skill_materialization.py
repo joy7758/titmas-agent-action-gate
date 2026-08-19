@@ -36,55 +36,61 @@ def _zip_info(name: str) -> zipfile.ZipInfo:
     return info
 
 
-def _source_inventory(
-    root: Path,
-    worker: dict[str, Any],
-    *,
-    verify_external_skill_source: bool = True,
-    schema_names: set[str] | None = None,
-) -> tuple[str, list[dict[str, str]], dict[str, bytes]]:
-    if len(worker["skills"]) != 1:
-        raise ActionGateError("SKILL_SCOPE_INVALID", "M4 Worker packages require exactly one repository Skill.")
-    skill_name = worker["skills"][0]
-    skill_root = root / "skills" / skill_name
+def _get_official_skill_version(root: Path, skill_name: str, verify_external_skill_source: bool) -> str:
+    lock_path = root / OFFICIAL_CLOUD_SOURCE_LOCK
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    if lock.get("skill", {}).get("name") != skill_name or not lock.get("skill", {}).get("version_identity"):
+        raise ActionGateError("SKILL_SCOPE_INVALID", f"official Skill source lock identity is invalid: {skill_name}")
+    if verify_external_skill_source:
+        try:
+            CloudContextInspector(root).verify_skill_source()
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            raise ActionGateError("SKILL_DIGEST_MISMATCH", "external official Skill does not match its source lock") from exc
+    return lock["skill"]["version_identity"]
+
+
+def _get_local_skill_version(skill_root: Path, skill_name: str) -> str:
     manifest_path = skill_root / "manifest.json"
     skill_path = skill_root / "SKILL.md"
-    if skill_name == OFFICIAL_CLOUD_SKILL:
-        lock_path = root / OFFICIAL_CLOUD_SOURCE_LOCK
-        lock = json.loads(lock_path.read_text(encoding="utf-8"))
-        if lock.get("skill", {}).get("name") != skill_name or not lock.get("skill", {}).get("version_identity"):
-            raise ActionGateError("SKILL_SCOPE_INVALID", f"official Skill source lock identity is invalid: {skill_name}")
-        if verify_external_skill_source:
-            try:
-                CloudContextInspector(root).verify_skill_source()
-            except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
-                raise ActionGateError("SKILL_DIGEST_MISMATCH", "external official Skill does not match its source lock") from exc
-        skill_version = lock["skill"]["version_identity"]
-    else:
-        if not skill_path.is_file():
-            raise ActionGateError("SKILL_MISSING", f"repository Skill is incomplete: {skill_name}")
-        if not manifest_path.is_file():
-            raise ActionGateError("SKILL_MISSING", f"repository Skill is incomplete: {skill_name}")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if manifest.get("name") != skill_name or not manifest.get("version"):
-            raise ActionGateError("SKILL_SCOPE_INVALID", f"Skill manifest identity is invalid: {skill_name}")
-        skill_version = manifest["version"]
+    if not skill_path.is_file():
+        raise ActionGateError("SKILL_MISSING", f"repository Skill is incomplete: {skill_name}")
+    if not manifest_path.is_file():
+        raise ActionGateError("SKILL_MISSING", f"repository Skill is incomplete: {skill_name}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("name") != skill_name or not manifest.get("version"):
+        raise ActionGateError("SKILL_SCOPE_INVALID", f"Skill manifest identity is invalid: {skill_name}")
+    return manifest["version"]
 
-    contents: dict[str, bytes] = {}
-    files: list[dict[str, str]] = []
-    if skill_name != OFFICIAL_CLOUD_SKILL:
-        for source_path in sorted(path for path in skill_root.rglob("*") if path.is_file()):
-            relative = source_path.relative_to(skill_root).as_posix()
-            package_path = f"skills/{skill_name}/{relative}"
-            data = source_path.read_bytes()
-            contents[package_path] = data
-            files.append(
-                {
-                    "package_path": package_path,
-                    "source_path": source_path.relative_to(root).as_posix(),
-                    "sha256": hashlib.sha256(data).hexdigest(),
-                }
-            )
+
+def _gather_skill_files(
+    root: Path,
+    skill_root: Path,
+    skill_name: str,
+    contents: dict[str, bytes],
+    files: list[dict[str, str]],
+) -> None:
+    if skill_name == OFFICIAL_CLOUD_SKILL:
+        return
+    for source_path in sorted(path for path in skill_root.rglob("*") if path.is_file()):
+        relative = source_path.relative_to(skill_root).as_posix()
+        package_path = f"skills/{skill_name}/{relative}"
+        data = source_path.read_bytes()
+        contents[package_path] = data
+        files.append(
+            {
+                "package_path": package_path,
+                "source_path": source_path.relative_to(root).as_posix(),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
+
+
+def _gather_schema_files(
+    root: Path,
+    schema_names: set[str] | None,
+    contents: dict[str, bytes],
+    files: list[dict[str, str]],
+) -> None:
     for schema_path in sorted((root / "schemas").glob("*.json")):
         if schema_names is not None and schema_path.name not in schema_names:
             continue
@@ -98,6 +104,31 @@ def _source_inventory(
                 "sha256": hashlib.sha256(data).hexdigest(),
             }
         )
+
+
+def _source_inventory(
+    root: Path,
+    worker: dict[str, Any],
+    *,
+    verify_external_skill_source: bool = True,
+    schema_names: set[str] | None = None,
+) -> tuple[str, list[dict[str, str]], dict[str, bytes]]:
+    if len(worker["skills"]) != 1:
+        raise ActionGateError("SKILL_SCOPE_INVALID", "M4 Worker packages require exactly one repository Skill.")
+    skill_name = worker["skills"][0]
+    skill_root = root / "skills" / skill_name
+
+    if skill_name == OFFICIAL_CLOUD_SKILL:
+        skill_version = _get_official_skill_version(root, skill_name, verify_external_skill_source)
+    else:
+        skill_version = _get_local_skill_version(skill_root, skill_name)
+
+    contents: dict[str, bytes] = {}
+    files: list[dict[str, str]] = []
+
+    _gather_skill_files(root, skill_root, skill_name, contents, files)
+    _gather_schema_files(root, schema_names, contents, files)
+
     return skill_version, files, contents
 
 
