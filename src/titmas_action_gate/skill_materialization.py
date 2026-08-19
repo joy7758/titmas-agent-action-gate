@@ -141,12 +141,10 @@ def _attestation(
     }
 
 
-def _agents_markdown(worker: dict[str, Any], skill_name: str) -> bytes:
-    tools = ", ".join(f"`{name}`" for name in worker["mcp_tools"])
-    responsibilities = "\n".join(f"- `{item}`" for item in worker["responsibilities"])
-    cloud_boundary = ""
-    if skill_name == OFFICIAL_CLOUD_SKILL:
-        cloud_boundary = """
+def _get_cloud_boundary_text(skill_name: str) -> str:
+    if skill_name != OFFICIAL_CLOUD_SKILL:
+        return ""
+    return """
 ## Official Alibaba Cloud Skill boundary
 
 The exact upstream Skill remains external to this package and is discovery and
@@ -172,6 +170,12 @@ instructions are outside this Worker assignment.
 - A successful search observes only the configured principal's visible scope. It
   is not a complete inventory or deployment authorization.
 """
+
+
+def _agents_markdown(worker: dict[str, Any], skill_name: str) -> bytes:
+    tools = ", ".join(f"`{name}`" for name in worker["mcp_tools"])
+    responsibilities = "\n".join(f"- `{item}`" for item in worker["responsibilities"])
+    cloud_boundary = _get_cloud_boundary_text(skill_name)
     if skill_name == OFFICIAL_CLOUD_SKILL:
         skill_instruction = "Use the external Skill load tool before acting. The external source lock is authoritative."
     else:
