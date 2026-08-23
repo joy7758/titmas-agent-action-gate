@@ -1,18 +1,18 @@
 import unittest
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
 
 from titmas_action_gate.agents import (
-    HandoffLog,
-    Handoff,
-    RequestAnalyst,
     EvidenceVerifier,
-    WorkflowLead,
     GitHubOperator,
+    HandoffLog,
     ReleaseSteward,
+    RequestAnalyst,
+    WorkflowLead,
 )
-from titmas_action_gate.service import ActionGateService, ExecuteAllowedRequest
 from titmas_action_gate.provider import GitHubProvider
+from titmas_action_gate.service import ActionGateService, ExecuteAllowedRequest
+
 
 class TestAgents(unittest.TestCase):
     def test_handoff_log(self):
@@ -32,7 +32,7 @@ class TestAgents(unittest.TestCase):
     @patch("titmas_action_gate.agents.validate_action_request")
     def test_request_analyst(self, mock_validate):
         analyst = RequestAnalyst()
-        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         req = analyst.analyze(
             action="test.action",
@@ -62,7 +62,7 @@ class TestAgents(unittest.TestCase):
         lead = WorkflowLead()
         mock_service = MagicMock(spec=ActionGateService)
         mock_service.evaluate_action_gate.return_value = {"decision": "allow"}
-        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         result = lead.decide(mock_service, "req-123", caller_token="token123", decided_at=dt)
 
@@ -74,16 +74,9 @@ class TestAgents(unittest.TestCase):
         mock_service = MagicMock(spec=ActionGateService)
         mock_service.execute_allowed.return_value = {"executed": True}
         mock_provider = MagicMock(spec=GitHubProvider)
-        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
-        result = operator.execute(
-            mock_service,
-            "req-123",
-            "dec-123",
-            mock_provider,
-            caller_token="token123",
-            consumed_at=dt
-        )
+        result = operator.execute(mock_service, "req-123", "dec-123", mock_provider, caller_token="token123", consumed_at=dt)
 
         self.assertTrue(mock_service.execute_allowed.called)
         args = mock_service.execute_allowed.call_args[0]
@@ -96,7 +89,7 @@ class TestAgents(unittest.TestCase):
     def test_release_steward(self, mock_validate):
         steward = ReleaseSteward()
         analyst = RequestAnalyst()
-        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
         req = steward.build_release_request(
             analyst,
