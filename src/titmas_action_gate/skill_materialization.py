@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import json
 import re
@@ -72,32 +73,40 @@ def _source_inventory(
 
     contents: dict[str, bytes] = {}
     files: list[dict[str, str]] = []
+
+    def _read_and_hash(path: Path) -> tuple[Path, bytes, str]:
+        data = path.read_bytes()
+        return path, data, hashlib.sha256(data).hexdigest()
+
     if skill_name != OFFICIAL_CLOUD_SKILL:
-        for source_path in sorted(path for path in skill_root.rglob("*") if path.is_file()):
-            relative = source_path.relative_to(skill_root).as_posix()
-            package_path = f"skills/{skill_name}/{relative}"
-            data = source_path.read_bytes()
+        source_paths = sorted(path for path in skill_root.rglob("*") if path.is_file())
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for source_path, data, sha256_hash in executor.map(_read_and_hash, source_paths):
+                relative = source_path.relative_to(skill_root).as_posix()
+                package_path = f"skills/{skill_name}/{relative}"
+                contents[package_path] = data
+                files.append(
+                    {
+                        "package_path": package_path,
+                        "source_path": source_path.relative_to(root).as_posix(),
+                        "sha256": sha256_hash,
+                    }
+                )
+    schema_paths = sorted((root / "schemas").glob("*.json"))
+    if schema_names is not None:
+        schema_paths = [p for p in schema_paths if p.name in schema_names]
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for schema_path, data, sha256_hash in executor.map(_read_and_hash, schema_paths):
+            package_path = f"schemas/{schema_path.name}"
             contents[package_path] = data
             files.append(
                 {
                     "package_path": package_path,
-                    "source_path": source_path.relative_to(root).as_posix(),
-                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "source_path": schema_path.relative_to(root).as_posix(),
+                    "sha256": sha256_hash,
                 }
             )
-    for schema_path in sorted((root / "schemas").glob("*.json")):
-        if schema_names is not None and schema_path.name not in schema_names:
-            continue
-        package_path = f"schemas/{schema_path.name}"
-        data = schema_path.read_bytes()
-        contents[package_path] = data
-        files.append(
-            {
-                "package_path": package_path,
-                "source_path": schema_path.relative_to(root).as_posix(),
-                "sha256": hashlib.sha256(data).hexdigest(),
-            }
-        )
     return skill_version, files, contents
 
 
