@@ -7,6 +7,7 @@ import shlex
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from contextlib import redirect_stdout
 from datetime import timedelta
 from pathlib import Path
@@ -18,7 +19,7 @@ from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, UnsafePathError, _missing_evidence_result, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -336,6 +337,202 @@ class PullRequestGateTests(unittest.TestCase):
         self.assertTrue(trusted_receipt["output_integrity"]["relocated_to_private_directory"])
         self.assertFalse(marker.exists())
         self.assertEqual((output / "receipt.json").read_text(encoding="utf-8"), "do-not-overwrite\n")
+
+    def test_output_path_symlink_not_allowed(self) -> None:
+        output_real = self.root / "real-output"
+        output_real.mkdir()
+        output_symlink = self.root / "symlink-output"
+        os.symlink(output_real, output_symlink)
+
+        command = self.command()
+        request = self.request(HEAD_A, command)
+        task = self.write_task(request, "symlink-task.json")
+        evidence = self.write_evidence(request, "symlink-evidence.json")
+
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output_symlink,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+
+        self.assertEqual(result["state"], "FAIL")
+        self.assertIn("OUTPUT_PATH_SYMLINK_NOT_ALLOWED", result["reason_codes"])
+
+    def test_output_mutation_relocated(self) -> None:
+        output = self.root / "mutated-output"
+
+        command = [sys.executable, "-c", f"import os; import sys; open({str(output / 'receipt.json')!r}, 'w').write('mutated'); sys.exit(0)"]
+
+        request = self.request(HEAD_A, command)
+        task = self.write_task(request, "mutated-task.json")
+        evidence = self.write_evidence(request, "mutated-evidence.json")
+
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+
+        trusted_receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+        self.assertEqual(trusted_receipt["decision"]["outcome"], "BLOCK")
+        self.assertEqual(result["state"], "FAIL")
+        self.assertTrue(trusted_receipt["output_integrity"]["mutated_during_test"])
+        self.assertEqual(trusted_receipt["output_integrity"]["mutation_reason"], "RESERVED_OUTPUT_CONTENT_MUTATED")
+
+    def test_output_identity_relocated(self) -> None:
+        output = self.root / "identity-output"
+
+        command = [
+            sys.executable,
+            "-c",
+            f"import os; import sys; os.remove({str(output / 'receipt.json')!r}); open({str(output / 'receipt.json')!r}, 'w').write('{{}}'); sys.exit(0)",
+        ]
+
+        request = self.request(HEAD_A, command)
+        task = self.write_task(request, "identity-task.json")
+        evidence = self.write_evidence(request, "identity-evidence.json")
+
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+
+        trusted_receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+        self.assertEqual(trusted_receipt["decision"]["outcome"], "BLOCK")
+        self.assertEqual(result["state"], "FAIL")
+        self.assertTrue(trusted_receipt["output_integrity"]["mutated_during_test"])
+        self.assertEqual(trusted_receipt["output_integrity"]["mutation_reason"], "RESERVED_OUTPUT_IDENTITY_CHANGED")
+
+    def test_output_private_reserve_exhausted(self) -> None:
+        with unittest.mock.patch("titmas_action_gate.pr_gate.ExclusiveOutput") as mock_exclusive_output:
+            mock_exclusive_output.side_effect = FileExistsError("mocked")
+
+            command = self.command()
+            request = self.request(HEAD_A, command)
+            task = self.write_task(request, "exhaust-task.json")
+            evidence = self.write_evidence(request, "exhaust-evidence.json")
+
+            with self.assertRaises(UnsafePathError):
+                verify_pull_request(
+                    task_path=task,
+                    evidence_path=evidence,
+                    policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+                    test_command=shlex.join(command),
+                    output_directory=self.root / "exhaust",
+                    repository=REPOSITORY,
+                    pull_request=PULL_REQUEST,
+                    head_sha=HEAD_A,
+                    execution_identity=EXECUTION_IDENTITY,
+                    environment={},
+                )
+
+    def test_reserve_summary_fails(self) -> None:
+        class MockExclusiveOutput:
+            def __init__(self, path, expected_ancestor_identities=None):
+                if path.name == "summary.md":
+                    raise RuntimeError("mocked failure")
+                self.path = path
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        with unittest.mock.patch("titmas_action_gate.pr_gate.ExclusiveOutput", new=MockExclusiveOutput):
+            command = self.command()
+            request = self.request(HEAD_A, command)
+            task = self.write_task(request, "exhaust-task.json")
+            evidence = self.write_evidence(request, "exhaust-evidence.json")
+
+            with self.assertRaises(RuntimeError):
+                verify_pull_request(
+                    task_path=task,
+                    evidence_path=evidence,
+                    policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+                    test_command=shlex.join(command),
+                    output_directory=self.root / "exhaust2",
+                    repository=REPOSITORY,
+                    pull_request=PULL_REQUEST,
+                    head_sha=HEAD_A,
+                    execution_identity=EXECUTION_IDENTITY,
+                    environment={},
+                )
+
+    def test_output_path_reserve_fails(self) -> None:
+        output_real = self.root / "real-output"
+        output_real.mkdir()
+        (output_real / "receipt.json").write_text("x")
+
+        command = self.command()
+        request = self.request(HEAD_A, command)
+        task = self.write_task(request, "fail-task.json")
+        evidence = self.write_evidence(request, "fail-evidence.json")
+
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output_real,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+
+        self.assertEqual(result["state"], "FAIL")
+
+    def test_output_preflight_unsafe_path_error(self) -> None:
+        class MockExclusiveOutput2:
+            def __init__(self, path, expected_ancestor_identities=None):
+                raise UnsafePathError("mocked_unsafe_path")
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        with unittest.mock.patch("titmas_action_gate.pr_gate.ExclusiveOutput", new=MockExclusiveOutput2):
+            command = self.command()
+            request = self.request(HEAD_A, command)
+            task = self.write_task(request, "exhaust-task.json")
+            evidence = self.write_evidence(request, "exhaust-evidence.json")
+
+            with self.assertRaises(UnsafePathError):
+                verify_pull_request(
+                    task_path=task,
+                    evidence_path=evidence,
+                    policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+                    test_command=shlex.join(command),
+                    output_directory=self.root / "exhaust3",
+                    repository=REPOSITORY,
+                    pull_request=PULL_REQUEST,
+                    head_sha=HEAD_A,
+                    execution_identity=EXECUTION_IDENTITY,
+                    environment={},
+                )
 
 
 class MissingEvidenceResultTests(unittest.TestCase):
