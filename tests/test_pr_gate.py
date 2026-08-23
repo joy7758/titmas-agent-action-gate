@@ -16,9 +16,10 @@ import yaml
 from titmas_action_gate.approval import ApprovalAuthority
 from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
+from titmas_action_gate.errors import ActionGateError
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, FrozenJsonInput, _missing_evidence_result, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -336,6 +337,65 @@ class PullRequestGateTests(unittest.TestCase):
         self.assertTrue(trusted_receipt["output_integrity"]["relocated_to_private_directory"])
         self.assertFalse(marker.exists())
         self.assertEqual((output / "receipt.json").read_text(encoding="utf-8"), "do-not-overwrite\n")
+
+
+class FrozenJsonInputTests(unittest.TestCase):
+    def test_payload_none(self) -> None:
+        input_obj = FrozenJsonInput(
+            role="test",
+            path=Path("test"),
+            reference="test",
+            raw_bytes=None,
+            canonical_bytes=None,
+            sha256=None,
+            canonical_sha256=None,
+            device=None,
+            inode=None,
+            missing=False,
+            allowed_root=None,
+            ancestor_identities=(),
+        )
+        self.assertEqual(input_obj.payload(), {})
+
+    def test_payload_valid_dict(self) -> None:
+        data = {"key": "value"}
+        canonical_bytes = json.dumps(data).encode("utf-8")
+        input_obj = FrozenJsonInput(
+            role="test",
+            path=Path("test"),
+            reference="test",
+            raw_bytes=None,
+            canonical_bytes=canonical_bytes,
+            sha256=None,
+            canonical_sha256=None,
+            device=None,
+            inode=None,
+            missing=False,
+            allowed_root=None,
+            ancestor_identities=(),
+        )
+        self.assertEqual(input_obj.payload(), data)
+
+    def test_payload_invalid_type(self) -> None:
+        data = ["not", "a", "dict"]  # type: ignore
+        canonical_bytes = json.dumps(data).encode("utf-8")
+        input_obj = FrozenJsonInput(
+            role="test",
+            path=Path("test"),
+            reference="test",
+            raw_bytes=None,
+            canonical_bytes=canonical_bytes,
+            sha256=None,
+            canonical_sha256=None,
+            device=None,
+            inode=None,
+            missing=False,
+            allowed_root=None,
+            ancestor_identities=(),
+        )
+        with self.assertRaises(ActionGateError) as cm:
+            input_obj.payload()
+        self.assertEqual(cm.exception.code, "JSON_ROOT_NOT_OBJECT")
 
 
 class MissingEvidenceResultTests(unittest.TestCase):
