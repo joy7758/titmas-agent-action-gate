@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -12,6 +13,17 @@ from typing import Any
 from .canonical import sha256_file
 from .cloud_context import EXTERNAL_SKILL_PATH_REFERENCE, CloudContextInspector
 from .errors import ActionGateError
+
+
+@dataclasses.dataclass
+class VerifyContext:
+    expected_worker: str
+    expected_version: str
+    workers: dict[str, Any]
+    runtime: str
+    expected_source_commit: str | None = None
+    expected_model: str | None = None
+
 
 PACKAGE_SCHEMA_VERSION = "0.1.0"
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
@@ -317,26 +329,21 @@ def _verify_package_structure(archive: zipfile.ZipFile, expected_hashes: dict[st
 
 def _verify_package_attestation(
     attestation: dict[str, Any],
-    expected_worker: str,
-    expected_version: str,
-    workers: dict[str, Any],
-    runtime: str,
-    expected_source_commit: str | None = None,
-    expected_model: str | None = None,
+    context: VerifyContext,
 ) -> tuple[str, str]:
-    if attestation.get("worker_id") != expected_worker:
+    if attestation.get("worker_id") != context.expected_worker:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package attestation identity does not match.")
-    if attestation.get("skill") != {"name": workers[expected_worker]["skills"][0], "version": expected_version}:
+    if attestation.get("skill") != {"name": context.workers[context.expected_worker]["skills"][0], "version": context.expected_version}:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package Skill name or version does not match the registry source.")
     source_commit = attestation.get("source_commit")
     model = attestation.get("model")
-    if expected_source_commit is not None and source_commit != expected_source_commit:
+    if context.expected_source_commit is not None and source_commit != context.expected_source_commit:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit does not match the requested source commit.")
-    if expected_model is not None and model != expected_model:
+    if context.expected_model is not None and model != context.expected_model:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package model does not match the requested model.")
     if not isinstance(source_commit, str) or not _VALID_SOURCE_COMMIT.fullmatch(source_commit):
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package source commit is not exact.")
-    if not isinstance(model, str) or not model or "preview" in model.lower() or attestation.get("runtime") != runtime:
+    if not isinstance(model, str) or not model or "preview" in model.lower() or attestation.get("runtime") != context.runtime:
         raise ActionGateError("SKILL_SCOPE_INVALID", "Worker package runtime or model contract is invalid.")
     return source_commit, model
 
@@ -413,12 +420,14 @@ def verify_worker_package(
         attestation = json.loads(archive.read("skill-attestation.json"))
         source_commit, model = _verify_package_attestation(
             attestation,
-            expected_worker,
-            expected_version,
-            workers,
-            runtime,
-            expected_source_commit,
-            expected_model,
+            VerifyContext(
+                expected_worker=expected_worker,
+                expected_version=expected_version,
+                workers=workers,
+                runtime=runtime,
+                expected_source_commit=expected_source_commit,
+                expected_model=expected_model,
+            ),
         )
         _verify_package_hashes(archive, attestation, expected_hashes)
         package_manifest = _verify_package_control_files(
