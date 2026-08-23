@@ -10,6 +10,7 @@ import unittest
 from contextlib import redirect_stdout
 from datetime import timedelta
 from pathlib import Path
+from unittest import mock
 
 import yaml
 
@@ -17,9 +18,8 @@ from titmas_action_gate.approval import ApprovalAuthority
 from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
-from unittest import mock
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request, resolve_pull_request_context
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, resolve_pull_request_context, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
