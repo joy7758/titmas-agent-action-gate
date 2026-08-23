@@ -109,7 +109,7 @@ class NativeRuntimeMcp:
                 },
             }
 
-    def _register_tools(self) -> None:
+    def _register_core_tools(self) -> None:
         @self.mcp.tool(description="Submit one request bound to the authenticated Worker and exact native run scope.")
         def submit_action_request(action_request: dict[str, Any], runtime_scope: dict[str, Any]) -> dict[str, Any]:
             def operation() -> dict[str, Any]:
@@ -171,6 +171,44 @@ class NativeRuntimeMcp:
 
             return self._call(operation)
 
+        @self.mcp.tool(description="Attach an immutable profile reference within the exact native request scope.")
+        def attach_evidence(
+            request_id: str,
+            runtime_scope: dict[str, Any],
+            profile_path: str,
+            evidence_types: list[str],
+        ) -> dict[str, Any]:
+            def operation() -> dict[str, Any]:
+                principal = self._principal()
+                scope = self.admission.admit_request(principal, "attach_evidence", runtime_scope, request_id)
+                record = self.service.attach_evidence(
+                    request_id,
+                    profile_path,
+                    evidence_types,
+                    caller_token=self.caller_token,
+                    actor=principal.principal_id,
+                )
+                self.admission.record_allowed(principal, "attach_evidence", scope, request_id=request_id, business_state_delta=1)
+                return record
+
+            return self._call(operation)
+
+        @self.mcp.tool(description="Invoke pinned agent-evidence after immutable attachment and subject binding checks.")
+        def verify_evidence(request_id: str, runtime_scope: dict[str, Any]) -> dict[str, Any]:
+            def operation() -> dict[str, Any]:
+                principal = self._principal()
+                scope = self.admission.admit_request(principal, "verify_evidence", runtime_scope, request_id)
+                result = self.service.verify_evidence(
+                    request_id,
+                    caller_token=self.caller_token,
+                    actor=principal.principal_id,
+                )
+                self.admission.record_allowed(principal, "verify_evidence", scope, request_id=request_id, business_state_delta=1)
+                return result
+
+            return self._call(operation)
+
+    def _register_cloud_tools(self) -> None:
         @self.mcp.tool(
             description=(
                 "Resolve and SHA-256 verify the source-locked external Alibaba Cloud Skill, then retain one minimal "
@@ -263,43 +301,7 @@ class NativeRuntimeMcp:
 
             return self._call(operation)
 
-        @self.mcp.tool(description="Attach an immutable profile reference within the exact native request scope.")
-        def attach_evidence(
-            request_id: str,
-            runtime_scope: dict[str, Any],
-            profile_path: str,
-            evidence_types: list[str],
-        ) -> dict[str, Any]:
-            def operation() -> dict[str, Any]:
-                principal = self._principal()
-                scope = self.admission.admit_request(principal, "attach_evidence", runtime_scope, request_id)
-                record = self.service.attach_evidence(
-                    request_id,
-                    profile_path,
-                    evidence_types,
-                    caller_token=self.caller_token,
-                    actor=principal.principal_id,
-                )
-                self.admission.record_allowed(principal, "attach_evidence", scope, request_id=request_id, business_state_delta=1)
-                return record
-
-            return self._call(operation)
-
-        @self.mcp.tool(description="Invoke pinned agent-evidence after immutable attachment and subject binding checks.")
-        def verify_evidence(request_id: str, runtime_scope: dict[str, Any]) -> dict[str, Any]:
-            def operation() -> dict[str, Any]:
-                principal = self._principal()
-                scope = self.admission.admit_request(principal, "verify_evidence", runtime_scope, request_id)
-                result = self.service.verify_evidence(
-                    request_id,
-                    caller_token=self.caller_token,
-                    actor=principal.principal_id,
-                )
-                self.admission.record_allowed(principal, "verify_evidence", scope, request_id=request_id, business_state_delta=1)
-                return result
-
-            return self._call(operation)
-
+    def _register_evaluation_tools(self) -> None:
         @self.mcp.tool(description="Compute the sole deterministic ALLOW, BLOCK, or REQUIRE_APPROVAL decision.")
         def evaluate_action_gate(request_id: str, runtime_scope: dict[str, Any]) -> dict[str, Any]:
             def operation() -> dict[str, Any]:
@@ -381,6 +383,11 @@ class NativeRuntimeMcp:
                 return result
 
             return self._call(operation)
+
+    def _register_tools(self) -> None:
+        self._register_core_tools()
+        self._register_cloud_tools()
+        self._register_evaluation_tools()
 
 
 def configured_runtime_host() -> str:
