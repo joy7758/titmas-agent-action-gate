@@ -58,22 +58,9 @@ class AgentTeamsWorkflow:
         self.steward = ReleaseSteward()
         self.handoffs = HandoffLog()
 
-    def run(self, *, repository: str, base_time: datetime | None = None) -> dict[str, Any]:
-        observed = base_time or datetime.now(UTC)
-        provider = InMemoryGitHubProvider()
-
-        request = self.analyst.analyze(
-            action="github.pull_request.create",
-            repository=repository,
-            resource_ref="refs/heads/docs-demo",
-            parameters={"base": "main", "head": "docs-demo", "title": "Document the Action Gate demo"},
-            evidence_requirements=["SOURCE_PIN", "DIFF", "TEST_RESULT"],
-            uncertainty=["Provider execution is sandboxed; no external GitHub write is claimed."],
-            created_at=observed,
-        )
-        self.handoffs.add("workflow-lead", "request-analyst", request["request_id"], "NORMALIZE_REQUEST", request)
-        self.service.submit_action_request(request, caller_token=self.caller_token)
-
+    def _run_pre_execution_phase(
+        self, request: dict[str, Any], provider: InMemoryGitHubProvider, observed: datetime
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         profile = self.service.generate_evidence_profile(
             request["request_id"],
             actor=self.analyst.agent_id,
@@ -109,7 +96,11 @@ class AgentTeamsWorkflow:
             caller_token=self.caller_token,
             consumed_at=observed + timedelta(seconds=3),
         )
+        return evidence_result, initial_decision, execution_receipt
 
+    def _run_post_execution_phase(
+        self, repository: str, execution_receipt: dict[str, Any], observed: datetime
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
         pull_number = execution_receipt["provider_result"]["result"]["pull_number"]
         release_request = self.steward.build_release_request(
             self.analyst,
@@ -158,6 +149,26 @@ class AgentTeamsWorkflow:
             caller_token=self.caller_token,
             decided_at=observed + timedelta(seconds=8),
         )["payload"]
+        return release_request, post_evidence, before_approval, approval, after_approval
+
+    def run(self, *, repository: str, base_time: datetime | None = None) -> dict[str, Any]:
+        observed = base_time or datetime.now(UTC)
+        provider = InMemoryGitHubProvider()
+
+        request = self.analyst.analyze(
+            action="github.pull_request.create",
+            repository=repository,
+            resource_ref="refs/heads/docs-demo",
+            parameters={"base": "main", "head": "docs-demo", "title": "Document the Action Gate demo"},
+            evidence_requirements=["SOURCE_PIN", "DIFF", "TEST_RESULT"],
+            uncertainty=["Provider execution is sandboxed; no external GitHub write is claimed."],
+            created_at=observed,
+        )
+        self.handoffs.add("workflow-lead", "request-analyst", request["request_id"], "NORMALIZE_REQUEST", request)
+        self.service.submit_action_request(request, caller_token=self.caller_token)
+
+        evidence_result, initial_decision, execution_receipt = self._run_pre_execution_phase(request, provider, observed)
+        release_request, post_evidence, before_approval, approval, after_approval = self._run_post_execution_phase(repository, execution_receipt, observed)
 
         return {
             "demo_version": "0.2.0",

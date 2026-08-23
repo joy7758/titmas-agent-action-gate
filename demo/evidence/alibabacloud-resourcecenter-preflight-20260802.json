@@ -11,7 +11,7 @@
     "workspace_manifest_sha256": "d564bc598d926b6c99a5d7d2fce95e6089f01b3460050614613a83339ebf5d3f",
     "runner_sha256": "c6890bb7865bbf0fab7baac42cc79806a0eabf92e51bcf41f8279cfb88347aaa",
     "adapter_sha256": "b93d95d26216642885f0bbe03ff8ecf5ebb37227dbf10f9bc72556e3a0e73d54",
-    "service_sha256": "e0190996a1d36f65d4833adaeb0d3177fdcbac81dd0fb778507d15e68df7fc7a",
+    "service_sha256": "2f2aa7204dfcbc9439c58dc75e921aad519df643f6f8f5f12c970b9bc4fdbfed",
     "evidence_adapter_sha256": "b053abb012afb339c947afe186940b8588ffd992710436db6b37684601e91603",
     "public_evidence_validator_sha256": "7a726d09b3b29ff8d47717303d3e620c37a4245a903806840df8963252b9cb87",
     "result_schema_sha256": "0861b7e60c4faac22f5df079c1c1ca1a153d3b8c2549841efa5c3964d561c3df",
