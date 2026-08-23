@@ -85,9 +85,14 @@ def _source_inventory(
                     "sha256": hashlib.sha256(data).hexdigest(),
                 }
             )
-    for schema_path in sorted((root / "schemas").glob("*.json")):
-        if schema_names is not None and schema_path.name not in schema_names:
-            continue
+    schema_dir = root / "schemas"
+    if schema_names is not None:
+        schema_paths = (schema_dir / name for name in schema_names)
+        schema_paths = (p for p in schema_paths if p.is_file() and p.suffix == ".json")
+    else:
+        schema_paths = schema_dir.glob("*.json")
+
+    for schema_path in sorted(schema_paths, key=lambda p: p.name):
         package_path = f"schemas/{schema_path.name}"
         data = schema_path.read_bytes()
         contents[package_path] = data
