@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import json
 import re
@@ -34,6 +35,23 @@ def _zip_info(name: str) -> zipfile.ZipInfo:
     info.create_system = 3
     info.external_attr = 0o100644 << 16
     return info
+
+
+def _process_schema(schema_path: Path, root_path_str: str) -> tuple[str, str, str, bytes, str]:
+    data = schema_path.read_bytes()
+    name = schema_path.name
+    # Avoid reconstructing the root Path object per file in the worker for relative_to performance
+    return (
+        name,
+        f"schemas/{name}",
+        schema_path.relative_to(Path(root_path_str)).as_posix(),
+        data,
+        hashlib.sha256(data).hexdigest()
+    )
+
+
+def _process_chunk(chunk: list[Path], root_path_str: str) -> list[tuple[str, str, str, bytes, str]]:
+    return [_process_schema(p, root_path_str) for p in chunk]
 
 
 def _source_inventory(
@@ -92,17 +110,25 @@ def _source_inventory(
     else:
         schema_paths = list(schema_dir.glob("*.json"))
 
-    for schema_path in sorted(schema_paths, key=lambda p: p.name):
-        package_path = f"schemas/{schema_path.name}"
-        data = schema_path.read_bytes()
-        contents[package_path] = data
-        files.append(
-            {
-                "package_path": package_path,
-                "source_path": schema_path.relative_to(root).as_posix(),
-                "sha256": hashlib.sha256(data).hexdigest(),
-            }
-        )
+    if schema_paths:
+        root_path_str = str(root)
+        chunk_size = max(1, len(schema_paths) // 4)
+        chunks = [schema_paths[i:i + chunk_size] for i in range(0, len(schema_paths), chunk_size)]
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            chunk_results = list(executor.map(_process_chunk, chunks, [root_path_str]*len(chunks)))
+
+        results = [item for chunk in chunk_results for item in chunk]
+
+        for _, package_path, source_path, data, sha256_hash in sorted(results, key=lambda x: x[0]):
+            contents[package_path] = data
+            files.append(
+                {
+                    "package_path": package_path,
+                    "source_path": source_path,
+                    "sha256": sha256_hash,
+                }
+            )
 
     return skill_version, files, contents
 
