@@ -17,8 +17,9 @@ from titmas_action_gate.approval import ApprovalAuthority
 from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
+from unittest import mock
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request, resolve_pull_request_context
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -400,6 +401,80 @@ class CliTests(PullRequestGateTests):
         self.assertEqual(raised.exception.code, PUBLIC_EXIT_CODES["FAIL"])
         self.assertTrue((output / "receipt.json").is_file())
         self.assertTrue((output / "summary.md").is_file())
+
+
+class ResolvePullRequestContextTests(unittest.TestCase):
+    def test_explicit_arguments(self):
+        context = resolve_pull_request_context(
+            repository="repo",
+            pull_request=123,
+            head_sha="sha",
+            execution_identity="identity",
+            environment={}
+        )
+        self.assertEqual(context.repository, "repo")
+        self.assertEqual(context.pull_request, 123)
+        self.assertEqual(context.head_sha, "sha")
+        self.assertEqual(context.execution_identity, "identity")
+
+    def test_environment_variables_titmas_precedence(self):
+        env = {
+            "TITMAS_CURRENT_REPOSITORY": "env_repo",
+            "GITHUB_REPOSITORY": "gh_repo",
+            "TITMAS_CURRENT_PULL_REQUEST": "456",
+            "TITMAS_CURRENT_HEAD_SHA": "env_sha",
+            "GITHUB_SHA": "gh_sha",
+            "TITMAS_EXECUTION_IDENTITY": "env_identity",
+        }
+        context = resolve_pull_request_context(environment=env)
+        self.assertEqual(context.repository, "env_repo")
+        self.assertEqual(context.pull_request, 456)
+        self.assertEqual(context.head_sha, "env_sha")
+        self.assertEqual(context.execution_identity, "env_identity")
+
+    def test_environment_variables_github_fallback(self):
+        env = {
+            "GITHUB_REPOSITORY": "gh_repo",
+            "GITHUB_SHA": "gh_sha",
+        }
+        context = resolve_pull_request_context(environment=env)
+        self.assertEqual(context.repository, "gh_repo")
+        self.assertIsNone(context.pull_request)
+        self.assertEqual(context.head_sha, "gh_sha")
+        self.assertEqual(context.execution_identity, "")
+
+    def test_github_event_path_pull_request(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            event_path = Path(tempdir) / "event.json"
+            event_path.write_text(json.dumps({"pull_request": {"number": 789}}))
+            env = {
+                "GITHUB_EVENT_PATH": str(event_path)
+            }
+            context = resolve_pull_request_context(environment=env)
+            self.assertEqual(context.pull_request, 789)
+
+    def test_invalid_titmas_current_pull_request(self):
+        env = {
+            "TITMAS_CURRENT_PULL_REQUEST": "not-a-number",
+            "GITHUB_EVENT_PATH": "/nonexistent"
+        }
+        context = resolve_pull_request_context(environment=env)
+        self.assertIsNone(context.pull_request)
+
+    def test_invalid_github_event_path_pull_request(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            event_path = Path(tempdir) / "event.json"
+            event_path.write_text(json.dumps({"pull_request": {"number": "not-a-number"}}))
+            env = {
+                "GITHUB_EVENT_PATH": str(event_path)
+            }
+            context = resolve_pull_request_context(environment=env)
+            self.assertIsNone(context.pull_request)
+
+    def test_missing_environment_defaults_to_os_environ(self):
+        with mock.patch.dict(os.environ, {"TITMAS_CURRENT_REPOSITORY": "os_repo"}, clear=True):
+            context = resolve_pull_request_context()
+            self.assertEqual(context.repository, "os_repo")
 
 
 if __name__ == "__main__":
