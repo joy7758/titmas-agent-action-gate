@@ -352,29 +352,16 @@ def _verify_package_hashes(archive: zipfile.ZipFile, attestation: dict[str, Any]
 
 def _verify_package_control_files(
     archive: zipfile.ZipFile,
-    workers: dict[str, Any],
-    expected_worker: str,
-    source_commit: str,
-    model: str,
-    runtime: str,
-    expected_version: str,
-    expected_files: list[dict[str, str]],
+    worker: dict[str, Any],
+    expected_manifest: dict[str, Any],
+    expected_attestation: dict[str, Any],
 ) -> dict[str, Any]:
     package_manifest = json.loads(archive.read("manifest.json"))
-    expected_manifest = _package_manifest(workers[expected_worker], source_commit=source_commit, model=model, runtime=runtime)
-    expected_attestation = _attestation(
-        workers[expected_worker],
-        source_commit=source_commit,
-        model=model,
-        runtime=runtime,
-        skill_version=expected_version,
-        source_files=expected_files,
-    )
     expected_special = {
         "manifest.json": _json_bytes(expected_manifest),
         "skill-attestation.json": _json_bytes(expected_attestation),
-        "config/AGENTS.md": _agents_markdown(workers[expected_worker], workers[expected_worker]["skills"][0]),
-        "config/SOUL.md": _soul_markdown(workers[expected_worker]),
+        "config/AGENTS.md": _agents_markdown(worker, worker["skills"][0]),
+        "config/SOUL.md": _soul_markdown(worker),
     }
     if any(archive.read(name) != data for name, data in expected_special.items()):
         raise ActionGateError("SKILL_DIGEST_MISMATCH", "Worker package control files do not match deterministic source.")
@@ -421,15 +408,22 @@ def verify_worker_package(
             expected_model,
         )
         _verify_package_hashes(archive, attestation, expected_hashes)
+
+        expected_manifest = _package_manifest(workers[expected_worker], source_commit=source_commit, model=model, runtime=runtime)
+        expected_attestation = _attestation(
+            workers[expected_worker],
+            source_commit=source_commit,
+            model=model,
+            runtime=runtime,
+            skill_version=expected_version,
+            source_files=expected_files,
+        )
+
         package_manifest = _verify_package_control_files(
             archive,
-            workers,
-            expected_worker,
-            source_commit,
-            model,
-            runtime,
-            expected_version,
-            expected_files,
+            workers[expected_worker],
+            expected_manifest,
+            expected_attestation,
         )
 
     skill_name = workers[expected_worker]["skills"][0]
