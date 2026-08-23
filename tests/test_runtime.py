@@ -12,6 +12,7 @@ from titmas_action_gate.runtime import (
     agent_registry_path,
 )
 
+
 class RuntimeTests(unittest.TestCase):
     def test_agent_registry_path_configured(self) -> None:
         with tempfile.NamedTemporaryFile() as tmp:
@@ -24,9 +25,11 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(path.is_file())
 
     def test_agent_registry_path_not_found(self) -> None:
-        with patch("pathlib.Path.is_file", return_value=False):
-            with self.assertRaisesRegex(ValueError, "agents/registry.json is required for native runtime admission"):
-                agent_registry_path()
+        with (
+            patch("pathlib.Path.is_file", return_value=False),
+            self.assertRaisesRegex(ValueError, "agents/registry.json is required for native runtime admission"),
+        ):
+            agent_registry_path()
 
     def test_runtime_principal(self) -> None:
         principal = RuntimePrincipal(
@@ -72,6 +75,7 @@ class RuntimeTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "must be at least 24 characters"):
             RuntimePrincipalRegistry(credentials)
+
 
 if __name__ == "__main__":
     unittest.main()
