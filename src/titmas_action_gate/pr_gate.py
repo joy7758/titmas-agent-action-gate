@@ -2024,6 +2024,76 @@ def _evaluate_pull_request(
     return receipt, result
 
 
+def _abort_reserved(reserved: ExclusiveOutput | None) -> None:
+    if reserved is not None:
+        reserved.__exit__(RuntimeError, RuntimeError("OUTPUT_RESERVATION_ABORTED"), None)
+
+
+def _reserve_outputs(
+    directory: Path,
+    expected_ancestor_identities: tuple[tuple[str, int, int], ...] | None = None,
+) -> tuple[ExclusiveOutput, ExclusiveOutput]:
+    first = ExclusiveOutput(
+        directory / "receipt.json",
+        expected_ancestor_identities=expected_ancestor_identities,
+    )
+    try:
+        second = ExclusiveOutput(
+            directory / "summary.md",
+            expected_ancestor_identities=expected_ancestor_identities,
+        )
+    except Exception:
+        _abort_reserved(first)
+        raise
+    return first, second
+
+
+def _reserve_private_outputs() -> tuple[Path, ExclusiveOutput, ExclusiveOutput]:
+    for _attempt in range(8):
+        private_directory, private_identities = _private_output_directory()
+        try:
+            first, second = _reserve_outputs(private_directory, private_identities)
+        except (FileExistsError, OSError, RuntimeError, UnsafePathError):
+            continue
+        return private_directory, first, second
+    raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
+
+
+def _prepare_outputs(output_directory: str | Path) -> tuple[Path, Path, ExclusiveOutput, ExclusiveOutput, bool, str]:
+    raw_output = Path(output_directory).expanduser()
+    output_path_syntax_safe = bool(str(raw_output)) and not any(part in {".", ".."} for part in raw_output.parts)
+    requested_output = Path(os.path.abspath(raw_output)) if output_path_syntax_safe else Path(os.path.abspath("artifacts/titmas"))
+    output = requested_output
+    receipt_output: ExclusiveOutput | None = None
+    summary_output: ExclusiveOutput | None = None
+    output_preflight_reason = "GATE_OUTPUT_PATH_PREEXISTED"
+    output_preflight_safe = output_path_syntax_safe and not _path_has_symlink_component(requested_output)
+    if not output_preflight_safe:
+        output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
+
+    if output_preflight_safe:
+        try:
+            receipt_output, summary_output = _reserve_outputs(output)
+        except UnsafePathError:
+            output_preflight_safe = False
+            output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
+        except (FileExistsError, OSError, RuntimeError):
+            output_preflight_safe = False
+    if not output_preflight_safe:
+        output, receipt_output, summary_output = _reserve_private_outputs()
+
+    assert receipt_output is not None and summary_output is not None
+    return requested_output, output, receipt_output, summary_output, output_preflight_safe, output_preflight_reason
+
+
+def _output_integrity_state(receipt_output: ExclusiveOutput, summary_output: ExclusiveOutput) -> str:
+    if not receipt_output._path_is_reserved_inode() or not summary_output._path_is_reserved_inode():
+        return "IDENTITY_CHANGED"
+    if not receipt_output.pristine() or not summary_output.pristine():
+        return "CONTENT_MUTATED"
+    return "PRISTINE"
+
+
 def verify_pull_request(
     *,
     task_path: str | Path,
@@ -2043,68 +2113,10 @@ def verify_pull_request(
 ) -> dict[str, Any]:
     """Run one bounded PR verification and create its receipt and summary once."""
 
-    raw_output = Path(output_directory).expanduser()
-    output_path_syntax_safe = bool(str(raw_output)) and not any(part in {".", ".."} for part in raw_output.parts)
-    requested_output = Path(os.path.abspath(raw_output)) if output_path_syntax_safe else Path(os.path.abspath("artifacts/titmas"))
-    output = requested_output
-    receipt_output: ExclusiveOutput | None = None
-    summary_output: ExclusiveOutput | None = None
-    output_preflight_reason = "GATE_OUTPUT_PATH_PREEXISTED"
-    output_preflight_safe = output_path_syntax_safe and not _path_has_symlink_component(requested_output)
-    if not output_preflight_safe:
-        output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
-
-    def abort_reserved(reserved: ExclusiveOutput | None) -> None:
-        if reserved is not None:
-            reserved.__exit__(RuntimeError, RuntimeError("OUTPUT_RESERVATION_ABORTED"), None)
-
-    def reserve(
-        directory: Path,
-        expected_ancestor_identities: tuple[tuple[str, int, int], ...] | None = None,
-    ) -> tuple[ExclusiveOutput, ExclusiveOutput]:
-        first = ExclusiveOutput(
-            directory / "receipt.json",
-            expected_ancestor_identities=expected_ancestor_identities,
-        )
-        try:
-            second = ExclusiveOutput(
-                directory / "summary.md",
-                expected_ancestor_identities=expected_ancestor_identities,
-            )
-        except Exception:
-            abort_reserved(first)
-            raise
-        return first, second
-
-    def reserve_private() -> tuple[Path, ExclusiveOutput, ExclusiveOutput]:
-        for _attempt in range(8):
-            private_directory, private_identities = _private_output_directory()
-            try:
-                first, second = reserve(private_directory, private_identities)
-            except (FileExistsError, OSError, RuntimeError, UnsafePathError):
-                continue
-            return private_directory, first, second
-        raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
-
-    if output_preflight_safe:
-        try:
-            receipt_output, summary_output = reserve(output)
-        except UnsafePathError:
-            output_preflight_safe = False
-            output_preflight_reason = "OUTPUT_PATH_SYMLINK_NOT_ALLOWED"
-        except (FileExistsError, OSError, RuntimeError):
-            output_preflight_safe = False
-    if not output_preflight_safe:
-        output, receipt_output, summary_output = reserve_private()
-
-    assert receipt_output is not None and summary_output is not None
+    requested_output, output, receipt_output, summary_output, output_preflight_safe, output_preflight_reason = _prepare_outputs(output_directory)
 
     def output_integrity_state() -> str:
-        if not receipt_output._path_is_reserved_inode() or not summary_output._path_is_reserved_inode():
-            return "IDENTITY_CHANGED"
-        if not receipt_output.pristine() or not summary_output.pristine():
-            return "CONTENT_MUTATED"
-        return "PRISTINE"
+        return _output_integrity_state(receipt_output, summary_output)
 
     observed_output_state = "PRISTINE"
 
@@ -2136,9 +2148,9 @@ def verify_pull_request(
     output_relocated = output_state != "PRISTINE"
     if output_relocated:
         reason = "RESERVED_OUTPUT_IDENTITY_CHANGED" if output_state == "IDENTITY_CHANGED" else "RESERVED_OUTPUT_CONTENT_MUTATED"
-        abort_reserved(receipt_output)
-        abort_reserved(summary_output)
-        output, receipt_output, summary_output = reserve_private()
+        _abort_reserved(receipt_output)
+        _abort_reserved(summary_output)
+        output, receipt_output, summary_output = _reserve_private_outputs()
     receipt["output_integrity"] = {
         "requested_reference": requested_output.name,
         "preflight_safe": output_preflight_safe,
