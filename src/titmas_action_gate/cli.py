@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
+import multiprocessing
 import sysconfig
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -36,14 +38,22 @@ def data_root() -> Path:
     raise RuntimeError("TITMAS Action Gate installed data files were not found")
 
 
-def evaluate_fixtures() -> dict[str, Any]:
-    root = data_root()
-    registry = json.loads((root / "evaluations/case-registry.json").read_text(encoding="utf-8"))
+def _evaluate_worker(cases: list[dict[str, Any]], root_path: str) -> list[dict[str, Any]]:
+    # Initialize locally for process pool safety
+
     authority = ApprovalAuthority(b"fixture-approval-key-material-32-bytes-minimum")
     gate = ActionGate(authority)
-    results: list[dict[str, Any]] = []
-    for item in registry["cases"]:
-        case = json.loads((root / "evaluations" / item["path"]).read_text(encoding="utf-8"))
+
+    root = Path(root_path)
+    case_cache: dict[str, dict[str, Any]] = {}
+    results = []
+
+    for item in cases:
+        path = item["path"]
+        if path not in case_cache:
+            case_cache[path] = json.loads((root / "evaluations" / path).read_text(encoding="utf-8"))
+
+        case = case_cache[path]
         decision = gate.evaluate(
             case["action_request"],
             case["policy_evaluation"],
@@ -61,6 +71,30 @@ def evaluate_fixtures() -> dict[str, Any]:
                 "passed": passed,
             }
         )
+    return results
+
+
+def evaluate_fixtures() -> dict[str, Any]:
+    root = data_root()
+    registry = json.loads((root / "evaluations/case-registry.json").read_text(encoding="utf-8"))
+    cases = registry["cases"]
+
+    if not cases:
+        return {"ok": True, "cases": []}
+
+    num_workers = min(multiprocessing.cpu_count(), len(cases))
+    if num_workers <= 1:
+        res = _evaluate_worker(cases, str(root))
+        return {"ok": all(item["passed"] for item in res), "cases": res}
+
+    chunk_size = len(cases) // num_workers + (1 if len(cases) % num_workers else 0)
+    chunks = [cases[i : i + chunk_size] for i in range(0, len(cases), chunk_size)]
+
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
+        for chunk_result in executor.map(_evaluate_worker, chunks, [str(root)] * len(chunks)):
+            results.extend(chunk_result)
+
     return {"ok": all(item["passed"] for item in results), "cases": results}
 
 
