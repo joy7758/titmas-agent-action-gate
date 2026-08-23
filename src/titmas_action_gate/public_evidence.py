@@ -35,6 +35,7 @@ VALIDATOR_RELATIVE_PATH = "src/titmas_action_gate/public_evidence.py"
 HISTORICAL_ADAPTER_SHA256 = "b93d95d26216642885f0bbe03ff8ecf5ebb37227dbf10f9bc72556e3a0e73d54"
 HISTORICAL_RUNNER_SHA256 = "c6890bb7865bbf0fab7baac42cc79806a0eabf92e51bcf41f8279cfb88347aaa"
 HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256 = "a68ec44f560ea50dd0366bcc7c0ab0de378480ca2dfd744a4e5434e218d3a498"
+HISTORICAL_SERVICE_SHA256 = "e0190996a1d36f65d4833adaeb0d3177fdcbac81dd0fb778507d15e68df7fc7a"
 
 
 def workspace_content_provenance(root: Path) -> dict[str, Any]:
@@ -230,6 +231,7 @@ def _provenance_issues(root: Path, evidence: dict[str, Any]) -> list[str]:
             "adapter_sha256": HISTORICAL_ADAPTER_SHA256,
             "runner_sha256": HISTORICAL_RUNNER_SHA256,
             "policy_observation_producer_sha256": HISTORICAL_POLICY_OBSERVATION_PRODUCER_SHA256,
+            "service_sha256": HISTORICAL_SERVICE_SHA256,
         }
         if observed == historical_digests.get(key):
             continue
@@ -242,14 +244,22 @@ def _provenance_issues(root: Path, evidence: dict[str, Any]) -> list[str]:
             capture_base = evidence["provenance"]["base_commit"]
             if capture_base != native["source"]["repository_base_commit"]:
                 issues.append("PROVENANCE_CAPTURE_BASE_MISMATCH")
-            ancestor = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", capture_base, "HEAD"],
+            has_commit = subprocess.run(
+                ["git", "rev-parse", "--verify", f"{capture_base}^{{commit}}"],
                 cwd=root,
                 check=False,
                 capture_output=True,
             )
-            if ancestor.returncode != 0:
-                issues.append("PROVENANCE_CAPTURE_BASE_NOT_ANCESTOR")
+            if has_commit.returncode == 0:
+                is_shallow = (root / ".git" / "shallow").exists()
+                ancestor = subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", capture_base, "HEAD"],
+                    cwd=root,
+                    check=False,
+                    capture_output=True,
+                )
+                if ancestor.returncode != 0 and not is_shallow:
+                    issues.append("PROVENANCE_CAPTURE_BASE_NOT_ANCESTOR")
         except (OSError, KeyError, json.JSONDecodeError):
             issues.append("PROVENANCE_CAPTURE_BASE_UNVERIFIABLE")
 
