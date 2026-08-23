@@ -48,8 +48,7 @@ def credentials() -> dict[str, str]:
 
 
 class CloudContextMcpTests(unittest.TestCase):
-    def test_authenticated_cloud_worker_invokes_only_typed_tool(self) -> None:
-        values = credentials()
+    def _create_test_request(self) -> dict:
         request = {
             "schema_version": "0.1.0",
             "request_id": "aar-cloud-mcp-test-001",
@@ -68,7 +67,10 @@ class CloudContextMcpTests(unittest.TestCase):
             "idempotency_key": "cloud-mcp-test-001",
         }
         request["parameters_sha256"] = sha256_json(request["parameters"])
-        scope = {
+        return request
+
+    def _create_test_scope(self) -> dict:
+        return {
             "schema_version": "0.1.0",
             "run_id": "run-cloud-mcp-test-001",
             "correlation_id": "corr-cloud-mcp-test-001",
@@ -76,7 +78,9 @@ class CloudContextMcpTests(unittest.TestCase):
             "repository": "joy7758/action-gate-demo",
             "commit": "a" * 40,
         }
-        query = {
+
+    def _create_test_query(self) -> dict:
+        return {
             "schema_version": "0.1.0",
             "operation": "resourcecenter.search-resources",
             "max_results": 1,
@@ -85,7 +89,9 @@ class CloudContextMcpTests(unittest.TestCase):
             "parameters_confirmed_by_user": True,
             "confirmation_ref": "confirmation:" + "a" * 64,
         }
-        cloud_credential = CloudCredentialContext(
+
+    def _create_test_cloud_credential(self) -> CloudCredentialContext:
+        return CloudCredentialContext(
             profile_name="not-returned-profile",
             permission_identity="not-returned-identity",
             permission_role_ref="sha256:" + "c" * 64,
@@ -95,6 +101,13 @@ class CloudContextMcpTests(unittest.TestCase):
             same_run_policy_readback_verified=True,
             policy_observation_observed_at=datetime.now(UTC),
         )
+
+    def test_authenticated_cloud_worker_invokes_only_typed_tool(self) -> None:
+        values = credentials()
+        request = self._create_test_request()
+        scope = self._create_test_scope()
+        query = self._create_test_query()
+        cloud_credential = self._create_test_cloud_credential()
         with tempfile.TemporaryDirectory(prefix="titmas-cloud-mcp-") as state_dir:
             service = ActionGateService.demo(state_dir)
             runtime = NativeRuntimeMcp(
