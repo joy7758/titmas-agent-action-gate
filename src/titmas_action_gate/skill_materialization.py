@@ -87,10 +87,10 @@ def _source_inventory(
             )
     schema_dir = root / "schemas"
     if schema_names is not None:
-        schema_paths = (schema_dir / name for name in schema_names)
-        schema_paths = (p for p in schema_paths if p.is_file() and p.suffix == ".json")
+        schema_paths = [schema_dir / name for name in schema_names if "/" not in name and "\\" not in name]
+        schema_paths = [p for p in schema_paths if p.is_file() and p.suffix == ".json"]
     else:
-        schema_paths = schema_dir.glob("*.json")
+        schema_paths = list(schema_dir.glob("*.json"))
 
     for schema_path in sorted(schema_paths, key=lambda p: p.name):
         package_path = f"schemas/{schema_path.name}"
@@ -103,6 +103,7 @@ def _source_inventory(
                 "sha256": hashlib.sha256(data).hexdigest(),
             }
         )
+
     return skill_version, files, contents
 
 
