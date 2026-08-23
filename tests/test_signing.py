@@ -1,5 +1,5 @@
-import unittest
 import copy
+import unittest
 
 from titmas_action_gate.signing import HmacRecordSigner
 
