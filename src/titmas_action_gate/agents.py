@@ -25,16 +25,8 @@ class Handoff:
 class HandoffLog:
     entries: list[Handoff] = field(default_factory=list)
 
-    def add(self, sender: str, recipient: str, request_id: str, responsibility: str, payload: dict[str, Any]) -> None:
-        self.entries.append(
-            Handoff(
-                sender=sender,
-                recipient=recipient,
-                request_id=request_id,
-                responsibility=responsibility,
-                payload_sha256=sha256_json(payload),
-            )
-        )
+    def add(self, handoff: Handoff) -> None:
+        self.entries.append(handoff)
 
     def as_dicts(self) -> list[dict[str, str]]:
         return [entry.__dict__.copy() for entry in self.entries]

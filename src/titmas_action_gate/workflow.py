@@ -9,8 +9,8 @@ from typing import Any
 
 import yaml
 
-from .agents import EvidenceVerifier, GitHubOperator, HandoffLog, ReleaseSteward, RequestAnalyst, WorkflowLead
-from .canonical import format_datetime
+from .agents import EvidenceVerifier, GitHubOperator, Handoff, HandoffLog, ReleaseSteward, RequestAnalyst, WorkflowLead
+from .canonical import format_datetime, sha256_json
 from .provider import InMemoryGitHubProvider
 from .service import ActionGateService
 
@@ -71,7 +71,15 @@ class AgentTeamsWorkflow:
             uncertainty=["Provider execution is sandboxed; no external GitHub write is claimed."],
             created_at=observed,
         )
-        self.handoffs.add("workflow-lead", "request-analyst", request["request_id"], "NORMALIZE_REQUEST", request)
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="request-analyst",
+                request_id=request["request_id"],
+                responsibility="NORMALIZE_REQUEST",
+                payload_sha256=sha256_json(request),
+            )
+        )
         self.service.submit_action_request(request, caller_token=self.caller_token)
 
         profile = self.service.generate_evidence_profile(
@@ -90,9 +98,25 @@ class AgentTeamsWorkflow:
             request["evidence_requirements"],
             caller_token=self.caller_token,
         )
-        self.handoffs.add("workflow-lead", "evidence-verifier", request["request_id"], "VERIFY_PRE_EXECUTION_EVIDENCE", profile)
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="evidence-verifier",
+                request_id=request["request_id"],
+                responsibility="VERIFY_PRE_EXECUTION_EVIDENCE",
+                payload_sha256=sha256_json(profile),
+            )
+        )
         evidence_result = self.verifier.verify(self.service, request["request_id"], caller_token=self.caller_token)
-        self.handoffs.add("evidence-verifier", "workflow-lead", request["request_id"], "RETURN_VERIFIER_RECEIPT", evidence_result)
+        self.handoffs.add(
+            Handoff(
+                sender="evidence-verifier",
+                recipient="workflow-lead",
+                request_id=request["request_id"],
+                responsibility="RETURN_VERIFIER_RECEIPT",
+                payload_sha256=sha256_json(evidence_result),
+            )
+        )
         initial_envelope = self.lead.decide(
             self.service,
             request["request_id"],
@@ -100,7 +124,15 @@ class AgentTeamsWorkflow:
             decided_at=observed + timedelta(seconds=2),
         )
         initial_decision = initial_envelope["payload"]
-        self.handoffs.add("workflow-lead", "github-operator", request["request_id"], "EXECUTE_EXACT_ALLOW", initial_decision)
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="github-operator",
+                request_id=request["request_id"],
+                responsibility="EXECUTE_EXACT_ALLOW",
+                payload_sha256=sha256_json(initial_decision),
+            )
+        )
         execution_receipt = self.operator.execute(
             self.service,
             request["request_id"],
@@ -117,7 +149,15 @@ class AgentTeamsWorkflow:
             pull_number=pull_number,
             created_at=observed + timedelta(seconds=4),
         )
-        self.handoffs.add("github-operator", "release-steward", release_request["request_id"], "ASSEMBLE_POST_EXECUTION_EVIDENCE", execution_receipt)
+        self.handoffs.add(
+            Handoff(
+                sender="github-operator",
+                recipient="release-steward",
+                request_id=release_request["request_id"],
+                responsibility="ASSEMBLE_POST_EXECUTION_EVIDENCE",
+                payload_sha256=sha256_json(execution_receipt),
+            )
+        )
         self.service.submit_action_request(release_request, caller_token=self.caller_token)
         post_profile = self.service.generate_evidence_profile(
             release_request["request_id"],
@@ -142,7 +182,15 @@ class AgentTeamsWorkflow:
             caller_token=self.caller_token,
             decided_at=observed + timedelta(seconds=6),
         )["payload"]
-        self.handoffs.add("workflow-lead", "titmas-action-gate-reviewer", release_request["request_id"], "REQUEST_SCOPED_HUMAN_APPROVAL", before_approval)
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="titmas-action-gate-reviewer",
+                request_id=release_request["request_id"],
+                responsibility="REQUEST_SCOPED_HUMAN_APPROVAL",
+                payload_sha256=sha256_json(before_approval),
+            )
+        )
         approval = self.service.record_human_approval(
             release_request["request_id"],
             subject="human:demo-reviewer",
@@ -151,7 +199,15 @@ class AgentTeamsWorkflow:
             approver_token=self.approver_token,
             decided_at=observed + timedelta(seconds=7),
         )
-        self.handoffs.add("titmas-action-gate-reviewer", "workflow-lead", release_request["request_id"], "RETURN_SCOPED_APPROVAL", approval)
+        self.handoffs.add(
+            Handoff(
+                sender="titmas-action-gate-reviewer",
+                recipient="workflow-lead",
+                request_id=release_request["request_id"],
+                responsibility="RETURN_SCOPED_APPROVAL",
+                payload_sha256=sha256_json(approval),
+            )
+        )
         after_approval = self.lead.decide(
             self.service,
             release_request["request_id"],

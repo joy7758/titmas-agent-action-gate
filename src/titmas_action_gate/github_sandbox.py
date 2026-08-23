@@ -7,7 +7,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .agents import EvidenceVerifier, GitHubOperator, HandoffLog, RequestAnalyst, WorkflowLead
+from .agents import EvidenceVerifier, GitHubOperator, Handoff, HandoffLog, RequestAnalyst, WorkflowLead
+from .canonical import sha256_json
 from .provider import GhCliProvider
 from .service import ActionGateService
 from .workflow import AGENTTEAMS_COMMIT, AGENTTEAMS_RELEASE
@@ -80,14 +81,30 @@ class RealGitHubSandboxWorkflow:
             uncertainty=[],
             created_at=observed,
         )
-        self.handoffs.add("workflow-lead", "request-analyst", push_request["request_id"], "NORMALIZE_BRANCH_PUSH", push_request)
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="request-analyst",
+                request_id=push_request["request_id"],
+                responsibility="NORMALIZE_BRANCH_PUSH",
+                payload_sha256=sha256_json(push_request),
+            )
+        )
         push_gate = self._verify_and_decide(
             push_request,
             phase="branch-push-pre-execution",
             evidence_output={"commit": commit, "worktree": "LOCAL_PATH_REDACTED_IN_PUBLIC_REPORT"},
             observed=observed + timedelta(seconds=1),
         )
-        self.handoffs.add("workflow-lead", "github-operator", push_request["request_id"], "EXECUTE_EXACT_BRANCH_PUSH", push_gate["decision"])
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="github-operator",
+                request_id=push_request["request_id"],
+                responsibility="EXECUTE_EXACT_BRANCH_PUSH",
+                payload_sha256=sha256_json(push_gate["decision"]),
+            )
+        )
         push_receipt = self.operator.execute(
             self.service,
             push_request["request_id"],
@@ -110,14 +127,30 @@ class RealGitHubSandboxWorkflow:
             uncertainty=[],
             created_at=observed + timedelta(seconds=4),
         )
-        self.handoffs.add("github-operator", "release-steward", pr_request["request_id"], "PREPARE_PR_REQUEST", push_receipt)
+        self.handoffs.add(
+            Handoff(
+                sender="github-operator",
+                recipient="release-steward",
+                request_id=pr_request["request_id"],
+                responsibility="PREPARE_PR_REQUEST",
+                payload_sha256=sha256_json(push_receipt),
+            )
+        )
         pr_gate = self._verify_and_decide(
             pr_request,
             phase="pull-request-pre-execution",
             evidence_output=push_receipt,
             observed=observed + timedelta(seconds=5),
         )
-        self.handoffs.add("workflow-lead", "github-operator", pr_request["request_id"], "EXECUTE_EXACT_PR_CREATE", pr_gate["decision"])
+        self.handoffs.add(
+            Handoff(
+                sender="workflow-lead",
+                recipient="github-operator",
+                request_id=pr_request["request_id"],
+                responsibility="EXECUTE_EXACT_PR_CREATE",
+                payload_sha256=sha256_json(pr_gate["decision"]),
+            )
+        )
         pr_receipt = self.operator.execute(
             self.service,
             pr_request["request_id"],
