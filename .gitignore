@@ -22,3 +22,4 @@ evaluations/results/
 # Installed locally from an exact source lock. Upstream redistribution permission is unresolved.
 skills/alibabacloud-resourcecenter-search/
 venv/
+.venv
