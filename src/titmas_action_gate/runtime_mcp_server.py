@@ -43,7 +43,7 @@ class RuntimeTokenVerifier:
 
 
 class NativeRuntimeMcp:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         service: ActionGateService,
         principals: RuntimePrincipalRegistry,
@@ -133,7 +133,7 @@ class NativeRuntimeMcp:
             return self._call(operation)
 
         @self.mcp.tool(description="Generate one request-bound evidence profile; grants no verification or authority.")
-        def generate_evidence_profile(
+        def generate_evidence_profile(  # noqa: PLR0913
             request_id: str,
             runtime_scope: dict[str, Any],
             phase: str,
