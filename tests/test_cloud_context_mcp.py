@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import typing
 import unittest
 import warnings
 from datetime import UTC, datetime
@@ -48,7 +49,8 @@ def credentials() -> dict[str, str]:
 
 
 class CloudContextMcpTests(unittest.TestCase):
-    def _create_test_request(self) -> dict:
+    @staticmethod
+    def _create_test_request() -> dict[str, typing.Any]:
         request = {
             "schema_version": "0.1.0",
             "request_id": "aar-cloud-mcp-test-001",
@@ -69,7 +71,8 @@ class CloudContextMcpTests(unittest.TestCase):
         request["parameters_sha256"] = sha256_json(request["parameters"])
         return request
 
-    def _create_test_scope(self) -> dict:
+    @staticmethod
+    def _create_test_scope() -> dict[str, typing.Any]:
         return {
             "schema_version": "0.1.0",
             "run_id": "run-cloud-mcp-test-001",
@@ -79,7 +82,8 @@ class CloudContextMcpTests(unittest.TestCase):
             "commit": "a" * 40,
         }
 
-    def _create_test_query(self) -> dict:
+    @staticmethod
+    def _create_test_query() -> dict[str, typing.Any]:
         return {
             "schema_version": "0.1.0",
             "operation": "resourcecenter.search-resources",
@@ -90,7 +94,8 @@ class CloudContextMcpTests(unittest.TestCase):
             "confirmation_ref": "confirmation:" + "a" * 64,
         }
 
-    def _create_test_cloud_credential(self) -> CloudCredentialContext:
+    @staticmethod
+    def _create_test_cloud_credential() -> CloudCredentialContext:
         return CloudCredentialContext(
             profile_name="not-returned-profile",
             permission_identity="not-returned-identity",
