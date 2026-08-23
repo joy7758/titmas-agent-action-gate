@@ -1657,29 +1657,7 @@ def _private_output_directory() -> tuple[Path, tuple[tuple[str, int, int], ...]]
     raise UnsafePathError("PRIVATE_OUTPUT_DIRECTORY_UNAVAILABLE")
 
 
-def _evaluate_pull_request(
-    *,
-    task_path: str | Path,
-    evidence_path: str | Path,
-    policy_path: str | Path,
-    test_command: str,
-    approval_path: str | Path | None = None,
-    repository: str | None = None,
-    pull_request: int | None = None,
-    head_sha: str | None = None,
-    execution_identity: str | None = None,
-    environment: Mapping[str, str] | None = None,
-    workspace: str | Path | None = None,
-    action_configuration_path: str | Path | None = None,
-    action_configuration_root: str | Path | None = None,
-    output_preflight_safe: bool = True,
-    output_preflight_reason: str = "GATE_OUTPUT_PATH_PREEXISTED",
-    output_integrity_check: Callable[[], str] | None = None,
-    declared_output_paths: tuple[Path, ...] = (),
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    env = dict(environment if environment is not None else os.environ)
-    started_at = utc_now()
-    configured_workspace = workspace or env.get("TITMAS_WORKSPACE") or env.get("GITHUB_WORKSPACE")
+def _validate_workspace(configured_workspace: str | None) -> tuple[Path | None, Path | None, Exception | None]:
     workspace_boundary: Path | None = None
     workspace_path: Path | None = None
     workspace_error: Exception | None = None
@@ -1706,6 +1684,169 @@ def _evaluate_pull_request(
             workspace_path = workspace_boundary
         except (OSError, ActionGateError) as exc:
             workspace_error = exc
+    return workspace_boundary, workspace_path, workspace_error
+
+
+def _generate_receipt(
+    context,
+    request,
+    task_digest,
+    runtime_checks,
+    test_result,
+    github_mode,
+    policy_evaluation,
+    evidence_path,
+    evidence_summary,
+    approval,
+    approval_verified,
+    approval_verifier_available,
+    approval_load_error,
+    decision,
+    state,
+    reasons,
+    started_at,
+    finished_at,
+    frozen_inputs,
+    policy_path,
+    policy_digest,
+    post_input_observations,
+    frozen_action_configuration,
+    post_action_configuration,
+    git_snapshot,
+    git_executable,
+    git_executable_unchanged_after_test,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "0.1.0",
+        "repository": context.repository or None,
+        "pull_request": context.pull_request,
+        "commit_sha": context.head_sha or None,
+        "task": {
+            **_safe_task_summary(request),
+            "sha256": task_digest,
+        },
+        "execution_identity": {
+            "reference": context.execution_identity or None,
+            "matches_task": any(item["check_id"] == "EXECUTION_IDENTITY_MATCH" and item["passed"] for item in runtime_checks),
+        },
+        "test_result": test_result,
+        "execution_mode": "GITHUB_PULL_REQUEST" if github_mode else "LOCAL_READ_ONLY",
+        "negative_checks": runtime_checks,
+        "authorization_scope": {
+            "action": request.get("action"),
+            "target": request.get("target"),
+            "parameters_sha256": request.get("parameters_sha256"),
+            "policy_effect": policy_evaluation.get("effect"),
+            "context_bound": bool(runtime_checks) and all(item["passed"] for item in runtime_checks),
+        },
+        "evidence": {
+            "reference": Path(evidence_path).name,
+            "status": evidence_summary["status"],
+            "bundle_sha256": evidence_summary["bundle_sha256"],
+            "verifier": evidence_summary["verifier"],
+            "checks": evidence_summary["checks"],
+        },
+        "risk_class": policy_evaluation.get("risk_class"),
+        "approval": {
+            "reference": approval.get("approval_id") if approval else None,
+            "verified": approval_verified,
+            "verifier_available": approval_verifier_available,
+            "load_error": approval_load_error,
+        },
+        "decision": decision,
+        "final_state": state,
+        "reason_codes": reasons,
+        "started_at": format_datetime(started_at),
+        "finished_at": format_datetime(finished_at),
+        "tool": {
+            "name": "titmas-action-gate",
+            "version": _tool_version(),
+            "engine_version": ActionGate.ENGINE_VERSION,
+        },
+        "policy": {
+            "reference": frozen_inputs.get("policy").reference if frozen_inputs.get("policy") else Path(policy_path).name,
+            "sha256": policy_digest,
+            "policy_id": policy_evaluation.get("policy_id"),
+            "version": policy_evaluation.get("policy_version"),
+            "ruleset_sha256": policy_evaluation.get("ruleset_sha256"),
+        },
+        "frozen_inputs": {
+            role: {
+                "reference": value.reference,
+                "sha256": value.sha256,
+                "canonical_sha256": value.canonical_sha256,
+                "missing": value.missing,
+                "post_test_sha256": post_input_observations.get(role, {}).get("sha256"),
+                "identity_changed": post_input_observations.get(role, {}).get("identity_changed", False),
+                "mutated_during_test": post_input_observations.get(role, {}).get("mutated", False),
+            }
+            for role, value in frozen_inputs.items()
+        },
+        "action_configuration": {
+            "reference": frozen_action_configuration.reference,
+            "sha256": frozen_action_configuration.sha256,
+            "post_test_sha256": post_action_configuration.get("sha256"),
+            "identity_changed": post_action_configuration.get("identity_changed", False),
+            "mutated_during_test": post_action_configuration.get("mutated", False),
+        },
+        "git_binding": {
+            "available": git_snapshot.available,
+            "head_sha": git_snapshot.head_sha,
+            "head_matches_context": git_snapshot.head_sha == context.head_sha if git_snapshot.available else None,
+            "repository_identity_matches": git_snapshot.repository_identity_matches,
+            "local_config_sha256": git_snapshot.local_config_sha256,
+            "effective_config_sha256": git_snapshot.effective_config_sha256,
+            "config_source_categories": list(git_snapshot.config_source_categories),
+            "head_tree_sha": git_snapshot.head_tree_sha,
+            "index_tree_sha": git_snapshot.index_tree_sha,
+            "tracked_index_clean": git_snapshot.tracked_index_clean,
+            "tracked_worktree_clean": git_snapshot.tracked_worktree_clean,
+            "submodules_clean": git_snapshot.submodules_clean,
+            "submodule_count": git_snapshot.submodule_count,
+            "submodule_paths": list(git_snapshot.submodule_paths),
+            "submodule_config_sha256": git_snapshot.submodule_config_sha256,
+            "submodule_state_sha256": git_snapshot.submodule_state_sha256,
+            "submodule_config_source_categories": list(git_snapshot.submodule_config_source_categories),
+            "submodule_credential_risk_categories": list(git_snapshot.submodule_credential_risks),
+            "unexpected_untracked_count": git_snapshot.unexpected_untracked_count,
+            "index_sha256": git_snapshot.index_sha256,
+            "worktree_diff_sha256": git_snapshot.worktree_diff_sha256,
+            "status_sha256": git_snapshot.status_sha256,
+            "state_sha256": git_snapshot.state_sha256,
+            "credential_risk_categories": list(git_snapshot.credential_risks),
+            "git_executable": {
+                "reference": git_executable.path.name if git_executable else None,
+                "sha256": git_executable.sha256 if git_executable else None,
+                "unchanged_after_test": git_executable_unchanged_after_test,
+            },
+        },
+    }
+
+
+def _evaluate_pull_request(
+    *,
+    task_path: str | Path,
+    evidence_path: str | Path,
+    policy_path: str | Path,
+    test_command: str,
+    approval_path: str | Path | None = None,
+    repository: str | None = None,
+    pull_request: int | None = None,
+    head_sha: str | None = None,
+    execution_identity: str | None = None,
+    environment: Mapping[str, str] | None = None,
+    workspace: str | Path | None = None,
+    action_configuration_path: str | Path | None = None,
+    action_configuration_root: str | Path | None = None,
+    output_preflight_safe: bool = True,
+    output_preflight_reason: str = "GATE_OUTPUT_PATH_PREEXISTED",
+    output_integrity_check: Callable[[], str] | None = None,
+    declared_output_paths: tuple[Path, ...] = (),
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    env = dict(environment if environment is not None else os.environ)
+    started_at = utc_now()
+    configured_workspace = workspace or env.get("TITMAS_WORKSPACE") or env.get("GITHUB_WORKSPACE")
+    workspace_boundary, workspace_path, workspace_error = _validate_workspace(configured_workspace)
     github_mode = (
         env.get("GITHUB_ACTIONS", "").lower() == "true" or env.get("TITMAS_CURRENT_EVENT_NAME") is not None or env.get("GITHUB_EVENT_NAME") is not None
     )
@@ -1910,111 +2051,35 @@ def _evaluate_pull_request(
         "verifier": {"name": "agent-evidence", "version": AGENT_EVIDENCE_VERSION},
         "checks": [],
     }
-    receipt = {
-        "schema_version": "0.1.0",
-        "repository": context.repository or None,
-        "pull_request": context.pull_request,
-        "commit_sha": context.head_sha or None,
-        "task": {
-            **_safe_task_summary(request),
-            "sha256": task_digest,
-        },
-        "execution_identity": {
-            "reference": context.execution_identity or None,
-            "matches_task": any(item["check_id"] == "EXECUTION_IDENTITY_MATCH" and item["passed"] for item in runtime_checks),
-        },
-        "test_result": test_result,
-        "execution_mode": "GITHUB_PULL_REQUEST" if github_mode else "LOCAL_READ_ONLY",
-        "negative_checks": runtime_checks,
-        "authorization_scope": {
-            "action": request.get("action"),
-            "target": request.get("target"),
-            "parameters_sha256": request.get("parameters_sha256"),
-            "policy_effect": policy_evaluation.get("effect"),
-            "context_bound": bool(runtime_checks) and all(item["passed"] for item in runtime_checks),
-        },
-        "evidence": {
-            "reference": Path(evidence_path).name,
-            "status": evidence_summary["status"],
-            "bundle_sha256": evidence_summary["bundle_sha256"],
-            "verifier": evidence_summary["verifier"],
-            "checks": evidence_summary["checks"],
-        },
-        "risk_class": policy_evaluation.get("risk_class"),
-        "approval": {
-            "reference": approval.get("approval_id") if approval else None,
-            "verified": approval_verified,
-            "verifier_available": approval_verifier_available,
-            "load_error": approval_load_error,
-        },
-        "decision": decision,
-        "final_state": state,
-        "reason_codes": reasons,
-        "started_at": format_datetime(started_at),
-        "finished_at": format_datetime(finished_at),
-        "tool": {
-            "name": "titmas-action-gate",
-            "version": _tool_version(),
-            "engine_version": ActionGate.ENGINE_VERSION,
-        },
-        "policy": {
-            "reference": frozen_inputs.get("policy").reference if frozen_inputs.get("policy") else Path(policy_path).name,
-            "sha256": policy_digest,
-            "policy_id": policy_evaluation.get("policy_id"),
-            "version": policy_evaluation.get("policy_version"),
-            "ruleset_sha256": policy_evaluation.get("ruleset_sha256"),
-        },
-        "frozen_inputs": {
-            role: {
-                "reference": value.reference,
-                "sha256": value.sha256,
-                "canonical_sha256": value.canonical_sha256,
-                "missing": value.missing,
-                "post_test_sha256": post_input_observations.get(role, {}).get("sha256"),
-                "identity_changed": post_input_observations.get(role, {}).get("identity_changed", False),
-                "mutated_during_test": post_input_observations.get(role, {}).get("mutated", False),
-            }
-            for role, value in frozen_inputs.items()
-        },
-        "action_configuration": {
-            "reference": frozen_action_configuration.reference,
-            "sha256": frozen_action_configuration.sha256,
-            "post_test_sha256": post_action_configuration.get("sha256"),
-            "identity_changed": post_action_configuration.get("identity_changed", False),
-            "mutated_during_test": post_action_configuration.get("mutated", False),
-        },
-        "git_binding": {
-            "available": git_snapshot.available,
-            "head_sha": git_snapshot.head_sha,
-            "head_matches_context": git_snapshot.head_sha == context.head_sha if git_snapshot.available else None,
-            "repository_identity_matches": git_snapshot.repository_identity_matches,
-            "local_config_sha256": git_snapshot.local_config_sha256,
-            "effective_config_sha256": git_snapshot.effective_config_sha256,
-            "config_source_categories": list(git_snapshot.config_source_categories),
-            "head_tree_sha": git_snapshot.head_tree_sha,
-            "index_tree_sha": git_snapshot.index_tree_sha,
-            "tracked_index_clean": git_snapshot.tracked_index_clean,
-            "tracked_worktree_clean": git_snapshot.tracked_worktree_clean,
-            "submodules_clean": git_snapshot.submodules_clean,
-            "submodule_count": git_snapshot.submodule_count,
-            "submodule_paths": list(git_snapshot.submodule_paths),
-            "submodule_config_sha256": git_snapshot.submodule_config_sha256,
-            "submodule_state_sha256": git_snapshot.submodule_state_sha256,
-            "submodule_config_source_categories": list(git_snapshot.submodule_config_source_categories),
-            "submodule_credential_risk_categories": list(git_snapshot.submodule_credential_risks),
-            "unexpected_untracked_count": git_snapshot.unexpected_untracked_count,
-            "index_sha256": git_snapshot.index_sha256,
-            "worktree_diff_sha256": git_snapshot.worktree_diff_sha256,
-            "status_sha256": git_snapshot.status_sha256,
-            "state_sha256": git_snapshot.state_sha256,
-            "credential_risk_categories": list(git_snapshot.credential_risks),
-            "git_executable": {
-                "reference": git_executable.path.name if git_executable else None,
-                "sha256": git_executable.sha256 if git_executable else None,
-                "unchanged_after_test": git_executable_unchanged_after_test,
-            },
-        },
-    }
+    receipt = _generate_receipt(
+        context,
+        request,
+        task_digest,
+        runtime_checks,
+        test_result,
+        github_mode,
+        policy_evaluation,
+        evidence_path,
+        evidence_summary,
+        approval,
+        approval_verified,
+        approval_verifier_available,
+        approval_load_error,
+        decision,
+        state,
+        reasons,
+        started_at,
+        finished_at,
+        frozen_inputs,
+        policy_path,
+        policy_digest,
+        post_input_observations,
+        frozen_action_configuration,
+        post_action_configuration,
+        git_snapshot,
+        git_executable,
+        git_executable_unchanged_after_test,
+    )
     result = {
         "ok": state == "PASS",
         "state": state,
