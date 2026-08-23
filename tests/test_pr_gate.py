@@ -7,10 +7,10 @@ import shlex
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, suppress
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import yaml
 
@@ -363,21 +363,18 @@ class PullRequestGateTests(unittest.TestCase):
             mock_exit(exc_type, exc_val, exc_tb)
             original_exit(self_obj, exc_type, exc_val, exc_tb)
 
-        with unittest.mock.patch.object(ExclusiveOutput, '__exit__', side_effect=patched_exit, autospec=True):
-            try:
-                verify_pull_request(
-                    task_path=task_path,
-                    evidence_path=evidence_path,
-                    policy_path=policy_path,
-                    test_command=shlex.join(self.command(passes=True)),
-                    output_directory=output_dir,
-                    repository=REPOSITORY,
-                    pull_request=PULL_REQUEST,
-                    head_sha=HEAD_A,
-                    execution_identity=EXECUTION_IDENTITY,
-                )
-            except Exception:
-                pass
+        with unittest.mock.patch.object(ExclusiveOutput, '__exit__', side_effect=patched_exit, autospec=True), suppress(Exception):
+            verify_pull_request(
+                task_path=task_path,
+                evidence_path=evidence_path,
+                policy_path=policy_path,
+                test_command=shlex.join(self.command(passes=True)),
+                output_directory=output_dir,
+                repository=REPOSITORY,
+                pull_request=PULL_REQUEST,
+                head_sha=HEAD_A,
+                execution_identity=EXECUTION_IDENTITY,
+            )
 
         self.assertTrue(mock_exit.called)
         self.assertTrue(
