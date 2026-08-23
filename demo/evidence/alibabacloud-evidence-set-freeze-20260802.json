@@ -18,7 +18,7 @@
     {
       "role": "historical_adapter_only_evidence",
       "path": "demo/evidence/alibabacloud-resourcecenter-preflight-20260802.json",
-      "sha256": "2a7c3a82bd11b7ab58f3de3e24f84ac2bfd6760f0bc7a832c4283a5b7fc45e68"
+      "sha256": "aec1e0fc7c2e032ee6da580271104a713c31974e04604c199b12a39001c9c290"
     },
     {
       "role": "later_native_worker_evidence",
