@@ -402,5 +402,33 @@ class CliTests(PullRequestGateTests):
         self.assertTrue((output / "summary.md").is_file())
 
 
+    def test_reserve_rollback_when_summary_exists(self) -> None:
+        output = self.root / "preexisting-summary"
+        output.mkdir()
+        (output / "summary.md").write_text("pre-existing\n", encoding="utf-8")
+
+        command = [sys.executable, "-c", "raise SystemExit(0)"]
+        request = self.request(HEAD_A, command)
+        task = self.write_task(request, "preexisting-summary-task.json")
+        evidence = self.write_evidence(request, "preexisting-summary-evidence.json")
+
+        result = verify_pull_request(
+            task_path=task,
+            evidence_path=evidence,
+            policy_path=ROOT / "policies/github-merge-gate-low-risk-demo.v0.1.json",
+            test_command=shlex.join(command),
+            output_directory=output,
+            repository=REPOSITORY,
+            pull_request=PULL_REQUEST,
+            head_sha=HEAD_A,
+            execution_identity=EXECUTION_IDENTITY,
+            environment={},
+        )
+
+        trusted_receipt = json.loads(Path(result["receipt"]).read_text(encoding="utf-8"))
+        self.assertTrue(trusted_receipt["output_integrity"]["relocated_to_private_directory"])
+        self.assertFalse((output / "receipt.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
