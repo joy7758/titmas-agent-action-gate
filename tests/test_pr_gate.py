@@ -18,7 +18,7 @@ from titmas_action_gate.canonical import format_datetime, sha256_json, utc_now
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _SharedOutputBudget, _missing_evidence_result, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -28,6 +28,37 @@ HEAD_B = "b" * 40
 EXECUTION_IDENTITY = "github-actions:required-evidence-gate"
 EVIDENCE_TYPES = ["SOURCE_PIN", "DIFF", "TEST_RESULT", "PULL_REQUEST_STATE"]
 APPROVAL_KEY = "public-disposable-demo-key-material-0001"
+
+
+class SharedOutputBudgetTests(unittest.TestCase):
+    def test_claim_within_budget(self):
+        budget = _SharedOutputBudget(10)
+        accepted, exceeded = budget.claim(b"hello")
+        self.assertEqual(accepted, b"hello")
+        self.assertFalse(exceeded)
+        self.assertEqual(budget.observed_bytes, 5)
+
+    def test_claim_exceeds_budget(self):
+        budget = _SharedOutputBudget(5)
+        accepted, exceeded = budget.claim(b"hello world")
+        self.assertEqual(accepted, b"hello")
+        self.assertTrue(exceeded)
+        self.assertEqual(budget.observed_bytes, 5)
+
+    def test_claim_after_budget_exhausted(self):
+        budget = _SharedOutputBudget(5)
+        budget.claim(b"hello")
+        accepted, exceeded = budget.claim(b" world")
+        self.assertEqual(accepted, b"")
+        self.assertTrue(exceeded)
+        self.assertEqual(budget.observed_bytes, 5)
+
+    def test_claim_zero_bytes(self):
+        budget = _SharedOutputBudget(5)
+        accepted, exceeded = budget.claim(b"")
+        self.assertEqual(accepted, b"")
+        self.assertFalse(exceeded)
+        self.assertEqual(budget.observed_bytes, 0)
 
 
 class PullRequestGateTests(unittest.TestCase):
