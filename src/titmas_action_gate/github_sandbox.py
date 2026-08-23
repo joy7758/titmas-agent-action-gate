@@ -70,10 +70,7 @@ class RealGitHubSandboxWorkflow:
         decision = self.lead.decide(self.service, request["request_id"], caller_token=self.caller_token, decided_at=observed + timedelta(seconds=1))["payload"]
         return {"evidence": evidence_result, "decision": decision}
 
-    def run(self, *, branch: str, base: str = "main", title: str = "TITMAS Agent Action Gate sandbox demo") -> dict[str, Any]:
-        observed = datetime.now(UTC)
-        commit = exact_head_commit(self.worktree)
-
+    def _process_branch_push(self, branch: str, commit: str, observed: datetime) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         push_request = self.analyst.analyze(
             action="github.branch.push",
             repository=self.repository,
@@ -99,7 +96,11 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             consumed_at=observed + timedelta(seconds=3),
         )
+        return push_request, push_gate, push_receipt
 
+    def _process_pull_request_create(
+        self, branch: str, base: str, title: str, push_receipt: dict[str, Any], observed: datetime
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         pr_request = self.analyst.analyze(
             action="github.pull_request.create",
             repository=self.repository,
@@ -125,8 +126,11 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             consumed_at=observed + timedelta(seconds=7),
         )
+        return pr_request, pr_gate, pr_receipt
 
-        pull_number = pr_receipt["provider_result"]["result"]["pull_number"]
+    def _process_merge(
+        self, pull_number: int, pr_receipt: dict[str, Any], observed: datetime
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
         merge_request = self.analyst.analyze(
             action="github.pull_request.merge",
             repository=self.repository,
@@ -157,6 +161,17 @@ class RealGitHubSandboxWorkflow:
             caller_token=self.caller_token,
             decided_at=observed + timedelta(seconds=12),
         )["payload"]
+        return merge_request, merge_gate, before_approval, approval, after_approval
+
+    def run(self, *, branch: str, base: str = "main", title: str = "TITMAS Agent Action Gate sandbox demo") -> dict[str, Any]:
+        observed = datetime.now(UTC)
+        commit = exact_head_commit(self.worktree)
+
+        push_request, push_gate, push_receipt = self._process_branch_push(branch, commit, observed)
+        pr_request, pr_gate, pr_receipt = self._process_pull_request_create(branch, base, title, push_receipt, observed)
+
+        pull_number = pr_receipt["provider_result"]["result"]["pull_number"]
+        merge_request, merge_gate, before_approval, approval, after_approval = self._process_merge(pull_number, pr_receipt, observed)
 
         return {
             "demo_version": "0.2.0",
