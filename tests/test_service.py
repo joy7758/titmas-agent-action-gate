@@ -3,12 +3,11 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
-import hashlib
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
-from titmas_action_gate.service import ActionGateService
 from titmas_action_gate.errors import AuthenticationError
+from titmas_action_gate.service import ActionGateService
 
 
 class ServiceTests(unittest.TestCase):

@@ -1,8 +1,8 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-import json
 from titmas_action_gate.workflow import validate_agentteams_template, write_demo_report
 
 
@@ -83,7 +83,7 @@ class TestWriteDemoReport(unittest.TestCase):
         self.assertEqual(result_path, output_file)
         self.assertTrue(output_file.exists())
 
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = json.load(f)
 
         self.assertEqual(content, report_data)
@@ -95,7 +95,7 @@ class TestWriteDemoReport(unittest.TestCase):
         write_demo_report(report_data, output_file)
 
         self.assertTrue(output_file.exists())
-        with open(output_file, "r", encoding="utf-8") as f:
+        with open(output_file, encoding="utf-8") as f:
             content = json.load(f)
 
         self.assertEqual(content, report_data)
