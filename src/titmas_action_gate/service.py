@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,6 @@ from .policy import PolicyEngine
 from .provider import GitHubProvider
 from .signing import HmacRecordSigner
 from .store import AppendOnlyStore
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

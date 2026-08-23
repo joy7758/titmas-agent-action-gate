@@ -1,10 +1,11 @@
 import unittest
-from unittest.mock import patch
 from datetime import timedelta
+from unittest.mock import patch
 
 from titmas_action_gate.approval import ApprovalAuthority
-from titmas_action_gate.gate import ActionGate
 from titmas_action_gate.errors import ContractValidationError
+from titmas_action_gate.gate import ActionGate
+
 
 class ActionGateTests(unittest.TestCase):
     def setUp(self):
