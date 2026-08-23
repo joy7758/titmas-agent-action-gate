@@ -48,6 +48,17 @@ def schema_directory() -> Path:
 
 
 @functools.cache
+def _schema_registry() -> Registry:
+    directory = schema_directory()
+    resources = []
+    for path in directory.glob("*.schema.json"):
+        candidate = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(candidate.get("$id"), str):
+            resources.append((candidate["$id"], Resource.from_contents(candidate)))
+    return Registry().with_resources(resources)
+
+
+@functools.cache
 def _validator(contract: str) -> Draft202012Validator:
     try:
         filename = SCHEMA_FILES[contract]
@@ -55,12 +66,7 @@ def _validator(contract: str) -> Draft202012Validator:
         raise ContractValidationError("SCHEMA_UNKNOWN", f"Unknown contract: {contract}") from exc
     directory = schema_directory()
     schema = json.loads((directory / filename).read_text(encoding="utf-8"))
-    resources = []
-    for path in directory.glob("*.schema.json"):
-        candidate = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(candidate.get("$id"), str):
-            resources.append((candidate["$id"], Resource.from_contents(candidate)))
-    registry = Registry().with_resources(resources)
+    registry = _schema_registry()
     return Draft202012Validator(schema, registry=registry, format_checker=FormatChecker())
 
 
