@@ -1353,6 +1353,111 @@ def _observe_stream(stream: BinaryIO, exceeded: threading.Event, budget: _Shared
     return _StreamObservation(digest.hexdigest(), observed_bytes, limit_exceeded)
 
 
+def _get_unexecuted_test_result(command: list[str]) -> dict[str, Any]:
+    return {
+        "executed": False,
+        "exit_code": None,
+        "command_sha256": sha256_json(command),
+        "stdout_sha256": None,
+        "stderr_sha256": None,
+        "duration_ms": 0,
+        "stdout_bytes": 0,
+        "stderr_bytes": 0,
+        "combined_output_bytes": 0,
+        "max_total_output_bytes": MAX_TOTAL_TEST_OUTPUT_BYTES,
+        "output_limit_exceeded": False,
+        "timed_out": False,
+        "process_group_cleanup": "NOT_STARTED",
+        "environment": {
+            "policy_version": TEST_ENVIRONMENT_POLICY_VERSION,
+            "allowed_parent_names": list(_TEST_ENVIRONMENT_ALLOWLIST),
+            "removed_names": [],
+            "removed_count": 0,
+            "fresh_home": False,
+            "fresh_tmpdir": False,
+        },
+    }
+
+
+def _execute_test_process(
+    command: list[str],
+    child_environment: Mapping[str, str],
+    workspace: Path | None,
+    output_limit_event: threading.Event,
+    started: float,
+    observe: Callable[[str, BinaryIO], None],
+) -> tuple[int, bool, str]:
+    timed_out = False
+    cleanup = "NOT_STARTED"
+    exit_code = 127
+    threads: list[threading.Thread] = []
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(workspace) if workspace is not None else None,
+            env=child_environment,
+            start_new_session=True,
+            close_fds=True,
+            bufsize=0,
+        )
+        if process.stdout is None or process.stderr is None:
+            raise OSError("TEST_OUTPUT_PIPE_UNAVAILABLE")
+        threads = [
+            threading.Thread(target=observe, args=("stdout", process.stdout), daemon=True),
+            threading.Thread(target=observe, args=("stderr", process.stderr), daemon=True),
+        ]
+        for thread in threads:
+            thread.start()
+        while process.poll() is None:
+            if output_limit_event.is_set():
+                _terminate_process_group(process)
+                break
+            if time.monotonic() - started >= TEST_TIMEOUT_SECONDS:
+                timed_out = True
+                _terminate_process_group(process)
+                break
+            time.sleep(0.01)
+        try:
+            exit_code = process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            _terminate_process_group(process)
+            try:
+                exit_code = process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                exit_code = 124
+        cleaned = process.poll() is not None and _terminate_process_group(process)
+        cleanup = "COMPLETE" if cleaned else "FAILED"
+    except OSError:
+        if process is None:
+            cleanup = "NOT_STARTED"
+            exit_code = 127
+        else:
+            cleanup = "FAILED"
+    finally:
+        for thread in threads:
+            thread.join(timeout=2)
+        if any(thread.is_alive() for thread in threads):
+            cleanup = "FAILED"
+        if process is not None:
+            if process.poll() is None:
+                group_cleaned = _terminate_process_group(process)
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=3)
+                cleanup = "COMPLETE" if group_cleaned and process.poll() is not None else "FAILED"
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+    return exit_code, timed_out, cleanup
+
+
 def _run_test(
     command: list[str],
     *,
@@ -1361,37 +1466,11 @@ def _run_test(
     workspace: Path | None,
 ) -> dict[str, Any]:
     if not execute:
-        return {
-            "executed": False,
-            "exit_code": None,
-            "command_sha256": sha256_json(command),
-            "stdout_sha256": None,
-            "stderr_sha256": None,
-            "duration_ms": 0,
-            "stdout_bytes": 0,
-            "stderr_bytes": 0,
-            "combined_output_bytes": 0,
-            "max_total_output_bytes": MAX_TOTAL_TEST_OUTPUT_BYTES,
-            "output_limit_exceeded": False,
-            "timed_out": False,
-            "process_group_cleanup": "NOT_STARTED",
-            "environment": {
-                "policy_version": TEST_ENVIRONMENT_POLICY_VERSION,
-                "allowed_parent_names": list(_TEST_ENVIRONMENT_ALLOWLIST),
-                "removed_names": [],
-                "removed_count": 0,
-                "fresh_home": False,
-                "fresh_tmpdir": False,
-            },
-        }
+        return _get_unexecuted_test_result(command)
     started = time.monotonic()
-    timed_out = False
     output_limit_event = threading.Event()
     output_budget = _SharedOutputBudget(MAX_TOTAL_TEST_OUTPUT_BYTES)
-    cleanup = "NOT_STARTED"
-    exit_code = 127
     observations: dict[str, _StreamObservation] = {}
-    threads: list[threading.Thread] = []
 
     def observe(name: str, stream: BinaryIO) -> None:
         observations[name] = _observe_stream(stream, output_limit_event, output_budget)
@@ -1403,70 +1482,14 @@ def _run_test(
         home.mkdir(mode=0o700)
         temporary.mkdir(mode=0o700)
         child_environment, environment_metadata = _test_environment(environment, home=home, temporary_directory=temporary)
-        process: subprocess.Popen[bytes] | None = None
-        try:
-            process = subprocess.Popen(
-                command,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(workspace) if workspace is not None else None,
-                env=child_environment,
-                start_new_session=True,
-                close_fds=True,
-                bufsize=0,
-            )
-            if process.stdout is None or process.stderr is None:
-                raise OSError("TEST_OUTPUT_PIPE_UNAVAILABLE")
-            threads = [
-                threading.Thread(target=observe, args=("stdout", process.stdout), daemon=True),
-                threading.Thread(target=observe, args=("stderr", process.stderr), daemon=True),
-            ]
-            for thread in threads:
-                thread.start()
-            while process.poll() is None:
-                if output_limit_event.is_set():
-                    _terminate_process_group(process)
-                    break
-                if time.monotonic() - started >= TEST_TIMEOUT_SECONDS:
-                    timed_out = True
-                    _terminate_process_group(process)
-                    break
-                time.sleep(0.01)
-            try:
-                exit_code = process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                _terminate_process_group(process)
-                try:
-                    exit_code = process.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    exit_code = 124
-            cleaned = process.poll() is not None and _terminate_process_group(process)
-            cleanup = "COMPLETE" if cleaned else "FAILED"
-        except OSError:
-            if process is None:
-                cleanup = "NOT_STARTED"
-                exit_code = 127
-            else:
-                cleanup = "FAILED"
-        finally:
-            for thread in threads:
-                thread.join(timeout=2)
-            if any(thread.is_alive() for thread in threads):
-                cleanup = "FAILED"
-            if process is not None:
-                if process.poll() is None:
-                    group_cleaned = _terminate_process_group(process)
-                    try:
-                        process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=3)
-                    cleanup = "COMPLETE" if group_cleaned and process.poll() is not None else "FAILED"
-                if process.stdout is not None:
-                    process.stdout.close()
-                if process.stderr is not None:
-                    process.stderr.close()
+        exit_code, timed_out, cleanup = _execute_test_process(
+            command,
+            child_environment,
+            workspace,
+            output_limit_event,
+            started,
+            observe,
+        )
     empty_digest = hashlib.sha256(b"").hexdigest()
     stdout_observation = observations.get("stdout", _StreamObservation(empty_digest, 0, False))
     stderr_observation = observations.get("stderr", _StreamObservation(empty_digest, 0, False))
