@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import typing
 import unittest
 import warnings
 from pathlib import Path
@@ -83,109 +84,114 @@ class RuntimeMcpEndToEndTests(unittest.TestCase):
                         self.assertTrue(result["ok"], result)
                         return result["result"]
 
-                    request = valid["action_request"]
-                    call(
-                        "request-analyst",
-                        "submit_action_request",
-                        {"action_request": request, "runtime_scope": runtime_scope},
-                    )
-                    generated = call(
-                        "request-analyst",
-                        "generate_evidence_profile",
-                        {
-                            "request_id": request["request_id"],
-                            "runtime_scope": runtime_scope,
-                            "phase": "pre-execution",
-                            "operation_status": "succeeded",
-                            "output": {"analysis": "normalized", "uncertainty_preserved": True},
-                            "evidence_types": request["evidence_requirements"],
-                        },
-                    )
-                    call(
-                        "evidence-verifier",
-                        "attach_evidence",
-                        {
-                            "request_id": request["request_id"],
-                            "runtime_scope": runtime_scope,
-                            "profile_path": generated["profile_path"],
-                            "evidence_types": request["evidence_requirements"],
-                        },
-                    )
-                    verified = call(
-                        "evidence-verifier",
-                        "verify_evidence",
-                        {"request_id": request["request_id"], "runtime_scope": runtime_scope},
-                    )
-                    self.assertEqual(verified["status"], "VALID")
-                    initial = call(
-                        "workflow-lead",
-                        "evaluate_action_gate",
-                        {"request_id": request["request_id"], "runtime_scope": runtime_scope},
-                    )["payload"]
-                    self.assertEqual(initial["outcome"], "ALLOW")
-                    execution = call(
-                        "github-operator",
-                        "execute_in_memory_github_action",
-                        {
-                            "decision_id": initial["decision_id"],
-                            "request_id": request["request_id"],
-                            "runtime_scope": runtime_scope,
-                        },
-                    )
-                    self.assertEqual(execution["status"], "SUCCEEDED")
-                    self.assertEqual(execution["provider_result"]["provider_mode"], "IN_MEMORY_NO_EXTERNAL_WRITE")
-
-                    release_request = json.loads(json.dumps(high["action_request"]))
-                    release_request["request_id"] = "aar-native-release-decision-001"
-                    release_request["target"]["resource_ref"] = "pull/1"
-                    release_request["parameters"]["pull_number"] = 1
-                    release_request["parameters_sha256"] = sha256_json(release_request["parameters"])
-                    release_request["idempotency_key"] = "native-release-decision-001"
-                    call(
-                        "release-steward",
-                        "submit_action_request",
-                        {"action_request": release_request, "runtime_scope": runtime_scope},
-                    )
-                    post_generated = call(
-                        "release-steward",
-                        "generate_evidence_profile",
-                        {
-                            "request_id": release_request["request_id"],
-                            "runtime_scope": runtime_scope,
-                            "phase": "post-execution",
-                            "operation_status": "succeeded",
-                            "output": execution,
-                            "evidence_types": release_request["evidence_requirements"],
-                        },
-                    )
-                    call(
-                        "release-steward",
-                        "attach_evidence",
-                        {
-                            "request_id": release_request["request_id"],
-                            "runtime_scope": runtime_scope,
-                            "profile_path": post_generated["profile_path"],
-                            "evidence_types": release_request["evidence_requirements"],
-                        },
-                    )
-                    final_evidence = call(
-                        "release-steward",
-                        "verify_evidence",
-                        {"request_id": release_request["request_id"], "runtime_scope": runtime_scope},
-                    )
-                    self.assertEqual(final_evidence["status"], "VALID")
-                    final_decision = call(
-                        "release-steward",
-                        "evaluate_action_gate",
-                        {"request_id": release_request["request_id"], "runtime_scope": runtime_scope},
-                    )["payload"]
-                    self.assertEqual(final_decision["outcome"], "REQUIRE_APPROVAL")
-                    self.assertEqual(final_decision["reason_codes"], ["HUMAN_APPROVAL_REQUIRED"])
+                    execution = self._execute_initial_request(call, valid["action_request"], runtime_scope)
+                    self._execute_release_decision(call, high, runtime_scope, execution)
 
             self.assertEqual(service.store.verify_chain(), [])
             self.assertEqual(service.store.verify_security_chain(runtime_scope["run_id"]), [])
             self.assertTrue(all(item["outcome"] == "ALLOW_CALL" for item in service.store.security_events_for_run(runtime_scope["run_id"])))
             self.assertEqual(len(runtime.providers[runtime_scope["run_id"]].pull_requests), 1)
+
+    def _execute_initial_request(self, call: typing.Callable, request: dict, runtime_scope: dict) -> dict:
+        call(
+            "request-analyst",
+            "submit_action_request",
+            {"action_request": request, "runtime_scope": runtime_scope},
+        )
+        generated = call(
+            "request-analyst",
+            "generate_evidence_profile",
+            {
+                "request_id": request["request_id"],
+                "runtime_scope": runtime_scope,
+                "phase": "pre-execution",
+                "operation_status": "succeeded",
+                "output": {"analysis": "normalized", "uncertainty_preserved": True},
+                "evidence_types": request["evidence_requirements"],
+            },
+        )
+        call(
+            "evidence-verifier",
+            "attach_evidence",
+            {
+                "request_id": request["request_id"],
+                "runtime_scope": runtime_scope,
+                "profile_path": generated["profile_path"],
+                "evidence_types": request["evidence_requirements"],
+            },
+        )
+        verified = call(
+            "evidence-verifier",
+            "verify_evidence",
+            {"request_id": request["request_id"], "runtime_scope": runtime_scope},
+        )
+        self.assertEqual(verified["status"], "VALID")
+        initial = call(
+            "workflow-lead",
+            "evaluate_action_gate",
+            {"request_id": request["request_id"], "runtime_scope": runtime_scope},
+        )["payload"]
+        self.assertEqual(initial["outcome"], "ALLOW")
+        execution = call(
+            "github-operator",
+            "execute_in_memory_github_action",
+            {
+                "decision_id": initial["decision_id"],
+                "request_id": request["request_id"],
+                "runtime_scope": runtime_scope,
+            },
+        )
+        self.assertEqual(execution["status"], "SUCCEEDED")
+        self.assertEqual(execution["provider_result"]["provider_mode"], "IN_MEMORY_NO_EXTERNAL_WRITE")
+        return execution
+
+    def _execute_release_decision(self, call: typing.Callable, high: dict, runtime_scope: dict, execution: dict) -> None:
+        release_request = json.loads(json.dumps(high["action_request"]))
+        release_request["request_id"] = "aar-native-release-decision-001"
+        release_request["target"]["resource_ref"] = "pull/1"
+        release_request["parameters"]["pull_number"] = 1
+        release_request["parameters_sha256"] = sha256_json(release_request["parameters"])
+        release_request["idempotency_key"] = "native-release-decision-001"
+        call(
+            "release-steward",
+            "submit_action_request",
+            {"action_request": release_request, "runtime_scope": runtime_scope},
+        )
+        post_generated = call(
+            "release-steward",
+            "generate_evidence_profile",
+            {
+                "request_id": release_request["request_id"],
+                "runtime_scope": runtime_scope,
+                "phase": "post-execution",
+                "operation_status": "succeeded",
+                "output": execution,
+                "evidence_types": release_request["evidence_requirements"],
+            },
+        )
+        call(
+            "release-steward",
+            "attach_evidence",
+            {
+                "request_id": release_request["request_id"],
+                "runtime_scope": runtime_scope,
+                "profile_path": post_generated["profile_path"],
+                "evidence_types": release_request["evidence_requirements"],
+            },
+        )
+        final_evidence = call(
+            "release-steward",
+            "verify_evidence",
+            {"request_id": release_request["request_id"], "runtime_scope": runtime_scope},
+        )
+        self.assertEqual(final_evidence["status"], "VALID")
+        final_decision = call(
+            "release-steward",
+            "evaluate_action_gate",
+            {"request_id": release_request["request_id"], "runtime_scope": runtime_scope},
+        )["payload"]
+        self.assertEqual(final_decision["outcome"], "REQUIRE_APPROVAL")
+        self.assertEqual(final_decision["reason_codes"], ["HUMAN_APPROVAL_REQUIRED"])
 
 
 if __name__ == "__main__":
