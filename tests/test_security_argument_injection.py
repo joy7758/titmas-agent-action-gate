@@ -1,9 +1,8 @@
 import unittest
-import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from titmas_action_gate.provider import GhCliProvider
-from titmas_action_gate.errors import ActionGateError
+
 
 class ProviderSecurityTests(unittest.TestCase):
     @patch("subprocess.run")
