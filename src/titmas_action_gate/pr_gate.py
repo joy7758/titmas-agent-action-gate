@@ -977,6 +977,40 @@ def _capture_initialized_submodules(
     return tuple(records)
 
 
+def _summarize_submodule_state(submodule_records: tuple[dict[str, Any], ...]) -> tuple[str, str, tuple[str, ...], tuple[str, ...]]:
+    submodule_config_projection = [
+        {
+            "path": record["path"],
+            "initialized": record["initialized"],
+            "config_sha256": record.get("config_sha256"),
+            "config_source_categories": record.get("config_source_categories", []),
+            "credential_risk_categories": record.get("credential_risk_categories", []),
+        }
+        for record in submodule_records
+    ]
+    submodule_config_sha256 = sha256_json(submodule_config_projection)
+    submodule_state_sha256 = sha256_json(list(submodule_records))
+    submodule_risks = tuple(sorted(f"{record['path']}:{risk}" for record in submodule_records for risk in record.get("credential_risk_categories", [])))
+    submodule_sources = tuple(sorted(f"{record['path']}:{source}" for record in submodule_records for source in record.get("config_source_categories", [])))
+    return submodule_config_sha256, submodule_state_sha256, submodule_risks, submodule_sources
+
+
+def _decode_git_object_identifiers(
+    head: subprocess.CompletedProcess[bytes],
+    head_tree: subprocess.CompletedProcess[bytes],
+    index_tree: subprocess.CompletedProcess[bytes],
+) -> tuple[str, str, str]:
+    try:
+        head_sha = head.stdout.decode("ascii", "strict").strip()
+        head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
+        index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
+    except UnicodeDecodeError as exc:
+        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was invalid.") from exc
+    if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
+        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was incomplete.")
+    return head_sha, head_tree_sha, index_tree_sha
+
+
 def _capture_git_snapshot(
     workspace: Path | None,
     expected_repository: str,
@@ -1024,33 +1058,13 @@ def _capture_git_snapshot(
     required = (head, head_tree, index_tree, index_result, worktree_diff, status_result)
     if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
         raise ActionGateError("GIT_STATE_UNAVAILABLE", "The repository HEAD, index, worktree, or local configuration could not be read.")
-    try:
-        head_sha = head.stdout.decode("ascii", "strict").strip()
-        head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
-        index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
-    except UnicodeDecodeError as exc:
-        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was invalid.") from exc
-    if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
-        raise ActionGateError("GIT_STATE_UNAVAILABLE", "A repository Git object identifier was incomplete.")
+    head_sha, head_tree_sha, index_tree_sha = _decode_git_object_identifiers(head, head_tree, index_tree)
     unexpected_untracked = tuple(path for path in _untracked_paths(status_result.stdout) if (workspace / path).absolute() not in allowed_untracked_paths)
     observed_repository = _repository_slug(remote.stdout.decode("utf-8", "replace")) if remote.returncode == 0 else None
     worktree_diff_sha256 = hashlib.sha256(worktree_diff.stdout).hexdigest()
     status_sha256 = hashlib.sha256(status_result.stdout).hexdigest()
     index_sha256 = hashlib.sha256(index_result.stdout).hexdigest()
-    submodule_config_projection = [
-        {
-            "path": record["path"],
-            "initialized": record["initialized"],
-            "config_sha256": record.get("config_sha256"),
-            "config_source_categories": record.get("config_source_categories", []),
-            "credential_risk_categories": record.get("credential_risk_categories", []),
-        }
-        for record in submodule_records
-    ]
-    submodule_config_sha256 = sha256_json(submodule_config_projection)
-    submodule_state_sha256 = sha256_json(list(submodule_records))
-    submodule_risks = tuple(sorted(f"{record['path']}:{risk}" for record in submodule_records for risk in record.get("credential_risk_categories", [])))
-    submodule_sources = tuple(sorted(f"{record['path']}:{source}" for record in submodule_records for source in record.get("config_source_categories", [])))
+    submodule_config_sha256, submodule_state_sha256, submodule_risks, submodule_sources = _summarize_submodule_state(submodule_records)
     state_sha256 = sha256_json(
         {
             "head_sha": head_sha,
