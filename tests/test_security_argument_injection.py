@@ -21,7 +21,7 @@ class ProviderSecurityTests(unittest.TestCase):
             "parameters": {
                 "branch": "main",
                 "commit": "0" * 40,
-            }
+            },
         }
 
         provider.execute(invocation)
@@ -32,9 +32,10 @@ class ProviderSecurityTests(unittest.TestCase):
         self.assertIn("--", args)
 
         dash_index = args.index("--")
-        refspec_index = args.index(f"{'0'*40}:refs/heads/main")
+        refspec_index = args.index(f"{'0' * 40}:refs/heads/main")
 
         self.assertEqual(dash_index + 1, refspec_index, "The '--' separator must appear immediately before the refspec")
+
 
 if __name__ == "__main__":
     unittest.main()
