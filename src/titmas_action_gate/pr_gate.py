@@ -826,6 +826,148 @@ def _gitlink_entries(index_bytes: bytes) -> tuple[tuple[str, str], ...]:
     return tuple(entries)
 
 
+def _capture_initialized_submodule(
+    *,
+    git_executable: FrozenExecutable,
+    workspace: Path,
+    repository: Path,
+    prefix: PurePosixPath,
+    local_path: str,
+    expected_sha: str,
+    visited: set[tuple[int, int]],
+    depth: int,
+) -> tuple[dict[str, Any], ...]:
+    relative = prefix / PurePosixPath(local_path)
+    submodule_path = repository.joinpath(*PurePosixPath(local_path).parts)
+    if _path_has_symlink_component(submodule_path):
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule path contained a symbolic link.")
+    try:
+        path_observation = submodule_path.lstat()
+    except FileNotFoundError:
+        return (
+            {
+                "path": str(relative),
+                "expected_head_sha": expected_sha,
+                "present": False,
+                "initialized": False,
+            },
+        )
+    if not stat.S_ISDIR(path_observation.st_mode):
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree path was not a directory.")
+    git_marker = submodule_path / ".git"
+    try:
+        git_marker_observation = git_marker.lstat()
+    except FileNotFoundError:
+        raise ActionGateError(
+            "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
+            "A present submodule worktree could not be proven initialized or bound to its gitlink.",
+        ) from None
+    except OSError as exc:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory was unavailable.") from exc
+    if stat.S_ISLNK(git_marker_observation.st_mode) or not (stat.S_ISREG(git_marker_observation.st_mode) or stat.S_ISDIR(git_marker_observation.st_mode)):
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory binding was unsafe.")
+    top_level = _git_command(git_executable, submodule_path, "rev-parse", "--show-toplevel")
+    if top_level.returncode != 0:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule could not be inspected.")
+    try:
+        observed_top_level = Path(os.path.abspath(top_level.stdout.decode("utf-8", "strict").strip()))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree could not be classified.") from exc
+    if observed_top_level != submodule_path:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree root was not exact.")
+    identity = (path_observation.st_dev, path_observation.st_ino)
+    if identity in visited:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule cycle was detected.")
+    visited.add(identity)
+    try:
+        audit = _capture_effective_git_config(git_executable, submodule_path)
+    except ActionGateError as exc:
+        raise ActionGateError(
+            "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
+            "An initialized submodule Git configuration could not be audited.",
+        ) from exc
+    record: dict[str, Any] = {
+        "path": str(relative),
+        "expected_head_sha": expected_sha,
+        "present": True,
+        "initialized": True,
+        "directory_identity": [path_observation.st_dev, path_observation.st_ino],
+        "config_sha256": audit.sha256,
+        "config_source_categories": list(audit.source_categories),
+        "credential_risk_categories": list(audit.risk_categories),
+    }
+    if audit.risk_categories:
+        record["clean"] = False
+        return (record,)
+    head = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{commit}")
+    head_tree = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{tree}")
+    index_tree = _git_command(git_executable, submodule_path, "write-tree")
+    index_result = _git_command(git_executable, submodule_path, "ls-files", "--stage", "-z")
+    staged_diff = _git_command(
+        git_executable,
+        submodule_path,
+        "diff",
+        "--cached",
+        "--quiet",
+        "--no-ext-diff",
+        "--no-textconv",
+        "HEAD",
+        "--",
+    )
+    worktree_clean = _git_command(
+        git_executable,
+        submodule_path,
+        "diff",
+        "--quiet",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--",
+    )
+    status_result = _git_command(
+        git_executable,
+        submodule_path,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+    )
+    required = (head, head_tree, index_tree, index_result, status_result)
+    if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule state could not be read.")
+    head_sha = head.stdout.decode("ascii", "strict").strip()
+    head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
+    index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
+    if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
+        raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule Git object identifier was invalid.")
+    nested = _capture_initialized_submodules(
+        git_executable=git_executable,
+        workspace=workspace,
+        repository=submodule_path,
+        prefix=relative,
+        index_bytes=index_result.stdout,
+        visited=visited,
+        depth=depth + 1,
+    )
+    record.update(
+        {
+            "head_sha": head_sha,
+            "head_tree_sha": head_tree_sha,
+            "index_tree_sha": index_tree_sha,
+            "index_sha256": hashlib.sha256(index_result.stdout).hexdigest(),
+            "status_sha256": hashlib.sha256(status_result.stdout).hexdigest(),
+            "clean": bool(
+                head_sha == expected_sha
+                and head_tree_sha == index_tree_sha
+                and staged_diff.returncode == 0
+                and worktree_clean.returncode == 0
+                and not status_result.stdout
+                and all(item.get("clean", True) for item in nested)
+            ),
+        }
+    )
+    return (record, *nested)
+
+
 def _capture_initialized_submodules(
     *,
     git_executable: FrozenExecutable,
@@ -840,140 +982,19 @@ def _capture_initialized_submodules(
         raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "The initialized submodule nesting limit was exceeded.")
     records: list[dict[str, Any]] = []
     for local_path, expected_sha in _gitlink_entries(index_bytes):
-        relative = prefix / PurePosixPath(local_path)
         if len(records) + len(visited) >= 64:
             raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "The initialized submodule count limit was exceeded.")
-        submodule_path = repository.joinpath(*PurePosixPath(local_path).parts)
-        if _path_has_symlink_component(submodule_path):
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule path contained a symbolic link.")
-        try:
-            path_observation = submodule_path.lstat()
-        except FileNotFoundError:
-            records.append(
-                {
-                    "path": str(relative),
-                    "expected_head_sha": expected_sha,
-                    "present": False,
-                    "initialized": False,
-                }
-            )
-            continue
-        if not stat.S_ISDIR(path_observation.st_mode):
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree path was not a directory.")
-        git_marker = submodule_path / ".git"
-        try:
-            git_marker_observation = git_marker.lstat()
-        except FileNotFoundError:
-            raise ActionGateError(
-                "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
-                "A present submodule worktree could not be proven initialized or bound to its gitlink.",
-            ) from None
-        except OSError as exc:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory was unavailable.") from exc
-        if stat.S_ISLNK(git_marker_observation.st_mode) or not (stat.S_ISREG(git_marker_observation.st_mode) or stat.S_ISDIR(git_marker_observation.st_mode)):
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule Git directory binding was unsafe.")
-        top_level = _git_command(git_executable, submodule_path, "rev-parse", "--show-toplevel")
-        if top_level.returncode != 0:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule could not be inspected.")
-        try:
-            observed_top_level = Path(os.path.abspath(top_level.stdout.decode("utf-8", "strict").strip()))
-        except (UnicodeDecodeError, ValueError) as exc:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree could not be classified.") from exc
-        if observed_top_level != submodule_path:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "A submodule worktree root was not exact.")
-        identity = (path_observation.st_dev, path_observation.st_ino)
-        if identity in visited:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule cycle was detected.")
-        visited.add(identity)
-        try:
-            audit = _capture_effective_git_config(git_executable, submodule_path)
-        except ActionGateError as exc:
-            raise ActionGateError(
-                "SUBMODULE_GIT_CONFIG_UNAUDITABLE",
-                "An initialized submodule Git configuration could not be audited.",
-            ) from exc
-        record: dict[str, Any] = {
-            "path": str(relative),
-            "expected_head_sha": expected_sha,
-            "present": True,
-            "initialized": True,
-            "directory_identity": [path_observation.st_dev, path_observation.st_ino],
-            "config_sha256": audit.sha256,
-            "config_source_categories": list(audit.source_categories),
-            "credential_risk_categories": list(audit.risk_categories),
-        }
-        if audit.risk_categories:
-            record["clean"] = False
-            records.append(record)
-            continue
-        head = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{commit}")
-        head_tree = _git_command(git_executable, submodule_path, "rev-parse", "--verify", "HEAD^{tree}")
-        index_tree = _git_command(git_executable, submodule_path, "write-tree")
-        index_result = _git_command(git_executable, submodule_path, "ls-files", "--stage", "-z")
-        staged_diff = _git_command(
-            git_executable,
-            submodule_path,
-            "diff",
-            "--cached",
-            "--quiet",
-            "--no-ext-diff",
-            "--no-textconv",
-            "HEAD",
-            "--",
-        )
-        worktree_clean = _git_command(
-            git_executable,
-            submodule_path,
-            "diff",
-            "--quiet",
-            "--no-ext-diff",
-            "--no-textconv",
-            "--",
-        )
-        status_result = _git_command(
-            git_executable,
-            submodule_path,
-            "status",
-            "--porcelain=v1",
-            "-z",
-            "--untracked-files=all",
-        )
-        required = (head, head_tree, index_tree, index_result, status_result)
-        if any(result.returncode != 0 for result in required) or staged_diff.returncode not in {0, 1} or worktree_clean.returncode not in {0, 1}:
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule state could not be read.")
-        head_sha = head.stdout.decode("ascii", "strict").strip()
-        head_tree_sha = head_tree.stdout.decode("ascii", "strict").strip()
-        index_tree_sha = index_tree.stdout.decode("ascii", "strict").strip()
-        if any(_SHA_PATTERN.fullmatch(value) is None for value in (head_sha, head_tree_sha, index_tree_sha)):
-            raise ActionGateError("SUBMODULE_GIT_CONFIG_UNAUDITABLE", "An initialized submodule Git object identifier was invalid.")
-        nested = _capture_initialized_submodules(
+        submodule_records = _capture_initialized_submodule(
             git_executable=git_executable,
             workspace=workspace,
-            repository=submodule_path,
-            prefix=relative,
-            index_bytes=index_result.stdout,
+            repository=repository,
+            prefix=prefix,
+            local_path=local_path,
+            expected_sha=expected_sha,
             visited=visited,
-            depth=depth + 1,
+            depth=depth,
         )
-        record.update(
-            {
-                "head_sha": head_sha,
-                "head_tree_sha": head_tree_sha,
-                "index_tree_sha": index_tree_sha,
-                "index_sha256": hashlib.sha256(index_result.stdout).hexdigest(),
-                "status_sha256": hashlib.sha256(status_result.stdout).hexdigest(),
-                "clean": bool(
-                    head_sha == expected_sha
-                    and head_tree_sha == index_tree_sha
-                    and staged_diff.returncode == 0
-                    and worktree_clean.returncode == 0
-                    and not status_result.stdout
-                    and all(item.get("clean", True) for item in nested)
-                ),
-            }
-        )
-        records.append(record)
-        records.extend(nested)
+        records.extend(submodule_records)
     return tuple(records)
 
 
