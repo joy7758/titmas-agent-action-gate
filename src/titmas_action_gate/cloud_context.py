@@ -837,14 +837,12 @@ class CloudContextInspector:
             policy_freshness = "FUTURE" if invocation_age < 0 else "STALE" if invocation_age > credential.policy_observation_max_age_seconds else "FRESH"
         return policy_freshness, maximum_age_valid
 
-    def _validate_pre_invocation(
+    def _validate_query(
         self,
         request_id: str,
         query: dict[str, Any],
         credential: CloudCredentialContext | None,
         skill: dict[str, Any],
-        policy_freshness: str,
-        maximum_age_valid: bool,
         checked_at: datetime,
     ) -> dict[str, Any] | None:
         try:
@@ -888,6 +886,18 @@ class CloudContextInspector:
                 uncertainty=["QUERY_PARAMETERS_NOT_CONFIRMED"],
                 observed_at=checked_at,
             )
+        return None
+
+    def _validate_policy(
+        self,
+        request_id: str,
+        query: dict[str, Any],
+        credential: CloudCredentialContext | None,
+        skill: dict[str, Any],
+        policy_freshness: str,
+        maximum_age_valid: bool,
+        checked_at: datetime,
+    ) -> dict[str, Any] | None:
         if credential is None:
             return self._base_result(
                 request_id,
@@ -1008,6 +1018,21 @@ class CloudContextInspector:
                 observed_at=checked_at,
             )
         return None
+
+    def _validate_pre_invocation(
+        self,
+        request_id: str,
+        query: dict[str, Any],
+        credential: CloudCredentialContext | None,
+        skill: dict[str, Any],
+        policy_freshness: str,
+        maximum_age_valid: bool,
+        checked_at: datetime,
+    ) -> dict[str, Any] | None:
+        query_result = self._validate_query(request_id, query, credential, skill, checked_at)
+        if query_result:
+            return query_result
+        return self._validate_policy(request_id, query, credential, skill, policy_freshness, maximum_age_valid, checked_at)
 
     def _invoke_runtime(
         self,
