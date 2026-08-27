@@ -19,7 +19,7 @@ from titmas_action_gate.canonical import ExclusiveOutput, format_datetime, sha25
 from titmas_action_gate.cli import main as cli_main
 from titmas_action_gate.evidence import AGENT_EVIDENCE_VERSION, AGENT_EVIDENCE_WHEEL_SHA256, AgentEvidenceAdapter
 from titmas_action_gate.policy import PolicyEngine
-from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _missing_evidence_result, verify_pull_request
+from titmas_action_gate.pr_gate import PUBLIC_EXIT_CODES, _SharedOutputBudget, _missing_evidence_result, verify_pull_request
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "joy7758/titmas-merge-gate-sandbox"
@@ -447,6 +447,30 @@ class CliTests(PullRequestGateTests):
         self.assertEqual(raised.exception.code, PUBLIC_EXIT_CODES["FAIL"])
         self.assertTrue((output / "receipt.json").is_file())
         self.assertTrue((output / "summary.md").is_file())
+
+
+class SharedOutputBudgetTests(unittest.TestCase):
+    def test_observed_bytes(self) -> None:
+        budget = _SharedOutputBudget(limit=10)
+        self.assertEqual(budget.observed_bytes, 0)
+
+        # Test claim returns chunk and observed bytes increments
+        chunk, exceeded = budget.claim(b"1234")
+        self.assertEqual(chunk, b"1234")
+        self.assertFalse(exceeded)
+        self.assertEqual(budget.observed_bytes, 4)
+
+        # Test claim hitting the limit
+        chunk, exceeded = budget.claim(b"567890")
+        self.assertEqual(chunk, b"567890")
+        self.assertFalse(exceeded)
+        self.assertEqual(budget.observed_bytes, 10)
+
+        # Test claim exceeding limit
+        chunk, exceeded = budget.claim(b"extra")
+        self.assertEqual(chunk, b"")
+        self.assertTrue(exceeded)
+        self.assertEqual(budget.observed_bytes, 10)
 
 
 if __name__ == "__main__":
