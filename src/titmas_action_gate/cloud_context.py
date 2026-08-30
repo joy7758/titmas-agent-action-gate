@@ -262,7 +262,8 @@ def _permission_code(stdout: str, stderr: str, *, command_failed: bool) -> str |
         if isinstance(code, str) and (code in PERMISSION_DENIED_CODES or "permission" in code.lower()):
             return code
     fallback = f"{stdout}\n{stderr}" if command_failed else stderr
-    if any(marker.lower() in fallback.lower() for marker in PERMISSION_DENIED_CODES):
+    fallback_lower = fallback.lower()
+    if any(marker.lower() in fallback_lower for marker in PERMISSION_DENIED_CODES):
         return "PERMISSION_DENIED_REDACTED"
     return None
 
