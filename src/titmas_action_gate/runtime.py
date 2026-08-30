@@ -13,7 +13,7 @@ from typing import Any
 
 from .contracts import validate_runtime_scope
 from .errors import AuthenticationError, AuthorizationError, ConflictError, NotFoundError
-from .store import AppendOnlyStore
+from .store import AppendOnlyStore, SecurityEventInput
 
 HUMAN_PRINCIPAL_ID = "titmas-action-gate-reviewer"
 EXECUTE_IN_MEMORY_TOOL = "execute_in_memory_github_action"
@@ -144,14 +144,16 @@ class RuntimeAdmission:
         request_id: str | None = None,
     ) -> dict[str, Any]:
         return self.store.append_security_event(
-            event_id=f"security-{uuid.uuid4().hex}",
-            scope=scope,
-            principal_id=principal.principal_id,
-            tool_name=tool_name,
-            outcome=outcome,
-            reason_code=reason_code,
-            business_state_delta=business_state_delta,
-            details={"request_id": request_id} if request_id else {},
+            SecurityEventInput(
+                event_id=f"security-{uuid.uuid4().hex}",
+                scope=scope,
+                principal_id=principal.principal_id,
+                tool_name=tool_name,
+                outcome=outcome,
+                reason_code=reason_code,
+                business_state_delta=business_state_delta,
+                details={"request_id": request_id} if request_id else {},
+            )
         )
 
     def authorize_tool(self, principal: RuntimePrincipal, tool_name: str, scope: dict[str, Any]) -> dict[str, str]:
